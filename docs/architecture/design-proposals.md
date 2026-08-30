@@ -94,7 +94,7 @@ Use Paru's supported machine-oriented surfaces for selection/planning, inspect a
 | bare search terms | intercept selection → plan → review → execute | may select AUR recipes |
 | `-S <targets>` | intercept unless an explicit trusted repo-only mode proves no AUR build is possible | explicit install may resolve AUR targets/dependencies |
 | bare invocation, `-Su`, `-Syu`, `-Sua` | intercept upgrade flow | may build installed foreign packages |
-| `-B <dirs>`, bare targetless `-U`, path-like sync targets (including `./...`), and targets resolved from PKGBUILD repositories | reject as unsupported in v1 before starting Paru | local paths can invoke makepkg `--printsrcinfo` before `PreBuildCommand`; safe support needs a separate design |
+| `-B <dirs>`, bare targetless `-U`, path-like sync targets (including `./...`), and targets resolved from PKGBUILD repositories | reject as unsupported in v1 before starting Paru | local paths can invoke makepkg `--printsrcinfo` before `PreBuildCommand`; safe support needs a separate design ([ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md)) |
 | `-U <package files/URLs>` | pass-through to Paru/Pacman in v1 | installs package archives, not AUR recipes; package-archive inspection is deferred |
 | `--downloadonly` with AUR target | preserve Paru rejection | Paru 2.1 explicitly rejects this combination |
 | `--noconfirm` with any new AUR decision | reject with AURoscope policy exit | conflicts with default human authority; later automation needs an explicit policy ADR |
@@ -123,7 +123,7 @@ Cancellation is `1` plus empty selection and maps to AURoscope `cancelled`, not 
 
 ### Planning and authoritative origin
 
-1. Paru remains authoritative for AUR/repository origin and dependency classification within supported modes. The classifier interprets user mode selectors but never forwards them blindly: any mode containing `pkgbuilds`/`p` is rejected; repo-only is normalized to a final trusted `--repo`, AUR-only (including `-Sua`) to a final trusted `--aur`, and default/combined repo+AUR to trusted `--repo --mode=aur`. These flags are inserted after user options and before the target separator, so they reset config-provided `PkgbuildsOnly` rather than OR-ing with it. Explicit local build operations and local path targets (`./`, `../`, absolute paths, or `file:`; repository-qualified `repo/pkg` remains valid) fail before any Paru process starts. Any `PKGBUILD` record is a contract violation and aborts.
+1. Paru remains authoritative for AUR/repository origin and dependency classification within supported modes. The classifier interprets user mode selectors but never forwards them blindly: any mode containing `pkgbuilds`/`p` is rejected; repo-only is normalized to a final trusted `--repo`, AUR-only (including `-Sua`) to a final trusted `--aur`, and default/combined repo+AUR to trusted `--repo --mode=aur`. These flags are inserted after user options and before the target separator, so they reset config-provided `PkgbuildsOnly` rather than OR-ing with it. Explicit local build operations and local path targets (`./`, `../`, absolute paths, or `file:`; repository-qualified `repo/pkg` remains valid) fail before any Paru process starts. Any `PKGBUILD` record is a contract violation and aborts. This accepted v1 boundary is defined by [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
 2. For explicit selected targets, use Paru's `paru -P --order -- <targets>` output as a version-gated planning surface. Released `v2.1.0` documents repository records as `INSTALL TARGET|DEP|MAKE <repo> <name>`, while post-release commit `9ac3578` actually emits `REPO TARGET|DEP|MAKE <repo> <name>` from `src/order.rs` although its man page still says `INSTALL`; AUR records remain `AUR TARGET|DEP|MAKE <pkgbase> <names...>`.[1][26]
 3. Parse only the grammar proven for the exact supported build. Reject unknown record kinds, documentation/code mismatches, `MISSING`, and conflicts rather than treating them as harmless. The `--order` spike returned `0` with complete synced databases and `1` plus `MISSING` records when repository databases were absent.
 4. Confirm repository packages independently with Pacman `-S --print --print-format` where a repository transaction is about to run. Pacman's repository order is authoritative.[10]
@@ -625,9 +625,9 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) | Proposed |
 | D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) | Proposed |
 | D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) | Proposed |
-| D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | Proposed |
+| D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | **Accepted:** [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md) |
 | D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) | Proposed |
-| D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) | Proposed |
+| D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) | **Accepted:** [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md) |
 
 Workflow for every decision issue:
 
@@ -654,7 +654,7 @@ Please accept, amend, reject, or defer each item. Recommendations are not yet de
 11. **D11 — XDG/cleanup — Accepted in [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md):** use the exact XDG layout and private ownership/symlink controls above, 24-hour stale-work recovery, and finite configurable retention defaults: 365-day identity/decision/outcome history, 30-day reports/model JSON, 7-day state backups, 14-day or 512-MiB reconstructible recipe cache, and 3-day failed-work metadata.
 12. **D12 — threat/tests:** adopt the stated threat boundary and require real supported-version, race, TOCTOU, and disposable-Arch integration proof before v1. **Recommended: accept.**
 
-13. **D13 — local PKGBUILD builds/repositories:** reject `-B`, targetless `-U`, local path targets, modes containing `pkgbuilds`, and any unexpected PKGBUILD record in v1 because Paru may execute `makepkg --printsrcinfo` before the guard; normalize allowed user modes with final trusted reset flags and design safe local-recipe support separately. **Recommended: accept.**
+13. **D13 — local PKGBUILD builds/repositories — Accepted in [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md):** reject `-B`, targetless `-U`, local path targets, modes containing `pkgbuilds`, and any unexpected PKGBUILD record in v1 because Paru may execute `makepkg --printsrcinfo` before the guard; normalize allowed user modes with final trusted reset flags and design safe local-recipe support separately.
 
 ## Sources
 
