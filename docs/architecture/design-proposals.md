@@ -2,9 +2,9 @@
 
 ## Status and decision protocol
 
-**Status:** Proposed for Mathieu's review. Nothing in this document is accepted merely because it is recommended.
+**Status:** Decision record in progress. Recommendations remain proposed until Mathieu authorizes them individually; accepted items link to their ADR below.
 
-This document intentionally contains no implementation plan and no production code. After Mathieu accepts, rejects, or amends the numbered decisions in [Decision set](#decision-set-for-mathieu), accepted choices will be split into ADRs. Only after the consequential ADRs are accepted may `docs/implementation/initial-plan.md` be written.
+This document intentionally contains no implementation plan and no production code. As Mathieu accepts, rejects, or amends the numbered decisions in [Decision set](#decision-set-for-mathieu), accepted choices are split into ADRs. Only after the consequential ADRs are accepted may `docs/implementation/initial-plan.md` be written.
 
 ## 1. Grounded baseline and proof
 
@@ -618,15 +618,15 @@ Workflow for every issue:
 3. Mathieu gives an explicit **go** for that issue.
 4. Only then may Héphaïstos record the accepted decision in an ADR and close the issue after verifying both effects.
 
-Until step 3, every item below remains **Proposed**. The PR itself is evidence and discussion material, not approval.
+Until step 3 is completed for a given item, that item remains **Proposed**. An accepted item is identified explicitly and linked to its ADR; the PR itself is evidence and discussion material, not approval.
 
-Please accept, amend, reject, or defer each item. Recommendations are not yet decisions.
+Please accept, amend, reject, or defer each unresolved item. Recommendations without an accepted ADR are not decisions.
 
 1. **D1 — Paru compatibility:** require the first stable Paru release containing `d1dfbc4` for production native search selection; use a pinned post-fix commit only in design/test meanwhile. **Recommended: accept.**
 2. **D2 — orchestration:** adopt two-stage Paru planning/review/execution; never parse Paru's human UI or replace its resolver. **Recommended: accept.**
 3. **D3 — upgrades:** review a provisional AUR plan before mutation, execute a complete repository-only `-Syu` phase, then re-plan/revalidate before the independently deferrable AUR phase. **Recommended: accept.**
 4. **D4 — execution/cache and specification amendment:** accept Paru's actual `PreBuildCommand` point as the last recipe-content check before any makepkg/recipe execution (not literally immediately before each build), run with `--skipreview`, and rebuild unless a cached artifact hash is tied to the exact approved identity. This explicitly amends the current wording in `docs/specification.md`; alternatives are to block production pending an upstream per-build hook or add a makepkg proxy. **Recommended: accept the explicit amendment; do not pretend current Paru offers a later hook.**
-5. **D5 — Go process architecture:** one executable, explicit internal packages, standard-library argv/process handling, no CLI framework and no PTY dependency initially. **Recommended: accept.**
+5. **D5 — Go process architecture:** **Accepted.** One executable, explicit internal packages, standard-library argv/process handling, no CLI framework and no PTY dependency initially. Recorded in [ADR-0006](../decisions/0006-go-process-architecture.md).
 6. **D6 — SQLite driver:** use `mattn/go-sqlite3`/CGO for Arch `linux/amd64` v1; revisit pure Go only with real cross-target need. **Recommended: accept.** Alternative: pay binary/dependency cost for `modernc.org/sqlite` now.
 7. **D7 — remaining dependencies:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords` with expansions disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework. **Recommended: accept.**
 8. **D8 — state model:** normalized immutable evidence/history plus explicit transaction/approval/build lifecycle tables; WAL, short writes, application mutator lock, no event-sourcing framework. **Recommended: accept.**
