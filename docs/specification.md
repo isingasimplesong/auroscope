@@ -47,6 +47,8 @@ Planning and execution are separate Paru resolver runs. After review and approva
 
 Official Arch repository upgrades must remain supported, complete transactions. AUR packages may be deferred, together with dependants that cannot safely proceed; the reason must be shown.
 
+AURoscope v1 inspects AUR recipes only. It rejects `-B`, targetless `-U`, local/path-like targets, modes containing `pkgbuilds`, and unexpected PKGBUILD-repository plan records before starting Paru. Supported intercepted flows use final trusted repo/AUR mode-reset flags so a configured PKGBUILD repository cannot enter the transaction implicitly. Explicit `-U` package archives remain a pass-through outside recipe inspection. This boundary is recorded in [`ADR-0014`](decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
+
 ## 4. Recipe identity and acquisition
 
 For each AUR `pkgbase`, AURoscope collects recipe data without sourcing the `PKGBUILD`:
@@ -199,7 +201,8 @@ Accepted design decisions relevant to these constraints are recorded in:
 - [`ADR-0001`](decisions/0001-go-and-self-hosted-arch-packaging.md);
 - [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md);
 - [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md);
-- [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md).
+- [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md);
+- [`ADR-0014`](decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
 
 ## 12. Design before implementation
 
@@ -236,7 +239,8 @@ Deferred:
 - exhaustive upstream-source or compiled-binary analysis;
 - a custom build sandbox;
 - a generic plugin/rule framework;
-- replacement of Paru's resolver.
+- replacement of Paru's resolver;
+- local PKGBUILD builds and configured PKGBUILD repositories.
 
 ## 14. Acceptance criteria
 
