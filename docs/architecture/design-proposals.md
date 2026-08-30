@@ -2,7 +2,7 @@
 
 ## Status and decision protocol
 
-**Status:** Proposed for Mathieu's review. Nothing in this document is accepted merely because it is recommended.
+**Status:** Proposed for Mathieu's review except where an accepted ADR is linked explicitly. A recommendation alone is never acceptance.
 
 This document intentionally contains no implementation plan and no production code. After Mathieu accepts, rejects, or amends the numbered decisions in [Decision set](#decision-set-for-mathieu), accepted choices will be split into ADRs. Only after the consequential ADRs are accepted may `docs/implementation/initial-plan.md` be written.
 
@@ -206,7 +206,7 @@ This is one executable and one process except for deliberate external commands. 
 - larger measured binary and dependency graph;
 - current tested version requires Go 1.25+, which current Arch satisfies but the present host Go 1.24.4 does not without toolchain download.[21]
 
-**Recommendation:** `mattn/go-sqlite3` for v1. It fits the single target, is materially smaller in the spike, and avoids 24 extra modules. Reconsider a pure-Go driver when cross-target releases become a real requirement. Pin exact module and SQLite compile options; verify `PRAGMA foreign_keys`, WAL, busy timeout, integrity check, and backup/restore in tests.
+**Accepted in [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md):** `mattn/go-sqlite3 v1.14.50` with CGO for v1. It fits the single target, is materially smaller in the spike, and avoids 24 extra modules. Reconsider a pure-Go driver when cross-target releases become a real requirement. Pin the exact module and SQLite compile options; verify `PRAGMA foreign_keys`, WAL, busy timeout, migrations, integrity/corruption handling, backup/restore, and concurrency in tests.
 
 ### Other proposed dependencies
 
@@ -338,6 +338,8 @@ The accepted specification currently says `PreBuildCommand` verifies "immediatel
 - **Option A — amend the guarantee to the actual security boundary:** the hook is the final complete recipe-content verification before Paru invokes any makepkg/recipe code; `--skipreview` removes Paru's later edit path, and the manifest is computed twice around the atomic claim. Repository dependency installation may occur later. **Recommended**, because no hostile recipe code runs in the interval and the remaining same-UID race is already explicit.
 - **Option B — require an upstream Paru per-build hook:** preserves the literal wording, but blocks production on an upstream change and still cannot defeat a malicious same-UID process after return.
 - **Option C — interpose an AURoscope makepkg proxy:** can reverify immediately before every makepkg invocation, but becomes a materially broader process boundary, must handle multiple source/prepare/build invocations and VCS `pkgver()` mutations, and needs separate chroot handling. Defer unless Mathieu rejects Option A.
+
+**Decision:** Option A was accepted on 2026-08-30. The guard is the final complete recipe-identity verification after AURoscope review and before any recipe-supplied code executes; it is not represented as adjacent to each build. See [`ADR-0005`](../decisions/0005-recipe-identity-guard-boundary.md).
 
 ### Limits and residual risk
 
@@ -600,9 +602,9 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D1 — Paru compatibility | [#2](https://git.2027a.net/2027a/auroscope/issues/2) |
 | D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) |
 | D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) |
-| D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) |
+| D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) — accepted in [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md) |
 | D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) |
-| D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) |
+| D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) — accepted in [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md) |
 | D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) |
 | D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) |
 | D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) |
@@ -619,7 +621,7 @@ Workflow for every decision issue:
 4. The watcher then transfers responsibility to `Agent/Hermes` and creates an idempotent decision-finalization task. Only then may Héphaïstos record the decision in an ADR, update design/specification documents, verify the remote commit/PR, comment the evidence, and close the issue.
 5. `GO DECISION` never authorizes production implementation or the implementation plan. Any resulting work requires a separate issue starting with `MODE: EXECUTION`.
 
-Issues without an exact mode marker fall back to a single existing routing label; missing or conflicting routing is classified `Agent/Needs Review` and executes nothing. Until step 3, every decision remains **Proposed**. The PR itself is evidence and discussion material, not approval.
+Issues without an exact mode marker fall back to a single existing routing label; missing or conflicting routing is classified `Agent/Needs Review` and executes nothing. Until step 3 is complete for a given decision, that item remains **Proposed**. The PR itself is evidence and discussion material, not approval.
 
 Please accept, amend, reject, or defer each item. Recommendations are not yet decisions.
 
@@ -628,7 +630,7 @@ Please accept, amend, reject, or defer each item. Recommendations are not yet de
 3. **D3 — upgrades:** review a provisional AUR plan before mutation, execute a complete repository-only `-Syu` phase, then re-plan/revalidate before the independently deferrable AUR phase. **Recommended: accept.**
 4. **D4 — execution/cache and specification amendment:** accept Paru's actual `PreBuildCommand` point as the last recipe-content check before any makepkg/recipe execution (not literally immediately before each build), run with `--skipreview`, and rebuild unless a cached artifact hash is tied to the exact approved identity. This explicitly amends the current wording in `docs/specification.md`; alternatives are to block production pending an upstream per-build hook or add a makepkg proxy. **Recommended: accept the explicit amendment; do not pretend current Paru offers a later hook.**
 5. **D5 — Go process architecture:** one executable, explicit internal packages, standard-library argv/process handling, no CLI framework and no PTY dependency initially. **Recommended: accept.**
-6. **D6 — SQLite driver:** use `mattn/go-sqlite3`/CGO for Arch `linux/amd64` v1; revisit pure Go only with real cross-target need. **Recommended: accept.** Alternative: pay binary/dependency cost for `modernc.org/sqlite` now.
+6. **D6 — SQLite driver — Accepted:** use `mattn/go-sqlite3 v1.14.50` with CGO for Arch `linux/amd64` v1; revisit pure Go only with real cross-target need. Record: [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md).
 7. **D7 — remaining dependencies:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords` with expansions disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework. **Recommended: accept.**
 8. **D8 — state model:** normalized immutable evidence/history plus explicit transaction/approval/build lifecycle tables; WAL, short writes, application mutator lock, no event-sourcing framework. **Recommended: accept.**
 9. **D9 — approval protocol:** transaction/process/workspace-bound one-shot approvals, 30-minute default expiry, atomic claim, all terminal states invalidate leftovers, explicit same-UID residual risk, and human approval remains representable after visibly recorded partial/failed analysis. **Recommended: accept.**
