@@ -35,7 +35,7 @@ auroscope <other Paru arguments>
 
 ## 3. Transaction planning
 
-Before changing the system, AURoscope identifies:
+Before any AUR recipe is built, AURoscope identifies:
 
 - explicit targets and relevant dependencies;
 - each package's authoritative origin;
@@ -43,9 +43,9 @@ Before changing the system, AURoscope identifies:
 - inspections that can be reused and candidates requiring review;
 - dependency consequences of deferring or rejecting a recipe.
 
-Planning and execution are separate Paru resolver runs. After review and approval, Paru resolves the transaction again; AURoscope compares the resulting versions, origins, dependencies, and recipe identities with the approved plan. Any drift stops execution and returns the transaction to review. Only versioned, contract-tested Paru output may be parsed; human-facing output is excluded except for ADR-0002's isolated, temporary, fail-closed Paru 2.1.0 selection adapter. Paru remains the resolver. These boundaries are recorded in [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md) and [`ADR-0003`](decisions/0003-multi-stage-paru-orchestration.md).
+For intercepted AUR work, planning and execution are separate Paru resolver runs. After review and approval, Paru resolves the AUR transaction again; AURoscope compares the resulting versions, origins, dependencies, and recipe identities with the approved plan. Any drift stops execution and returns the transaction to review. Only versioned, contract-tested Paru output may be parsed; human-facing output is excluded except for ADR-0002's isolated, temporary, fail-closed Paru 2.1.0 selection adapter. Paru remains the resolver. These boundaries are recorded in [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md) and [`ADR-0003`](decisions/0003-multi-stage-paru-orchestration.md).
 
-Official Arch repository upgrades must remain supported, complete transactions. AUR packages may be deferred, together with dependants that cannot safely proceed; the reason must be shown.
+Normal system upgrades are explicitly phased. AURoscope first runs the complete official repository upgrade with native Paru/Pacman behavior (`paru -Syu --repo` or a contract-tested equivalent), without an added AURoscope audit or approval layer and without excluding official packages. Only after that phase succeeds does it query, plan, inspect, and request decisions for AUR updates against the resulting system state. There is no provisional AUR review before the official upgrade. AUR packages may then be deferred, together with dependants that cannot safely proceed; the reason must be shown. This sequencing is recorded in [`ADR-0004`](decisions/0004-official-upgrade-before-aur-review.md).
 
 AURoscope v1 inspects AUR recipes only. It rejects `-B`, targetless `-U`, local/path-like targets, modes containing `pkgbuilds`, and unexpected PKGBUILD-repository plan records before starting Paru. Supported intercepted flows use final trusted repo/AUR mode-reset flags so a configured PKGBUILD repository cannot enter the transaction implicitly. Explicit `-U` package archives remain a pass-through outside recipe inspection. This boundary is recorded in [`ADR-0014`](decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
 
@@ -138,7 +138,7 @@ If the user modifies recipe content, the prior identity and approval are invalid
 
 ## 9. Execution and TOCTOU guard
 
-After human decisions, AURoscope delegates the executable plan to Paru/Pacman. Deferred or rejected AUR recipes and impossible dependants are omitted with an explanation; official repository upgrades are not fragmented into unsupported partial upgrades.
+After human decisions for the AUR phase, AURoscope delegates the executable AUR plan to Paru/Pacman. Deferred or rejected AUR recipes and impossible dependants are omitted with an explanation. The preceding official repository phase is never fragmented into an unsupported partial upgrade; if it fails or is cancelled, AURoscope preserves that result and does not start the AUR phase.
 
 Paru's `PreBuildCommand` remains a narrow guard only. After AURoscope review and before any recipe-supplied code is executed, it performs the last complete identity check of every planned recipe against a live AURoscope approval. The check covers the reviewed commit, tree, tracked-file manifest, and file hashes; any divergence aborts the operation and returns the recipe to review.
 
@@ -210,6 +210,7 @@ Accepted design decisions relevant to these constraints are recorded in:
 
 - [`ADR-0001`](decisions/0001-go-and-self-hosted-arch-packaging.md);
 - [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md);
+- [`ADR-0004`](decisions/0004-official-upgrade-before-aur-review.md);
 - [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md);
 - [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md);
 - [`ADR-0010`](decisions/0010-one-shot-approval-protocol.md);
