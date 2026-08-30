@@ -182,16 +182,22 @@ The default status view reports at least:
 - Beyond the SQLite driver, the accepted initial direct dependencies are `github.com/pelletier/go-toml/v2` for strict TOML configuration and `github.com/mattn/go-shellwords v1.0.14` only for non-expanding `$VISUAL`/`$EDITOR` argv parsing. Migrations, LLM validation/client code, and logging use the standard library; no PTY or framework dependency is added without demonstrated need.
 - The initial Arch distribution is a self-hosted AUR-style PKGBUILD repository. Publishing to `aur.archlinux.org` is deferred. Go should be a build dependency rather than a runtime dependency where feasible.
 - SQLite remains the authoritative durable state store. The Arch `linux/amd64` v1 uses pinned `github.com/mattn/go-sqlite3` with CGO; schema, migrations, concurrency, and recovery remain separate design-phase decisions.
-- Standard roots are:
+- The accepted concrete storage layout is:
 
 ```text
-${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/
-${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/
-${XDG_CACHE_HOME:-$HOME/.cache}/auroscope/
-${TMPDIR:-/tmp}/auroscope-*/
+${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.toml                  0600
+${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/state.db                0600
+${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/reports/YYYY/MM/...     0600 files, 0700 dirs
+${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/backups/                 0700
+${XDG_CACHE_HOME:-$HOME/.cache}/auroscope/recipes/<source>/<pkgbase>/    0700 root
+${XDG_CACHE_HOME:-$HOME/.cache}/auroscope/model/                         0700, optional
+${XDG_RUNTIME_DIR}/auroscope/<transaction>/                              preferred, 0700
+${TMPDIR:-/tmp}/auroscope-<uid>-<random>/<transaction>/                  fallback, 0700
 ```
 
-- Temporary clones and downloaded audit inputs must be private, bounded, and removed after success, error, interruption, or cancellation. Stale crash residue must be recoverably cleaned. `/tmp` is not assumed to be RAM; no accumulation is the invariant.
+- AURoscope uses umask `0077`, private roots, and `0600` sensitive files including SQLite `-wal`/`-shm`. It rejects relative roots, unsafe ownership or group/world-writable roots, and symlinks at sensitive final components. If a safe `XDG_RUNTIME_DIR` is unavailable, it uses an unpredictable private `os.MkdirTemp` fallback under `$TMPDIR`; `/tmp` is not assumed to be RAM.
+- Temporary clones and downloaded audit inputs are removed after success, error, interruption, or cancellation. Descriptor-relative no-follow recovery cross-checks recorded UID, device/inode, and PID plus process start time before removing stale direct children; active work is never removed, and stale runtime handoffs have a 24-hour grace period.
+- Default retention is finite and configurable: 365 days for recipe identities, human decisions, and build/install outcomes; 30 days for reports and retained model JSON; 7 days for SQLite backups; 14 days or 512 MiB LRU for reconstructible recipe cache, whichever limit is reached first; and 3 days for failed-work metadata. No category defaults to unlimited retention or disabled purge.
 - Human-readable status is generated from SQLite. Markdown and JSON exports are snapshots, never a second state source.
 
 Accepted design decisions relevant to these constraints are recorded in:
@@ -199,7 +205,8 @@ Accepted design decisions relevant to these constraints are recorded in:
 - [`ADR-0001`](decisions/0001-go-and-self-hosted-arch-packaging.md);
 - [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md);
 - [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md);
-- [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md).
+- [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md);
+- [`ADR-0012`](decisions/0012-xdg-layout-permissions-retention.md).
 
 ## 12. Design before implementation
 
