@@ -242,47 +242,42 @@ This is one executable and one process except for deliberate external commands. 
 
 - **Event log only:** excellent audit trail, awkward status queries and invariant enforcement.
 - **Mutable current-state tables only:** simple queries, weak history and replay evidence.
-- **Normalized immutable evidence/history plus explicit mutable lifecycle rows:** recommended balance.
+- **Normalized immutable evidence/history plus explicit mutable lifecycle rows:** accepted balance, constrained to concrete v1 needs.
 
-### Proposed schema
+**Decision:** the scope-narrowed third option was accepted on 2026-08-30. The database is an instrumental product model, not a generic event store: a table or column enters v1 only when it directly serves exact identity/anti-TOCTOU, inspection evidence, an explicit human decision, readable status, or crash recovery, and has a concrete product read or testable invariant. See [`ADR-0009`](../decisions/0009-minimal-sqlite-state-model.md).
 
-All IDs are opaque 128-bit random values stored as 16-byte BLOBs; timestamps are UTC Unix milliseconds. Enums use `TEXT CHECK (...)`. All foreign keys are enforced.
+### Accepted minimal schema boundary
 
-- `schema_migrations(version INTEGER PRIMARY KEY, applied_at, sha256)`
-- `package_bases(id, source_kind, source_namespace, pkgbase, created_at, UNIQUE(source_kind, source_namespace, pkgbase))`
-- `recipe_identities(id, package_base_id, commit_oid, tree_oid, manifest_sha256, created_at, UNIQUE(package_base_id, commit_oid, manifest_sha256))`
-- `recipe_files(recipe_identity_id, path_bytes, mode, object_type, size, sha256, git_blob_oid, symlink_target_bytes, PRIMARY KEY(recipe_identity_id, path_bytes))`
-- `inspections(id, recipe_identity_id, baseline_identity_id, scanner_schema, scanner_version, status, advisory_signal, context_manifest_sha256, started_at, completed_at, error_code)`
-- `deterministic_findings(id, inspection_id, rule_id, rule_version, severity, path_bytes, line, byte_start, byte_end, evidence_sha256, evidence_text)`; append-only
-- `llm_assessments(id, inspection_id, contract_version, provider, model, prompt_sha256, request_manifest_sha256, response_sha256, status, advisory_level, summary, raw_json, started_at, completed_at)`
-- `human_decisions(id, inspection_id, actor_uid, action, note, created_at)`; append-only, action in `approve|inspect|defer|reject`
-- `transactions(id, cwd_bytes, wrapper_version, paru_version, pacman_version, state, owner_uid, wrapper_pid, wrapper_start_ticks, created_at, updated_at, terminal_error)`
-- `transaction_args(transaction_id, ordinal, arg_bytes, PRIMARY KEY(transaction_id, ordinal))`
-- `transaction_recipes(transaction_id, package_base_id, recipe_identity_id, role, disposition, dependency_reason, PRIMARY KEY(transaction_id, package_base_id))`
-- `approvals(id, transaction_id, inspection_id, decision_id, recipe_identity_id, workspace_dev, workspace_ino, manifest_sha256, expires_at, state, claimed_at, consumed_at, invalidated_at, UNIQUE(transaction_id, recipe_identity_id))`; `decision_id` must reference an `approve` action for the same inspection
-- `process_sessions(transaction_id PRIMARY KEY, paru_pid, paru_start_ticks, paru_exe_dev, paru_exe_ino, started_at, ended_at)`
-- `builds(id, transaction_id, recipe_identity_id, approval_id, status, started_at, completed_at, child_exit, child_signal)`
-- `package_artifacts(id, build_id, pkgname, version, arch, path_bytes, size, sha256, signature_status, UNIQUE(build_id, sha256))`
-- `install_outcomes(id, transaction_id, artifact_id, status, pacman_exit, installed_at)`
+- migrations: `schema_migrations`;
+- recipe identity: `package_bases`, `recipe_identities`, `recipe_files`;
+- inspection and decision: `inspections`, `deterministic_findings`, `human_decisions`;
+- execution and guard: `transactions`, `transaction_args`, `transaction_recipes`, `approvals`, `process_sessions`;
+- outcome evidence: `builds`, `package_artifacts`, `install_outcomes`.
 
-`path_bytes`, `arg_bytes`, and `cwd_bytes` must have reversible representations; do not assume hostile Git filenames or Unix argv are UTF-8. Reports render escaped display strings separately. Critical cross-row invariants are enforced both by composite foreign keys/unique indexes where SQLite can express them and by transactional triggers/store checks: approval, decision, inspection, and recipe identity must match; only an `approve` decision can arm approval; lifecycle transitions are monotonic.
+`llm_assessments` is created only by the migration that delivers the LLM assessment feature. Report-retention data and every later persistence addition follow the same rule: grow through a forward migration only with a real workflow, query, and invariant.
 
-### Lifecycle and transactions
+### Accepted invariants
 
-```text
-transaction: planning → reviewing → ready → executing → succeeded
-                                      ↘ cancelled|failed
-approval:    armed → claimed → consumed
-               ↘ invalidated|expired
-inspection:  running → complete|partial|failed
-```
+- Enforce foreign keys and one coherent identity → inspection → human decision → approval chain.
+- Arm an approval only from a human `approve` decision for the same inspection and recipe identity.
+- Make `armed → claimed` atomic and one-shot; all lifecycle transitions are monotonic.
+- Reuse no package artifact without a successful build tied to the exact identity and recorded artifact hash.
+- Preserve recipe paths, process arguments, and working directories as reversible bytes; escaped text is display-only.
 
-- Use WAL for normal local-filesystem operation, `foreign_keys=ON`, `busy_timeout=5000`, `synchronous=FULL` for approval state, and one short write transaction at a time.[15][16][17] Run a locking/WAL self-test when initializing the DB; do not place authoritative state on a network filesystem that cannot provide SQLite's required shared-memory/locking semantics.
-- AURoscope takes an application lock file under runtime state to prevent two interactive mutating wrappers. SQLite still permits read-only status commands.
-- Never hold a SQLite transaction while waiting on Paru, the model, editor, or user.
-- Migrations are embedded, checksummed, monotonic, and applied under an exclusive application lock. No down-migration promise in v1; backup before migration and support restore.
-- On startup: check `PRAGMA quick_check`, expire stale approvals, mark orphaned running transactions interrupted after validating PID+start time, and clean only work owned by those recorded transactions.
-- Retain recipe identities, decisions, build/install outcomes, and compact findings by policy; purge raw LLM payloads/reports earlier. Never purge an identity referenced by an approval or installed artifact record.
+Exact columns must be justified by these needs rather than copied speculatively from the earlier sketch. Composite keys, constraints, triggers, or transactional store checks may enforce cross-row invariants, but their SQL form belongs to the implementation and migration tests.
+
+Explicitly deferred are a generic event table or replay framework, generic provenance/EAV/plugin schemas, distributed orchestration, authoritative state on a network filesystem, v1 down migrations, and fields kept merely "just in case." Concurrency, crash, migration, byte-round-trip, and artifact-reuse tests remain mandatory before implementation is considered complete.
+
+### Operational mechanics still proposed
+
+The C-minimal acceptance does not turn every earlier tuning and retention recommendation into an accepted schema requirement. The current operational proposal remains:
+
+- use WAL for normal local-filesystem operation, `foreign_keys=ON`, `busy_timeout=5000`, `synchronous=FULL` for approval state, and one short write transaction at a time.[15][16][17]
+- run a locking/WAL self-test when initializing the database and reject authoritative state on network filesystems that cannot provide SQLite's required shared-memory/locking semantics;
+- take an application lock under runtime state to prevent two interactive mutating wrappers while still permitting read-only status commands;
+- never hold a SQLite transaction while waiting on Paru, the model, an editor, or the user;
+- embed, checksum, and apply ordered forward migrations under an exclusive application lock, with backup before migration and restore support;
+- on startup, run `PRAGMA quick_check`, expire stale approvals, validate PID plus start time before marking orphaned transactions interrupted, and clean only work owned by recorded transactions.
 
 ### Accepted retention defaults
 
@@ -293,6 +288,8 @@ inspection:  running → complete|partial|failed
 - failed temporary-work metadata: 3 days while actual private temp trees are removed at recovery;
 - all thresholds are configurable, but none defaults to unlimited retention or disabled purge;
 - `VACUUM` only as an explicit maintenance action; routine purge uses incremental vacuum if configured.
+
+No purge may delete an identity referenced by a live transaction, approval, or retained build/install outcome. These limits and the concrete XDG/cleanup boundary are accepted separately in [`ADR-0012`](../decisions/0012-xdg-layout-permissions-retention.md).
 
 ## 5. Approval and anti-TOCTOU protocol
 
@@ -545,7 +542,7 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) | Proposed |
 | D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) | **Accepted:** [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md) |
 | D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) | **Accepted:** [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md) |
-| D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) | Proposed |
+| D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) | **Accepted:** [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md) |
 | D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) | Proposed |
 | D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) | Proposed |
 | D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | **Accepted:** [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md) |
@@ -571,7 +568,7 @@ Please accept, amend, reject, or defer each item. Recommendations are not yet de
 5. **D5 — Go process architecture:** one executable, explicit internal packages, standard-library argv/process handling, no CLI framework and no PTY dependency initially. **Recommended: accept.**
 6. **D6 — SQLite driver — Accepted:** use `mattn/go-sqlite3 v1.14.50` with CGO for Arch `linux/amd64` v1; revisit pure Go only with real cross-target need. Record: [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md).
 7. **D7 — remaining dependencies — Accepted:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords v1.0.14` with environment and backtick expansion disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework or PTY dependency without demonstrated need. See [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md).
-8. **D8 — state model:** normalized immutable evidence/history plus explicit transaction/approval/build lifecycle tables; WAL, short writes, application mutator lock, no event-sourcing framework. **Recommended: accept.**
+8. **D8 — state model — Accepted in [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md):** normalized immutable evidence/decisions plus only the mutable lifecycle rows required for identity, inspection, human authority, status, and recovery; no generic event-sourcing, provenance, EAV, plugin, or speculative schema.
 9. **D9 — approval protocol:** transaction/process/workspace-bound one-shot approvals, 30-minute default expiry, atomic claim, all terminal states invalidate leftovers, explicit same-UID residual risk, and human approval remains representable after visibly recorded partial/failed analysis. **Recommended: accept.**
 10. **D10 — scanner/LLM:** immutable versioned deterministic findings; inference-only optional LLM with no decision field/tools; model failure pauses for human but does not autonomously veto. **Recommended: accept.**
 11. **D11 — XDG/cleanup — Accepted in [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md):** use the exact XDG layout and private ownership/symlink controls above, 24-hour stale-work recovery, and finite configurable retention defaults: 365-day identity/decision/outcome history, 30-day reports/model JSON, 7-day state backups, 14-day or 512-MiB reconstructible recipe cache, and 3-day failed-work metadata.
