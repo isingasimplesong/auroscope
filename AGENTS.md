@@ -19,5 +19,6 @@ Rules:
 - Prefer small, explicit, boring architecture. Dependencies must be minimal and justified, but do not reimplement fundamental components to chase a zero-dependency slogan.
 - Consult `https://git.2027a.net/2027a/paru-llm-audit` only for targeted historical lessons and fixtures. It is archived and is not the implementation base.
 - Use branches and Forgejo PRs for issue-driven work. Never merge a PR or silently settle a product decision for Mathieu.
+- Forgejo decision issues start with `MODE: DECISION`. Ordinary comments continue discussion only; exact standalone `GO DECISION` from Mathieu authorizes ADR/docs finalization and closure, never production implementation. Executable work must use a separate `MODE: EXECUTION` issue.
 - Every design proposal must state options, trade-offs, recommendation, unresolved risks, and evidence/spikes used.
 - Only after accepted ADRs cover the important boundaries should `docs/implementation/initial-plan.md` be created.

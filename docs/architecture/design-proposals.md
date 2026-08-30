@@ -611,14 +611,15 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) |
 | D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) |
 
-Workflow for every issue:
+Workflow for every decision issue:
 
-1. Mathieu replies with his chosen option, amendment, or rejection.
-2. Héphaïstos restates the resulting decision in the issue; the reply alone does not accept or close it.
-3. Mathieu gives an explicit **go** for that issue.
-4. Only then may Héphaïstos record the accepted decision in an ADR and close the issue after verifying both effects.
+1. The issue body starts with the exact first-line marker `MODE: DECISION`; the watcher keeps it under `Agent/Human` and never starts implementation.
+2. Mathieu replies with his chosen option, amendment, question, or rejection. Each new ordinary comment creates only a bounded scratch discussion task: Héphaïstos may answer in the issue but may not edit the repository, create an ADR/PR, close the issue, or implement code.
+3. When the latest concrete proposal is accepted, Mathieu posts a comment whose entire trimmed content is exactly `GO DECISION`. The watcher accepts it only from Mathieu's pinned Forgejo login and numeric user ID, and only when it is the latest external comment.
+4. The watcher then transfers responsibility to `Agent/Hermes` and creates an idempotent decision-finalization task. Only then may Héphaïstos record the decision in an ADR, update design/specification documents, verify the remote commit/PR, comment the evidence, and close the issue.
+5. `GO DECISION` never authorizes production implementation or the implementation plan. Any resulting work requires a separate issue starting with `MODE: EXECUTION`.
 
-Until step 3, every item below remains **Proposed**. The PR itself is evidence and discussion material, not approval.
+Issues without an exact mode marker fall back to a single existing routing label; missing or conflicting routing is classified `Agent/Needs Review` and executes nothing. Until step 3, every decision remains **Proposed**. The PR itself is evidence and discussion material, not approval.
 
 Please accept, amend, reject, or defer each item. Recommendations are not yet decisions.
 
