@@ -43,6 +43,8 @@ Before changing the system, AURoscope identifies:
 - inspections that can be reused and candidates requiring review;
 - dependency consequences of deferring or rejecting a recipe.
 
+Planning and execution are separate Paru resolver runs. After review and approval, Paru resolves the transaction again; AURoscope compares the resulting versions, origins, dependencies, and recipe identities with the approved plan. Any drift stops execution and returns the transaction to review. Only versioned, contract-tested machine-oriented Paru output may be parsed; the human-facing menu is never parsed, and Paru remains the resolver. This boundary is recorded in [`ADR-0003`](decisions/0003-multi-stage-paru-orchestration.md).
+
 Official Arch repository upgrades must remain supported, complete transactions. AUR packages may be deferred, together with dependants that cannot safely proceed; the reason must be shown.
 
 ## 4. Recipe identity and acquisition

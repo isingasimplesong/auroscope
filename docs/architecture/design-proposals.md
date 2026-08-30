@@ -76,6 +76,8 @@ Use Paru's supported machine-oriented surfaces for selection/planning, inspect a
 
 **Recommendation:** Option B, with explicit compatibility gates and no parsing of human UI.
 
+**Decision:** Option B was accepted on 2026-08-30. Paru remains responsible for selection, resolution, build, and installation across separate planning and execution runs; any drift from the reviewed plan returns to review. See [`ADR-0003`](../decisions/0003-multi-stage-paru-orchestration.md).
+
 #### Option C — link to or reimplement Paru/libalpm internals
 
 **Advantage:** richer typed plan.
@@ -600,7 +602,7 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | Decision | Issue |
 |---|---|
 | D1 — Paru compatibility | [#2](https://git.2027a.net/2027a/auroscope/issues/2) |
-| D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) |
+| D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) — accepted in [ADR-0003](../decisions/0003-multi-stage-paru-orchestration.md) |
 | D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) |
 | D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) — accepted in [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md) |
 | D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) |
