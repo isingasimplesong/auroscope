@@ -4,7 +4,7 @@
 
 **Status:** Proposed for Mathieu's review except where an accepted ADR is linked explicitly. A recommendation alone is never acceptance.
 
-This document intentionally contains no implementation plan and no production code. After Mathieu accepts, rejects, or amends the numbered decisions in [Decision set](#decision-set-for-mathieu), accepted choices will be split into ADRs. Only after the consequential ADRs are accepted may `docs/implementation/initial-plan.md` be written.
+This document intentionally contains no implementation plan and no production code. As Mathieu accepts, rejects, or amends the numbered decisions in [Decision set](#decision-set-for-mathieu), accepted choices are split into ADRs. Only after the consequential ADRs are accepted may `docs/implementation/initial-plan.md` be written.
 
 ## 1. Grounded baseline and proof
 
@@ -74,7 +74,7 @@ Use Paru's supported machine-oriented surfaces for selection/planning, inspect a
 - current stable Paru 2.1 cannot cleanly separate menu output from selected targets;
 - no single documented Paru JSON transaction-plan API exists.
 
-**Recommendation:** Option B, with explicit compatibility gates and no parsing of human UI.
+**Recommendation:** Option B, with explicit compatibility gates and no durable parsing of human UI beyond ADR-0002's strictly bounded transitional 2.1.0 adapter.
 
 **Decision:** Option B was accepted on 2026-08-30. Paru remains responsible for selection, resolution, build, and installation across separate planning and execution runs; any drift from the reviewed plan returns to review. See [`ADR-0003`](../decisions/0003-multi-stage-paru-orchestration.md).
 
@@ -119,7 +119,7 @@ The menu inherits the real terminal through stderr; stdout is captured as newlin
 
 Cancellation is `1` plus empty selection and maps to AURoscope `cancelled`, not `failed`.
 
-**Compatibility blocker:** released Paru 2.1.0 does not provide the required stream separation; commit `d1dfbc4` does, but no stable tag contains it.[5][6] Do not parse the menu. Development may use a pinned `paru-git`/upstream commit, but production support should require the first stable release containing that fix and pass a startup contract probe.
+**Accepted compatibility boundary:** the durable target is the first stable Paru release containing `d1dfbc4`, but Paru 2.1.0 may be supported meanwhile by an isolated, explicitly temporary adapter for its verified combined stdout format.[5][6] That adapter must accept only bounded, unambiguous tested output and fail closed on format or locale divergence. A pinned `paru-git`/upstream commit remains limited to design, development, and contract tests. Both adapters require executable capability tests; the version string alone is insufficient. See [ADR-0002](../decisions/0002-paru-native-selection-compatibility.md).
 
 ### Planning and authoritative origin
 
@@ -162,8 +162,8 @@ Keeps one combined flow, but refresh may occur before AUR review, failure after 
 
 - Pacman/makepkg: support `7.1.x` initially; test both upstream `v7.1.0` and Arch's packaged patch level.
 - Paru execution features: `2.1.0-2` behavior is the inspected floor for planning/guard mechanics.
-- Paru native selection capture: require a stable release containing `d1dfbc4`; until it exists, bare-search production support is blocked rather than emulated.
-- At startup, verify `paru --version`, `pacman --version`, and `makepkg --version`; run feature-level contract tests in release CI. Version strings alone cannot distinguish patched Paru 2.1 builds.
+- Paru native selection capture: the durable floor is the first stable release containing `d1dfbc4`; until it exists and passes the capability matrix, allow a strictly bounded temporary adapter for verified Paru 2.1.0 output.
+- At startup, verify `paru --version`, `pacman --version`, and `makepkg --version`; run feature-level contract tests in release CI. Version strings alone cannot distinguish patched Paru 2.1 builds, and the temporary adapter must reject output outside its tested grammar.
 
 ## 3. Go architecture and direct dependencies
 
@@ -587,7 +587,7 @@ Use disposable Arch containers/VMs with private Pacman DB/root and synthetic loc
 
 ## 10. Unresolved risks and explicit non-goals
 
-- Current stable Paru does not satisfy clean native selection capture. This is a real upstream compatibility blocker, not a parser exercise.
+- Current stable Paru does not satisfy clean native selection capture. ADR-0002 permits a temporary fail-closed 2.1.0 parser, but format and locale drift can disable that adapter; the clean durable contract still depends on a stable release containing `d1dfbc4`.
 - Paru lacks a stable JSON plan API; its documented text grammar must be contract-tested and version-gated.
 - Transaction-specific config layering is grounded in Paru's parser, but still needs an executable spike for nested includes, repeated sections, whitespace paths, and preservation of every supported user option before ADR acceptance.
 - Same-UID post-guard mutation cannot be fully prevented without moving execution to an immutable/sandboxed snapshot; v1 must state this limit.
@@ -599,21 +599,21 @@ Use disposable Arch containers/VMs with private Pacman DB/root and synthetic loc
 
 Each decision is tracked in a dedicated Forgejo issue containing its context, evidence, alternatives, trade-offs, recommendation, risks, and expected reply:
 
-| Decision | Issue |
-|---|---|
-| D1 — Paru compatibility | [#2](https://git.2027a.net/2027a/auroscope/issues/2) |
-| D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) — accepted in [ADR-0003](../decisions/0003-multi-stage-paru-orchestration.md) |
-| D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) |
-| D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) — accepted in [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md) |
-| D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) |
-| D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) — accepted in [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md) |
-| D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) |
-| D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) |
-| D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) |
-| D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) |
-| D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) |
-| D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) |
-| D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) |
+| Decision | Issue | Status |
+|---|---|---|
+| D1 — Paru compatibility | [#2](https://git.2027a.net/2027a/auroscope/issues/2) | **Accepted:** [ADR-0002](../decisions/0002-paru-native-selection-compatibility.md) |
+| D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) | **Accepted:** [ADR-0003](../decisions/0003-multi-stage-paru-orchestration.md) |
+| D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) | Proposed |
+| D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) | **Accepted:** [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md) |
+| D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) | Proposed |
+| D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) | **Accepted:** [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md) |
+| D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) | **Accepted:** [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md) |
+| D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) | Proposed |
+| D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) | Proposed |
+| D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) | Proposed |
+| D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | Proposed |
+| D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) | Proposed |
+| D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) | Proposed |
 
 Workflow for every decision issue:
 
@@ -623,17 +623,17 @@ Workflow for every decision issue:
 4. The watcher then transfers responsibility to `Agent/Hermes` and creates an idempotent decision-finalization task. Only then may Héphaïstos record the decision in an ADR, update design/specification documents, verify the remote commit/PR, comment the evidence, and close the issue.
 5. `GO DECISION` never authorizes production implementation or the implementation plan. Any resulting work requires a separate issue starting with `MODE: EXECUTION`.
 
-Issues without an exact mode marker fall back to a single existing routing label; missing or conflicting routing is classified `Agent/Needs Review` and executes nothing. Until step 3 is complete for a given decision, that item remains **Proposed**. The PR itself is evidence and discussion material, not approval.
+Issues without an exact mode marker fall back to a single existing routing label; missing or conflicting routing is classified `Agent/Needs Review` and executes nothing. Until step 3 is complete and the resulting ADR is committed for a given decision, that item remains **Proposed**. Accepted items below link to their ADR. The PR itself is evidence and discussion material, not approval.
 
 Please accept, amend, reject, or defer each item. Recommendations are not yet decisions.
 
-1. **D1 — Paru compatibility:** require the first stable Paru release containing `d1dfbc4` for production native search selection; use a pinned post-fix commit only in design/test meanwhile. **Recommended: accept.**
-2. **D2 — orchestration:** adopt two-stage Paru planning/review/execution; never parse Paru's human UI or replace its resolver. **Recommended: accept.**
+1. **D1 — Paru compatibility — Accepted in [ADR-0002](../decisions/0002-paru-native-selection-compatibility.md):** retain the first stable Paru release containing `d1dfbc4` as the durable floor; meanwhile permit an isolated, temporary, fail-closed adapter for verified 2.1.0 output. Detect capability behaviorally and remove the adapter after a fixed stable release passes the contract matrix. A pinned post-fix commit remains design/test-only.
+2. **D2 — orchestration — Accepted in [ADR-0003](../decisions/0003-multi-stage-paru-orchestration.md):** adopt two-stage Paru planning/review/execution; do not parse Paru's human UI beyond ADR-0002's temporary 2.1.0 exception, and never replace its resolver.
 3. **D3 — upgrades:** review a provisional AUR plan before mutation, execute a complete repository-only `-Syu` phase, then re-plan/revalidate before the independently deferrable AUR phase. **Recommended: accept.**
-4. **D4 — execution/cache and specification amendment:** accept Paru's actual `PreBuildCommand` point as the last recipe-content check before any makepkg/recipe execution (not literally immediately before each build), run with `--skipreview`, and rebuild unless a cached artifact hash is tied to the exact approved identity. This explicitly amends the current wording in `docs/specification.md`; alternatives are to block production pending an upstream per-build hook or add a makepkg proxy. **Recommended: accept the explicit amendment; do not pretend current Paru offers a later hook.**
+4. **D4 — execution/cache and specification amendment — Accepted in [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md):** treat the guard as the final complete recipe-identity verification after AURoscope review and before any recipe-supplied code executes, without claiming that it is adjacent to each build; run with `--skipreview`, and rebuild unless a cached artifact hash is tied to the exact approved identity.
 5. **D5 — Go process architecture:** one executable, explicit internal packages, standard-library argv/process handling, no CLI framework and no PTY dependency initially. **Recommended: accept.**
 6. **D6 — SQLite driver — Accepted:** use `mattn/go-sqlite3 v1.14.50` with CGO for Arch `linux/amd64` v1; revisit pure Go only with real cross-target need. Record: [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md).
-7. **D7 — remaining dependencies:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords` with expansions disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework. **Recommended: accept.**
+7. **D7 — remaining dependencies — Accepted:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords v1.0.14` with environment and backtick expansion disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework or PTY dependency without demonstrated need. See [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md).
 8. **D8 — state model:** normalized immutable evidence/history plus explicit transaction/approval/build lifecycle tables; WAL, short writes, application mutator lock, no event-sourcing framework. **Recommended: accept.**
 9. **D9 — approval protocol:** transaction/process/workspace-bound one-shot approvals, 30-minute default expiry, atomic claim, all terminal states invalidate leftovers, explicit same-UID residual risk, and human approval remains representable after visibly recorded partial/failed analysis. **Recommended: accept.**
 10. **D10 — scanner/LLM:** immutable versioned deterministic findings; inference-only optional LLM with no decision field/tools; model failure pauses for human but does not autonomously veto. **Recommended: accept.**

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on 2026-08-30.
+Accepted on 2026-08-30. Its human-menu compatibility clause was amended later the same day by [ADR-0002](0002-paru-native-selection-compatibility.md), which permits one strictly bounded transitional Paru 2.1.0 adapter.
 
 Decision issue: [#3](https://git.2027a.net/2027a/auroscope/issues/3). Mathieu authorized this exact decision with [`GO DECISION`](https://git.2027a.net/2027a/auroscope/issues/3#issuecomment-1119).
 
@@ -24,7 +24,7 @@ Adopt multi-stage Paru orchestration:
 2. AURoscope records the plan identity, collects and inspects the exact recipes, and presents the evidence for human review before execution.
 3. After approval, Paru resolves again and remains responsible for dependency resolution, building, and installation.
 4. A transaction-scoped guard compares the current execution plan with the approved plan. Any drift in versions, origins, dependencies, or recipe identities stops execution and returns the transaction to review.
-5. Adapters reject unknown or incompatible machine records. AURoscope never parses Paru's human-facing menu and never replaces Paru's resolver.
+5. Adapters reject unknown or incompatible records. AURoscope does not parse Paru's human-facing menu except through ADR-0002's isolated, temporary, fail-closed Paru 2.1.0 selection adapter, and never replaces Paru's resolver.
 
 The exact plan schema, approval handoff, hook timing, upgrade phasing, and compatibility floor remain governed by their dedicated design decisions. This ADR fixes the orchestration boundary, not those separate contracts.
 
@@ -54,7 +54,7 @@ Negative:
 - planning and execution perform separate resolver runs;
 - every supported Paru version needs a contract-tested adapter;
 - changed plans require another review cycle;
-- production search selection remains blocked until a supported Paru build exposes clean machine output without parsing the human UI.
+- production search selection temporarily carries a bounded human-output parser risk on Paru 2.1.0; the durable path still requires a supported stable Paru build exposing clean machine output.
 
 ## Unresolved risks
 
