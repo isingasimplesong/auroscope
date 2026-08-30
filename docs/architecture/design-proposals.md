@@ -278,15 +278,19 @@ inspection:  running → complete|partial|failed
 - On startup: check `PRAGMA quick_check`, expire stale approvals, mark orphaned running transactions interrupted after validating PID+start time, and clean only work owned by those recorded transactions.
 - Retain recipe identities, decisions, build/install outcomes, and compact findings by policy; purge raw LLM payloads/reports earlier. Never purge an identity referenced by an approval or installed artifact record.
 
-### Retention proposal
+### Accepted retention defaults
 
-- durable identity/decision/outcome: unlimited by default until explicit `auroscope purge --history-before`;
-- full reports and raw model JSON: 90 days default;
-- reconstructible recipe cache: 30 days or 1 GiB, LRU, whichever binds first;
-- failed temporary-work metadata: 7 days while actual private temp trees are removed at recovery;
+- durable recipe identities, human decisions, and build/install outcomes: 365 days;
+- full reports and retained model JSON: 30 days;
+- SQLite state backups: 7 days;
+- reconstructible recipe cache: 14 days or 512 MiB, LRU, whichever limit is reached first;
+- failed temporary-work metadata: 3 days while actual private temp trees are removed at recovery;
+- all thresholds are configurable, but none defaults to unlimited retention or disabled purge;
 - `VACUUM` only as an explicit maintenance action; routine purge uses incremental vacuum if configured.
 
 ## 5. Approval and anti-TOCTOU protocol
+
+**Decision:** The one-shot transaction-ID handoff, complete identity binding, atomic claim, 30-minute default expiry with a configurable 2-hour maximum, and terminal invalidation rules below were accepted on 2026-08-30. See [`ADR-0010`](../decisions/0010-one-shot-approval-protocol.md). The separately accepted final guard timing remains governed by [`ADR-0005`](../decisions/0005-recipe-identity-guard-boundary.md).
 
 ### Identity
 
@@ -311,13 +315,13 @@ The commit OID is identity, not a safety score. The manifest additionally detect
 
 - **Bearer token in environment:** simple, but inherited by subprocesses and unnecessary before recipe execution. Rejected.
 - **One-shot token file:** limits accidental reuse but adds secret-file lifecycle without defeating the same-UID threat.
-- **Transaction ID plus process/workspace binding in SQLite:** recommended. The transaction ID is not treated as a secret.
+- **Transaction ID plus process/workspace binding in SQLite:** accepted. The transaction ID is not treated as a secret.
 
-### Recommended protocol
+### Accepted protocol
 
 1. Wrapper creates transaction and private runtime directory (`0700`), records its own PID/start time.
 2. It plans, clones, safely collects, scans, obtains optional LLM assessment, and records the user's decision.
-3. For each approved identity it inserts an `armed` approval with a short expiry (recommended: 30 minutes, configurable maximum 2 hours).
+3. For each approved identity it inserts an `armed` approval with a 30-minute default expiry and a configurable maximum of 2 hours.
 4. It writes a transaction-specific Paru config (`0600`) whose `PreBuildCommand` is a fixed shell command equivalent to:
 
    ```text
@@ -430,7 +434,9 @@ Do **not** inherit its hook-centered architecture, aggregate automatic allow/blo
 
 The XDG Base Directory specification assigns configuration, durable state, cache, and runtime files distinct roots.[14]
 
-### Proposed exact layout
+### Accepted exact layout
+
+The layout, private-permission checks, cleanup boundary, and finite retention defaults below are accepted in [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md).
 
 ```text
 ${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.toml                  0600
@@ -466,6 +472,16 @@ TOML with explicit sections: `[policy]`, `[paths]`, `[scanner]`, `[llm]`, `[revi
 - On startup and `auroscope cleanup`, enumerate only direct children of the configured AURoscope runtime/cache root, cross-check SQLite ownership, PID+start time, age, device, inode, and UID, then delete.
 - Default stale runtime grace: 24 hours. Active recorded process sessions are never removed.
 - Cache pruning is quota+age based, uses a lock, and never follows symlinks. Reports/state are not cache.
+
+### Retention policy
+
+- Recipe identities, human decisions, and build/install outcomes: 365 days.
+- Generated reports and retained model JSON: 30 days.
+- SQLite state backups: 7 days.
+- Reconstructible recipe cache: 14 days or 512 MiB under LRU pruning, whichever limit is reached first.
+- Failed-work metadata: 3 days; recovered temporary trees are removed immediately.
+
+Every threshold is configurable, but no category has unlimited retention or disabled purge by default. Purging must preserve evidence referenced by a live transaction, approval, or retained build/install outcome.
 
 ## 8. Threat model
 
@@ -526,7 +542,7 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) | Proposed |
 | D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) | Proposed |
 | D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) | Proposed |
-| D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | Proposed |
+| D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | **Accepted:** [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md) |
 | D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) | **Accepted:** [ADR-0013](../decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md) |
 | D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) | **Accepted:** [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md) |
 
@@ -552,7 +568,7 @@ Please accept, amend, reject, or defer each item. Recommendations are not yet de
 8. **D8 — state model:** normalized immutable evidence/history plus explicit transaction/approval/build lifecycle tables; WAL, short writes, application mutator lock, no event-sourcing framework. **Recommended: accept.**
 9. **D9 — approval protocol:** transaction/process/workspace-bound one-shot approvals, 30-minute default expiry, atomic claim, all terminal states invalidate leftovers, explicit same-UID residual risk, and human approval remains representable after visibly recorded partial/failed analysis. **Recommended: accept.**
 10. **D10 — scanner/LLM:** immutable versioned deterministic findings; inference-only optional LLM with no decision field/tools; model failure pauses for human but does not autonomously veto. **Recommended: accept.**
-11. **D11 — XDG/cleanup:** exact layout and permissions above, private runtime dirs, 24-hour stale-work recovery, 90-day reports, 30-day/1-GiB reconstructible cache defaults. **Recommended: accept the structure; amend numerical retention defaults if desired.**
+11. **D11 — XDG/cleanup — Accepted in [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md):** use the exact XDG layout and private ownership/symlink controls above, 24-hour stale-work recovery, and finite configurable retention defaults: 365-day identity/decision/outcome history, 30-day reports/model JSON, 7-day state backups, 14-day or 512-MiB reconstructible recipe cache, and 3-day failed-work metadata.
 12. **D12 — threat/tests — Accepted in [ADR-0013](../decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md):** limit the adversary model to hostile AUR supply-chain input. Before v1, require a benign/suspicious recipe corpus, proof that inspection executes no package content, faithful evidence/error presentation with human authority, and one disposable-Arch review-to-install E2E. The local machine and account are outside the security guarantee.
 
 13. **D13 — local PKGBUILD builds/repositories — Accepted in [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md):** reject `-B`, targetless `-U`, local path targets, modes containing `pkgbuilds`, and any unexpected PKGBUILD record in v1 because Paru may execute `makepkg --printsrcinfo` before the guard; normalize allowed user modes with final trusted reset flags and design safe local-recipe support separately.
