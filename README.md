@@ -15,7 +15,9 @@ auroscope held               # recipes currently awaiting a decision
 auroscope explain <package>  # findings and decision history
 ```
 
-AURoscope is currently a specification-first, from-scratch project. No production implementation exists yet.
+AURoscope is currently a specification-first, from-scratch project in its **design phase**. No production implementation exists yet. The next phase must ground and propose the Paru contract, Go architecture, SQLite model, approval protocol, scanner/LLM contracts, threat model, and test strategy before an implementation plan is accepted.
+
+Start with [the design-phase mandate](docs/design-phase.md). Repository agents must also follow [AGENTS.md](AGENTS.md).
 
 ## Design principles
 
@@ -27,6 +29,8 @@ AURoscope is currently a specification-first, from-scratch project. No productio
 - A minimal Paru `PreBuildCommand` prevents changes between review and build.
 - SQLite is the source of truth; readable status views are generated from it.
 - Reports use ordinary text, Markdown, unified diffs, `$VISUAL`, and `$EDITOR` without editor-specific plugins.
+- The implementation language is Go, with minimal justified dependencies and a self-hosted AUR-style PKGBUILD as the initial distribution path.
+- Configuration, durable state, reconstructible cache, and disposable work follow the standard XDG roots; downloaded audit work must not accumulate.
 
 See [the product specification](docs/specification.md) for the agreed behavior.
 

@@ -171,7 +171,41 @@ The default status view reports at least:
 
 `--markdown` may export a readable snapshot for sharing or archiving, but that export is never authoritative and must not be read back as state.
 
-## 11. Initial scope
+## 11. Technology, packaging, and storage constraints
+
+- AURoscope is implemented in Go and delivered as a small target-specific executable, initially for Arch Linux on `linux/amd64`.
+- Prefer the Go standard library. Direct dependencies must be ordinary, maintained, minimal, and justified by a concrete need; dependency minimization must not cause bespoke reimplementation of fundamental components.
+- The initial Arch distribution is a self-hosted AUR-style PKGBUILD repository. Publishing to `aur.archlinux.org` is deferred. Go should be a build dependency rather than a runtime dependency where feasible.
+- SQLite remains the authoritative durable state store. Driver, schema, migrations, concurrency, and recovery are design-phase decisions.
+- Standard roots are:
+
+```text
+${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/
+${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/
+${XDG_CACHE_HOME:-$HOME/.cache}/auroscope/
+${TMPDIR:-/tmp}/auroscope-*/
+```
+
+- Temporary clones and downloaded audit inputs must be private, bounded, and removed after success, error, interruption, or cancellation. Stale crash residue must be recoverably cleaned. `/tmp` is not assumed to be RAM; no accumulation is the invariant.
+- Human-readable status is generated from SQLite. Markdown and JSON exports are snapshots, never a second state source.
+
+The accepted technology decision is recorded in [`docs/decisions/0001-go-and-self-hosted-arch-packaging.md`](decisions/0001-go-and-self-hosted-arch-packaging.md).
+
+## 12. Design before implementation
+
+Before production code, the design phase must investigate and submit proposals for:
+
+- exact Paru/Pacman command, PTY, origin, dependency, transaction, cache, and exit-code contracts;
+- Go module boundaries, CLI/process handling, dependencies, build, and release strategy;
+- SQLite schema, migrations, lifecycle, concurrency, retention, and crash recovery;
+- approval identity, expiry, anti-replay, and `PreBuildCommand` TOCTOU protocol;
+- deterministic rule and constrained-LLM schemas, privacy, truncation, and failure behavior;
+- concrete XDG paths, permissions, configuration format, reports, and cleanup;
+- threat model and risk-proportional test strategy.
+
+Consequential alternatives must be presented to Mathieu and recorded as accepted ADRs. The detailed implementation plan is written only after those decisions are accepted. See [`docs/design-phase.md`](design-phase.md).
+
+## 13. Initial scope
 
 Included in the first useful version:
 
@@ -194,7 +228,7 @@ Deferred:
 - a generic plugin/rule framework;
 - replacement of Paru's resolver.
 
-## 12. Acceptance criteria
+## 14. Acceptance criteria
 
 AURoscope is not useful until tests demonstrate that:
 
@@ -210,6 +244,6 @@ AURoscope is not useful until tests demonstrate that:
 10. cancellation leaves no reusable floating approval;
 11. end-to-end fixtures run in a disposable Arch environment without altering the real workstation.
 
-## 13. Relationship to the previous project
+## 15. Relationship to the previous project
 
 AURoscope is a from-scratch successor to [2027a/paru-llm-audit](https://git.2027a.net/2027a/paru-llm-audit). The old project is a reference for lessons, test fixtures, and scanner ideas only. No production code or hook-centered architecture is inherited implicitly.
