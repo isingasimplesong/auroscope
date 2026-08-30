@@ -13,7 +13,7 @@ AURoscope should replace Paru as the user's normal terminal entry point while re
 - Implement AURoscope in Go.
 - Initially target Arch Linux on `linux/amd64`; additional target binaries may be produced later.
 - Prefer the Go standard library and use only minimal, maintained, justified direct dependencies.
-- Evaluate the SQLite driver during design, including pure-Go and CGO trade-offs.
+- Evaluate the SQLite driver during design, including pure-Go and CGO trade-offs; the resulting choice is recorded in [ADR-0007](0007-mattn-go-sqlite3-cgo.md).
 - Distribute initially through a self-hosted AUR-style PKGBUILD repository.
 - Treat Go as a build dependency rather than a runtime dependency where feasible.
 - Keep publication to `aur.archlinux.org` out of the initial scope.
@@ -30,6 +30,6 @@ Positive:
 Negative or deferred:
 
 - binaries are target-specific rather than universally portable;
-- the SQLite driver choice may affect binary size, CGO requirements, and reproducibility;
+- the accepted SQLite driver adds CGO and C-toolchain build requirements, as detailed in [ADR-0007](0007-mattn-go-sqlite3-cgo.md);
 - PTY behavior and exact Paru integration still require grounded design spikes;
 - dependency minimization must not become bespoke replacements for mature fundamentals.

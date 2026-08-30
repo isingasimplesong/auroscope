@@ -178,7 +178,7 @@ The default status view reports at least:
 - AURoscope is implemented in Go and delivered as a small target-specific executable, initially for Arch Linux on `linux/amd64`.
 - Prefer the Go standard library. Direct dependencies must be ordinary, maintained, minimal, and justified by a concrete need; dependency minimization must not cause bespoke reimplementation of fundamental components.
 - The initial Arch distribution is a self-hosted AUR-style PKGBUILD repository. Publishing to `aur.archlinux.org` is deferred. Go should be a build dependency rather than a runtime dependency where feasible.
-- SQLite remains the authoritative durable state store. Driver, schema, migrations, concurrency, and recovery are design-phase decisions.
+- SQLite remains the authoritative durable state store. The Arch `linux/amd64` v1 uses pinned `github.com/mattn/go-sqlite3` with CGO; schema, migrations, concurrency, and recovery remain separate design-phase decisions.
 - Standard roots are:
 
 ```text
@@ -191,7 +191,7 @@ ${TMPDIR:-/tmp}/auroscope-*/
 - Temporary clones and downloaded audit inputs must be private, bounded, and removed after success, error, interruption, or cancellation. Stale crash residue must be recoverably cleaned. `/tmp` is not assumed to be RAM; no accumulation is the invariant.
 - Human-readable status is generated from SQLite. Markdown and JSON exports are snapshots, never a second state source.
 
-The accepted technology decision is recorded in [`docs/decisions/0001-go-and-self-hosted-arch-packaging.md`](decisions/0001-go-and-self-hosted-arch-packaging.md).
+The accepted technology decisions are recorded in [`ADR-0001`](decisions/0001-go-and-self-hosted-arch-packaging.md) and [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md).
 
 ## 12. Design before implementation
 
