@@ -63,11 +63,11 @@ Propose the config format, defaults, exact paths, permissions, report generation
 
 ### 7. Threat model
 
-Cover hostile Git repositories and recipes, symlinks/path traversal, prompt injection, audit/build substitution, PATH/editor/config manipulation, sudo and privilege boundaries, process concurrency, Pacman locking, secrets, reports, and crash residue.
+The accepted boundary is recorded in [`ADR-0013`](decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md). Cover hostile AUR recipes, repository files, source/upstream material and metadata, non-executing inspection, prompt injection, evidence provenance, analysis failure, and honest residual-risk language. The local machine, account, other local processes, configuration/editors, and general sudo hardening are outside the security guarantee; test their behavior only where ordinary application correctness requires it.
 
 ### 8. Test strategy
 
-Propose unit, contract, PTY, SQLite/migration, scanner, LLM, TOCTOU, failure, and disposable-Arch end-to-end tests. Keep the plan proportional, but require real integration proof for security boundaries.
+Keep ordinary unit, contract, PTY, SQLite/migration, scanner, LLM, identity-guard, and failure tests proportional to their functional contracts. The mandatory v1 security gates are narrower: a benign/suspicious recipe corpus, proof that inspection executes no package content, faithful evidence/error presentation with no automatic decision, and one disposable-Arch review-to-install end-to-end test. Never run that proof against the real workstation.
 
 ## Process and deliverables
 
