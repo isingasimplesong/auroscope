@@ -593,6 +593,33 @@ Use disposable Arch containers/VMs with private Pacman DB/root and synthetic loc
 
 ## 11. Decision set for Mathieu
 
+Each decision is tracked in a dedicated Forgejo issue containing its context, evidence, alternatives, trade-offs, recommendation, risks, and expected reply:
+
+| Decision | Issue |
+|---|---|
+| D1 — Paru compatibility | [#2](https://git.2027a.net/2027a/auroscope/issues/2) |
+| D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) |
+| D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) |
+| D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) |
+| D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) |
+| D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) |
+| D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) |
+| D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) |
+| D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) |
+| D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) |
+| D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) |
+| D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) |
+| D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) |
+
+Workflow for every issue:
+
+1. Mathieu replies with his chosen option, amendment, or rejection.
+2. Héphaïstos restates the resulting decision in the issue; the reply alone does not accept or close it.
+3. Mathieu gives an explicit **go** for that issue.
+4. Only then may Héphaïstos record the accepted decision in an ADR and close the issue after verifying both effects.
+
+Until step 3, every item below remains **Proposed**. The PR itself is evidence and discussion material, not approval.
+
 Please accept, amend, reject, or defer each item. Recommendations are not yet decisions.
 
 1. **D1 — Paru compatibility:** require the first stable Paru release containing `d1dfbc4` for production native search selection; use a pinned post-fix commit only in design/test meanwhile. **Recommended: accept.**
