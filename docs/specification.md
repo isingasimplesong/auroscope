@@ -215,6 +215,7 @@ Accepted design decisions relevant to these constraints are recorded in:
 - [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md);
 - [`ADR-0010`](decisions/0010-one-shot-approval-protocol.md);
 - [`ADR-0012`](decisions/0012-xdg-layout-permissions-retention.md);
+- [`ADR-0013`](decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md);
 - [`ADR-0014`](decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
 
 ## 12. Design before implementation
@@ -231,7 +232,22 @@ Before production code, the design phase must investigate and submit proposals f
 
 Consequential alternatives must be presented to Mathieu and recorded as accepted ADRs. The detailed implementation plan is written only after those decisions are accepted. See [`docs/design-phase.md`](design-phase.md).
 
-## 13. Initial scope
+## 13. Threat boundary and v1 security proof
+
+AURoscope is an advisory aid against AUR supply-chain risk. It treats recipes, repository files, source/upstream material and metadata, and package-derived scanner or model input as hostile data. Inspection must not execute or source that material. Findings remain attributable evidence, analysis failures are explicit, and the user retains every consequential decision.
+
+The local machine, user account, other local processes, local configuration and editors, and the versioned Paru/Pacman/makepkg/Git toolchain are trusted by this threat model. AURoscope is not a sandbox, antivirus, endpoint-protection system, or boundary against a compromised host. Functional tests may still cover state, concurrency, identity drift, process handling, cleanup, and dependency compatibility without presenting them as local-host security guarantees.
+
+Before v1, tests must provide four bounded proofs:
+
+1. benign and suspicious recipe fixtures cover every advertised deterministic rule or indicator;
+2. marker fixtures prove inspection executes neither `PKGBUILD` nor package source material;
+3. presentation tests prove readable and attributable indicators, explicit partial/failed analysis, separation of deterministic and LLM evidence, and no automatic decision;
+4. a disposable Arch environment proves inspection, evidence presentation, and an explicit human decision happen before installation without touching the real workstation.
+
+This boundary is accepted in [`ADR-0013`](decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md).
+
+## 14. Initial scope
 
 Included in the first useful version:
 
@@ -255,7 +271,7 @@ Deferred:
 - replacement of Paru's resolver;
 - local PKGBUILD builds and configured PKGBUILD repositories.
 
-## 14. Acceptance criteria
+## 15. Acceptance criteria
 
 AURoscope is not useful until tests demonstrate that:
 
@@ -271,6 +287,6 @@ AURoscope is not useful until tests demonstrate that:
 10. cancellation leaves no reusable floating approval;
 11. end-to-end fixtures run in a disposable Arch environment without altering the real workstation.
 
-## 15. Relationship to the previous project
+## 16. Relationship to the previous project
 
 AURoscope is a from-scratch successor to [2027a/paru-llm-audit](https://git.2027a.net/2027a/paru-llm-audit). The old project is a reference for lessons, test fixtures, and scanner ideas only. No production code or hook-centered architecture is inherited implicitly.
