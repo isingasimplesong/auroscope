@@ -47,6 +47,8 @@ Planning and execution are separate Paru resolver runs. After review and approva
 
 Official Arch repository upgrades must remain supported, complete transactions. AUR packages may be deferred, together with dependants that cannot safely proceed; the reason must be shown.
 
+AURoscope v1 inspects AUR recipes only. It rejects `-B`, targetless `-U`, local/path-like targets, modes containing `pkgbuilds`, and unexpected PKGBUILD-repository plan records before starting Paru. Supported intercepted flows use final trusted repo/AUR mode-reset flags so a configured PKGBUILD repository cannot enter the transaction implicitly. Explicit `-U` package archives remain a pass-through outside recipe inspection. This boundary is recorded in [`ADR-0014`](decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
+
 ## 4. Recipe identity and acquisition
 
 For each AUR `pkgbase`, AURoscope collects recipe data without sourcing the `PKGBUILD`:
@@ -120,6 +122,8 @@ Before the user acts, `decision` is null. In the default interactive `human-auth
 
 Non-interactive modes may later apply an explicit configured policy, but cannot change the default interactive semantics.
 
+An explicit approval is transaction-scoped and one-shot. It binds the source/namespace/`pkgbase`, commit and tree, complete canonical recipe manifest and per-file identity, inspection and human decision, workspace, expected Paru process, and expiry. `PKGBUILD` is included but is not sufficient by itself. The default approval lifetime is 30 minutes, with a configurable maximum of 2 hours. The exact binding, atomic claim, replay prevention, and invalidation rules are recorded in [`ADR-0010`](decisions/0010-one-shot-approval-protocol.md).
+
 ## 8. Generic terminal review
 
 Reports use ordinary text, Markdown, unified diffs, and normal files. The review command resolves the viewer in this order:
@@ -139,6 +143,8 @@ After human decisions, AURoscope delegates the executable plan to Paru/Pacman. D
 Paru's `PreBuildCommand` remains a narrow guard only. After AURoscope review and before any recipe-supplied code is executed, it performs the last complete identity check of every planned recipe against a live AURoscope approval. The check covers the reviewed commit, tree, tracked-file manifest, and file hashes; any divergence aborts the operation and returns the recipe to review.
 
 Paru does not invoke this hook immediately before each individual build: it may perform other trusted orchestration, including official dependency installation, between the hooks and `makepkg`. AURoscope therefore runs the execution phase with `--skipreview` so Paru cannot edit recipe content after the guard. A separate same-UID process can still race the worktree after the guard returns; eliminating that residual race requires a stronger isolation boundary and is outside the current threat model. This accepted boundary is recorded in [`ADR-0005`](decisions/0005-recipe-identity-guard-boundary.md).
+
+The handoff carries only a non-secret transaction ID in a private transaction-specific Paru configuration. The guard verifies the recorded Paru process and workspace, computes the complete identity, atomically claims one matching unexpired SQLite approval, and computes the identity again before returning success. Approval progresses only `armed → claimed → consumed`; mismatch, expiry, cancellation, failure, signal, or another terminal transaction state invalidates all reusable approval state. A claimed or consumed approval cannot authorize another process or transaction. This protocol is recorded in [`ADR-0010`](decisions/0010-one-shot-approval-protocol.md).
 
 ## 10. SQLite and readable filter state
 
@@ -184,16 +190,22 @@ The default status view reports at least:
 - Beyond the SQLite driver, the accepted initial direct dependencies are `github.com/pelletier/go-toml/v2` for strict TOML configuration and `github.com/mattn/go-shellwords v1.0.14` only for non-expanding `$VISUAL`/`$EDITOR` argv parsing. Migrations, LLM validation/client code, and logging use the standard library; no PTY or framework dependency is added without demonstrated need.
 - The initial Arch distribution is a self-hosted AUR-style PKGBUILD repository. Publishing to `aur.archlinux.org` is deferred. Go should be a build dependency rather than a runtime dependency where feasible.
 - SQLite remains the authoritative durable state store. The Arch `linux/amd64` v1 uses pinned `github.com/mattn/go-sqlite3` with CGO; the minimal state-model boundary is accepted in ADR-0009, while exact SQL migrations and concurrency/recovery mechanics still require implementation-lane verification.
-- Standard roots are:
+- The accepted concrete storage layout is:
 
 ```text
-${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/
-${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/
-${XDG_CACHE_HOME:-$HOME/.cache}/auroscope/
-${TMPDIR:-/tmp}/auroscope-*/
+${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.toml                  0600
+${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/state.db                0600
+${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/reports/YYYY/MM/...     0600 files, 0700 dirs
+${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/backups/                 0700
+${XDG_CACHE_HOME:-$HOME/.cache}/auroscope/recipes/<source>/<pkgbase>/    0700 root
+${XDG_CACHE_HOME:-$HOME/.cache}/auroscope/model/                         0700, optional
+${XDG_RUNTIME_DIR}/auroscope/<transaction>/                              preferred, 0700
+${TMPDIR:-/tmp}/auroscope-<uid>-<random>/<transaction>/                  fallback, 0700
 ```
 
-- Temporary clones and downloaded audit inputs must be private, bounded, and removed after success, error, interruption, or cancellation. Stale crash residue must be recoverably cleaned. `/tmp` is not assumed to be RAM; no accumulation is the invariant.
+- AURoscope uses umask `0077`, private roots, and `0600` sensitive files including SQLite `-wal`/`-shm`. It rejects relative roots, unsafe ownership or group/world-writable roots, and symlinks at sensitive final components. If a safe `XDG_RUNTIME_DIR` is unavailable, it uses an unpredictable private `os.MkdirTemp` fallback under `$TMPDIR`; `/tmp` is not assumed to be RAM.
+- Temporary clones and downloaded audit inputs are removed after success, error, interruption, or cancellation. Descriptor-relative no-follow recovery cross-checks recorded UID, device/inode, and PID plus process start time before removing stale direct children; active work is never removed, and stale runtime handoffs have a 24-hour grace period.
+- Default retention is finite and configurable: 365 days for recipe identities, human decisions, and build/install outcomes; 30 days for reports and retained model JSON; 7 days for SQLite backups; 14 days or 512 MiB LRU for reconstructible recipe cache, whichever limit is reached first; and 3 days for failed-work metadata. No category defaults to unlimited retention or disabled purge.
 - Human-readable status is generated from SQLite. Markdown and JSON exports are snapshots, never a second state source.
 
 Accepted design decisions relevant to these constraints are recorded in:
@@ -202,7 +214,11 @@ Accepted design decisions relevant to these constraints are recorded in:
 - [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md);
 - [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md);
 - [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md);
-- [`ADR-0009`](decisions/0009-minimal-sqlite-state-model.md).
+- [`ADR-0009`](decisions/0009-minimal-sqlite-state-model.md);
+- [`ADR-0010`](decisions/0010-one-shot-approval-protocol.md);
+- [`ADR-0012`](decisions/0012-xdg-layout-permissions-retention.md);
+- [`ADR-0013`](decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md);
+- [`ADR-0014`](decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
 
 ## 12. Design before implementation
 
@@ -218,7 +234,22 @@ Before production code, the design phase must investigate and submit proposals f
 
 Consequential alternatives must be presented to Mathieu and recorded as accepted ADRs. The detailed implementation plan is written only after those decisions are accepted. See [`docs/design-phase.md`](design-phase.md).
 
-## 13. Initial scope
+## 13. Threat boundary and v1 security proof
+
+AURoscope is an advisory aid against AUR supply-chain risk. It treats recipes, repository files, source/upstream material and metadata, and package-derived scanner or model input as hostile data. Inspection must not execute or source that material. Findings remain attributable evidence, analysis failures are explicit, and the user retains every consequential decision.
+
+The local machine, user account, other local processes, local configuration and editors, and the versioned Paru/Pacman/makepkg/Git toolchain are trusted by this threat model. AURoscope is not a sandbox, antivirus, endpoint-protection system, or boundary against a compromised host. Functional tests may still cover state, concurrency, identity drift, process handling, cleanup, and dependency compatibility without presenting them as local-host security guarantees.
+
+Before v1, tests must provide four bounded proofs:
+
+1. benign and suspicious recipe fixtures cover every advertised deterministic rule or indicator;
+2. marker fixtures prove inspection executes neither `PKGBUILD` nor package source material;
+3. presentation tests prove readable and attributable indicators, explicit partial/failed analysis, separation of deterministic and LLM evidence, and no automatic decision;
+4. a disposable Arch environment proves inspection, evidence presentation, and an explicit human decision happen before installation without touching the real workstation.
+
+This boundary is accepted in [`ADR-0013`](decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md).
+
+## 14. Initial scope
 
 Included in the first useful version:
 
@@ -239,9 +270,10 @@ Deferred:
 - exhaustive upstream-source or compiled-binary analysis;
 - a custom build sandbox;
 - a generic plugin/rule framework;
-- replacement of Paru's resolver.
+- replacement of Paru's resolver;
+- local PKGBUILD builds and configured PKGBUILD repositories.
 
-## 14. Acceptance criteria
+## 15. Acceptance criteria
 
 AURoscope is not useful until tests demonstrate that:
 
@@ -257,6 +289,6 @@ AURoscope is not useful until tests demonstrate that:
 10. cancellation leaves no reusable floating approval;
 11. end-to-end fixtures run in a disposable Arch environment without altering the real workstation.
 
-## 15. Relationship to the previous project
+## 16. Relationship to the previous project
 
 AURoscope is a from-scratch successor to [2027a/paru-llm-audit](https://git.2027a.net/2027a/paru-llm-audit). The old project is a reference for lessons, test fixtures, and scanner ideas only. No production code or hook-centered architecture is inherited implicitly.

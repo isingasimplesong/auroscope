@@ -94,7 +94,7 @@ Use Paru's supported machine-oriented surfaces for selection/planning, inspect a
 | bare search terms | intercept selection → plan → review → execute | may select AUR recipes |
 | `-S <targets>` | intercept unless an explicit trusted repo-only mode proves no AUR build is possible | explicit install may resolve AUR targets/dependencies |
 | bare invocation, `-Su`, `-Syu`, `-Sua` | intercept upgrade flow | may build installed foreign packages |
-| `-B <dirs>`, bare targetless `-U`, path-like sync targets (including `./...`), and targets resolved from PKGBUILD repositories | reject as unsupported in v1 before starting Paru | local paths can invoke makepkg `--printsrcinfo` before `PreBuildCommand`; safe support needs a separate design |
+| `-B <dirs>`, bare targetless `-U`, path-like sync targets (including `./...`), and targets resolved from PKGBUILD repositories | reject as unsupported in v1 before starting Paru | local paths can invoke makepkg `--printsrcinfo` before `PreBuildCommand`; safe support needs a separate design ([ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md)) |
 | `-U <package files/URLs>` | pass-through to Paru/Pacman in v1 | installs package archives, not AUR recipes; package-archive inspection is deferred |
 | `--downloadonly` with AUR target | preserve Paru rejection | Paru 2.1 explicitly rejects this combination |
 | `--noconfirm` with any new AUR decision | reject with AURoscope policy exit | conflicts with default human authority; later automation needs an explicit policy ADR |
@@ -123,7 +123,7 @@ Cancellation is `1` plus empty selection and maps to AURoscope `cancelled`, not 
 
 ### Planning and authoritative origin
 
-1. Paru remains authoritative for AUR/repository origin and dependency classification within supported modes. The classifier interprets user mode selectors but never forwards them blindly: any mode containing `pkgbuilds`/`p` is rejected; repo-only is normalized to a final trusted `--repo`, AUR-only (including `-Sua`) to a final trusted `--aur`, and default/combined repo+AUR to trusted `--repo --mode=aur`. These flags are inserted after user options and before the target separator, so they reset config-provided `PkgbuildsOnly` rather than OR-ing with it. Explicit local build operations and local path targets (`./`, `../`, absolute paths, or `file:`; repository-qualified `repo/pkg` remains valid) fail before any Paru process starts. Any `PKGBUILD` record is a contract violation and aborts.
+1. Paru remains authoritative for AUR/repository origin and dependency classification within supported modes. The classifier interprets user mode selectors but never forwards them blindly: any mode containing `pkgbuilds`/`p` is rejected; repo-only is normalized to a final trusted `--repo`, AUR-only (including `-Sua`) to a final trusted `--aur`, and default/combined repo+AUR to trusted `--repo --mode=aur`. These flags are inserted after user options and before the target separator, so they reset config-provided `PkgbuildsOnly` rather than OR-ing with it. Explicit local build operations and local path targets (`./`, `../`, absolute paths, or `file:`; repository-qualified `repo/pkg` remains valid) fail before any Paru process starts. Any `PKGBUILD` record is a contract violation and aborts. This accepted v1 boundary is defined by [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
 2. For explicit selected targets, use Paru's `paru -P --order -- <targets>` output as a version-gated planning surface. Released `v2.1.0` documents repository records as `INSTALL TARGET|DEP|MAKE <repo> <name>`, while post-release commit `9ac3578` actually emits `REPO TARGET|DEP|MAKE <repo> <name>` from `src/order.rs` although its man page still says `INSTALL`; AUR records remain `AUR TARGET|DEP|MAKE <pkgbase> <names...>`.[1][26]
 3. Parse only the grammar proven for the exact supported build. Reject unknown record kinds, documentation/code mismatches, `MISSING`, and conflicts rather than treating them as harmless. The `--order` spike returned `0` with complete synced databases and `1` plus `MISSING` records when repository databases were absent.
 4. Confirm repository packages independently with Pacman `-S --print --print-format` where a repository transaction is about to run. Pacman's repository order is authoritative.[10]
@@ -273,9 +273,21 @@ The C-minimal acceptance does not turn every earlier tuning and retention recomm
 - embed, checksum, and apply ordered forward migrations under an exclusive application lock, with backup before migration and restore support;
 - on startup, run `PRAGMA quick_check`, expire stale approvals, validate PID plus start time before marking orphaned transactions interrupted, and clean only work owned by recorded transactions.
 
-Retention limits remain part of D11 rather than D8: durable identity/decision/outcome history is unlimited by default until explicit purge; reports and raw model JSON default to 90 days; reconstructible recipe cache defaults to 30 days or 1 GiB, whichever binds first; failed-work metadata defaults to 7 days; routine purge uses incremental vacuum if configured, while full `VACUUM` is explicit maintenance. No purge may delete an identity referenced by an approval or installed-artifact record.
+### Accepted retention defaults
+
+- durable recipe identities, human decisions, and build/install outcomes: 365 days;
+- full reports and retained model JSON: 30 days;
+- SQLite state backups: 7 days;
+- reconstructible recipe cache: 14 days or 512 MiB, LRU, whichever limit is reached first;
+- failed temporary-work metadata: 3 days while actual private temp trees are removed at recovery;
+- all thresholds are configurable, but none defaults to unlimited retention or disabled purge;
+- `VACUUM` only as an explicit maintenance action; routine purge uses incremental vacuum if configured.
+
+No purge may delete an identity referenced by a live transaction, approval, or retained build/install outcome. These limits and the concrete XDG/cleanup boundary are accepted separately in [`ADR-0012`](../decisions/0012-xdg-layout-permissions-retention.md).
 
 ## 5. Approval and anti-TOCTOU protocol
+
+**Decision:** The one-shot transaction-ID handoff, complete identity binding, atomic claim, 30-minute default expiry with a configurable 2-hour maximum, and terminal invalidation rules below were accepted on 2026-08-30. See [`ADR-0010`](../decisions/0010-one-shot-approval-protocol.md). The separately accepted final guard timing remains governed by [`ADR-0005`](../decisions/0005-recipe-identity-guard-boundary.md).
 
 ### Identity
 
@@ -300,13 +312,13 @@ The commit OID is identity, not a safety score. The manifest additionally detect
 
 - **Bearer token in environment:** simple, but inherited by subprocesses and unnecessary before recipe execution. Rejected.
 - **One-shot token file:** limits accidental reuse but adds secret-file lifecycle without defeating the same-UID threat.
-- **Transaction ID plus process/workspace binding in SQLite:** recommended. The transaction ID is not treated as a secret.
+- **Transaction ID plus process/workspace binding in SQLite:** accepted. The transaction ID is not treated as a secret.
 
-### Recommended protocol
+### Accepted protocol
 
 1. Wrapper creates transaction and private runtime directory (`0700`), records its own PID/start time.
 2. It plans, clones, safely collects, scans, obtains optional LLM assessment, and records the user's decision.
-3. For each approved identity it inserts an `armed` approval with a short expiry (recommended: 30 minutes, configurable maximum 2 hours).
+3. For each approved identity it inserts an `armed` approval with a 30-minute default expiry and a configurable maximum of 2 hours.
 4. It writes a transaction-specific Paru config (`0600`) whose `PreBuildCommand` is a fixed shell command equivalent to:
 
    ```text
@@ -419,7 +431,9 @@ Do **not** inherit its hook-centered architecture, aggregate automatic allow/blo
 
 The XDG Base Directory specification assigns configuration, durable state, cache, and runtime files distinct roots.[14]
 
-### Proposed exact layout
+### Accepted exact layout
+
+The layout, private-permission checks, cleanup boundary, and finite retention defaults below are accepted in [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md).
 
 ```text
 ${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.toml                  0600
@@ -456,130 +470,55 @@ TOML with explicit sections: `[policy]`, `[paths]`, `[scanner]`, `[llm]`, `[revi
 - Default stale runtime grace: 24 hours. Active recorded process sessions are never removed.
 - Cache pruning is quota+age based, uses a lock, and never follows symlinks. Reports/state are not cache.
 
+### Retention policy
+
+- Recipe identities, human decisions, and build/install outcomes: 365 days.
+- Generated reports and retained model JSON: 30 days.
+- SQLite state backups: 7 days.
+- Reconstructible recipe cache: 14 days or 512 MiB under LRU pruning, whichever limit is reached first.
+- Failed-work metadata: 3 days; recovered temporary trees are removed immediately.
+
+Every threshold is configurable, but no category has unlimited retention or disabled purge by default. Purging must preserve evidence referenced by a live transaction, approval, or retained build/install outcome.
+
 ## 8. Threat model
 
-### Assets
+Accepted boundary: [ADR-0013](../decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md).
 
-- root-owned system and Pacman database;
-- user files, secrets, model credentials, and terminal integrity;
-- exact recipe approval and audit history;
-- trusted official repository transaction semantics;
-- package artifacts installed by Pacman.
+AURoscope protects the quality of a human AUR review. It treats the recipe repository, its files and metadata, source/upstream material, and all package-derived scanner or model input as hostile data. It must inspect those inputs without executing them, preserve the provenance of each indicator, expose uncertainty and failure, and leave the install decision to the user.
 
-### Actors and trust boundaries
+The local machine, user account, other local processes, configuration and editors are trusted by this model. Paru, Pacman, makepkg, and Git are trusted versioned dependencies whose compatibility is tested. AURoscope is not a sandbox, antivirus, endpoint-protection tool, or security boundary against a compromised host.
 
-- human user: authority, but may make mistakes;
-- AUR maintainer/repository and all tracked/untracked content: hostile;
-- upstream source URLs/archives: hostile and mostly out of v1 inspection scope;
-- Paru/Pacman/makepkg/Git: trusted versioned dependencies with constrained contracts;
-- LLM/provider: untrusted advisory processor and privacy boundary;
-- other same-UID process: can race local files; partially mitigated, not fully defeatable;
-- root/sudo boundary: Pacman alone receives elevation in the normal flow.
+Supply-chain abuse cases in scope are deliberately narrow:
 
-### Abuse cases and mitigations
-
-| Threat | Required mitigation | Residual risk/proof |
+| Hostile AUR input | Required behavior | Residual risk/proof |
 |---|---|---|
-| symlink/path traversal | Git-tree paths as bytes; descriptor-relative no-follow open; reject special/escaping paths | integration fixture with intermediate symlink replacement |
-| prompt injection | JSON data envelope, no tools, strict local validation, no decision field | adversarial prompt corpus; model can still give poor advice |
-| recipe changed after review | commit+tree+manifest+per-file hashes, workspace dev/inode, one-shot guard | same-UID post-guard race remains |
-| Paru review edits after guard | execution uses `--skipreview` | contract test against supported Paru versions |
-| stale/replayed approval | transaction/process binding, expiry, atomic claim, terminal invalidation | `/proc` unavailable is fail closed |
-| cached binary substitution | exact artifact SHA-256 linked to successful build identity; otherwise rebuild | compiler/build compromise out of scope |
-| hostile filename/terminal escape | byte-safe paths, escaped rendering, bounded output | golden tests with control/bidi/invalid UTF-8 |
-| PATH/config/editor manipulation | resolve configured executables before elevation, absolute guard command, owner/mode checks, argv arrays | user's own trusted config can choose unsafe tools |
-| sudo leakage | wrapper never runs as root; no secrets in environment passed to Pacman/build; sanitize model vars | PKGBUILD runs as user and can read that user's files unless build sandbox added |
-| Pacman concurrency | application mutator lock plus Pacman's own `db.lck`; never delete lock | real concurrent-container test |
-| cleanup escape | owned roots, DB cross-check, descriptor-relative deletion | crash between create and DB record leaves age-gated residue |
-| Git helper execution | fixed absolute Git, disable hooks, external diff, textconv, filters, credential prompts; do not checkout untrusted symlink targets | Git vulnerabilities remain dependency risk |
-| partial official upgrade | complete repo-only `-Syu` phase; never convert held AUR into held repo packages | AUR may break temporarily after upgrade |
-| LLM data exfiltration | minimal selected context, no host paths/secrets, explicit provider, privacy mode | recipe content itself is sent when enabled |
-| database corruption | WAL, FULL sync for approvals, quick_check, backup before migration | disk/hardware failure needs user backup |
+| suspicious or obfuscated recipe behavior | deterministic corpus covers every advertised indicator and preserves evidence provenance | indicators can miss malicious behavior; no “safe” verdict |
+| recipe/source content attempting prompt injection | package content remains delimited data; model has no tools or decision field; output is strictly validated | model advice can still be wrong |
+| `PKGBUILD`, source, symlink, path, or filename causing execution during inspection | collection and analysis never source or execute package content; rendering is escaped and bounded | marker fixtures provide executable proof |
+| malformed, oversized, partial, or failed analysis | explicit visible failure/limitation; no silent approval and no automatic veto | user still decides with incomplete evidence |
+| confusing or unattributed findings | readable report separates deterministic and LLM evidence and identifies indicator provenance | presentation tests cover the decision surface |
+
+Recipe identity checks, SQLite consistency, process handling, locking, cleanup, and dependency contracts remain functional design concerns. They receive proportional regression tests, but are not presented as resistance to malicious local processes under this threat model.
 
 ## 9. Risk-proportional test strategy
 
-### Unit
+Ordinary correctness remains covered by focused unit, parser/fuzz, SQLite/migration, process, and supported-version contract tests. Those suites validate behavior described by the other decisions; they are not security claims against a hostile local machine.
 
-- raw argv classifier matrix and unknown-option preservation;
-- Paru `--order` record parser, unknown record rejection, selected-name validation;
-- canonical manifest with byte filenames, modes, symlinks, size/limits;
-- each deterministic rule with positive, negative, obfuscation, and false-positive fixtures;
-- LLM decoder: extra fields, invalid enum, fake path/line, oversized text, decision language;
-- lifecycle transitions and exit-category mapping;
-- XDG resolution, ownership/mode validation, cleanup eligibility;
-- report escaping and deterministic rendering.
+The accepted v1 security quality gates are only:
 
-### Property/fuzz
+1. **Recipe corpus:** benign and suspicious fixtures cover every advertised rule or indicator, including false-positive and obfuscation cases.
+2. **No execution during inspection:** marker fixtures prove that collection, deterministic scanning, and model-context preparation execute or source neither `PKGBUILD` nor package source material.
+3. **Faithful presentation and human authority:** tests prove readable alerts, indicator provenance, immutable separation of deterministic and LLM evidence, explicit partial/failed analysis, and absence of an automatic install decision.
+4. **Disposable Arch E2E:** a private container or VM exercises inspection → evidence presentation → explicit human decision → installation. It uses synthetic repositories and a private Pacman root/database and never targets the real workstation.
 
-- argv classifier never changes transparent argv;
-- path parser/manifest cannot escape root or panic on arbitrary bytes;
-- Paru record and LLM JSON parsers reject malformed/oversized input without excessive allocation;
-- scanner never suppresses deterministic findings under arbitrary LLM output;
-- lifecycle model admits no `approve` without an exact recipe identity, a recorded inspection status (including `partial` or `failed`), visibly recorded limitations/errors, and an explicit human decision;
-
-### SQLite/migration
-
-- fresh schema, each forward migration, interrupted migration, checksum mismatch;
-- foreign keys, uniqueness, atomic approval claim under concurrent goroutines/processes;
-- WAL busy timeout, reader during writer, crash after claim/before consume;
-- quick_check, backup/restore, retention without deleting referenced identities;
-- run the suite against the selected driver and SQLite version.
-
-### Executable dependency contracts
-
-For every supported Paru/Pacman package combination in a disposable Arch image:
-
-- bare Paru maps to `-Syu`;
-- interactive search menu stays on terminal stream, selected names alone on captured stdout, selected and cancelled exit behavior recorded;
-- `-P --order` grammar for repo/AUR target/dep/make and missing/conflict cases;
-- `PreBuildCommand` cwd, env, call count/order, already-built behavior, failure propagation;
-- `--skipreview` prevents post-guard editing;
-- cached artifact policy forces rebuild or verifies an exact recorded artifact;
-- pure repo commands preserve output, TTY, signals, and exit status;
-- Pacman `--print-format` origin/plan fields and `db.lck` contention.
-
-### Security integration
-
-- mutate commit/file/mode/symlink/untracked relevant file after approval;
-- replace workspace directory inode;
-- replay approval from another Paru PID, after expiry, after cancellation, and twice concurrently;
-- race mutation during hashing and immediately after claim;
-- malicious config/PATH/editor/pager/environment;
-- prompt injection, fake deterministic finding, model tool-call-like output, timeout, schema bomb;
-- crash at each approval transition and startup recovery;
-- verify no package code executes during collector/scanner/model phases with marker fixtures.
-
-### End-to-end
-
-Use disposable Arch containers/VMs with private Pacman DB/root and synthetic local repositories/AUR Git remotes. Never target the real workstation.
-
-1. repo-only install/query/remove pass-through;
-2. explicit mixed repo+AUR target with dependencies;
-3. bare upgrade with complete repo phase and approved/deferred/rejected AUR phase;
-4. native interactive search selection;
-5. first install/full review and later differential review;
-6. scanner clear/noteworthy/partial/failed plus LLM enabled/disabled/failed;
-7. cancellation at selection, model, editor, approval, guard, build, Pacman confirmation;
-8. successful build, recorded artifact reuse, tampered cache rejection;
-9. interrupted migration and stale-work cleanup;
-10. package build/install/remove of AURoscope itself, `namcap`, reproducibility attempt.
-
-### Quality gates before implementation can be called complete
-
-- supported-version contract matrix green;
-- race detector and fuzz smoke green;
-- no collector path executes/sources PKGBUILD (marker tests);
-- anti-TOCTOU negative tests all stop before makepkg;
-- complete official upgrade proof in disposable Arch;
-- clean install/upgrade/rollback of the AURoscope package;
-- independent review of schema migrations, path handling, process/signal code, and approval protocol.
+Functional end-to-end coverage may additionally exercise repo-only pass-through, mixed repo/AUR dependencies, upgrades, native selection, cancellation, migrations, cleanup, packaging, and the D4 identity guard. Those are release-confidence tests, not additions to the accepted threat boundary.
 
 ## 10. Unresolved risks and explicit non-goals
 
 - Current stable Paru does not satisfy clean native selection capture. ADR-0002 permits a temporary fail-closed 2.1.0 parser, but format and locale drift can disable that adapter; the clean durable contract still depends on a stable release containing `d1dfbc4`.
 - Paru lacks a stable JSON plan API; its documented text grammar must be contract-tested and version-gated.
 - Transaction-specific config layering is grounded in Paru's parser, but still needs an executable spike for nested includes, repeated sections, whitespace paths, and preservation of every supported user option before ADR acceptance.
-- Same-UID post-guard mutation cannot be fully prevented without moving execution to an immutable/sandboxed snapshot; v1 must state this limit.
+- A compromised local account or machine can tamper with AURoscope, its state, display, or execution flow; local-host protection is outside the accepted threat model.
 - Upstream source archives and compiled binary behavior remain out of scope; approval says “reviewed recipe,” never “safe software.”
 - Clean chroot/sandbox builds are valuable but remain deferred unless Mathieu expands scope.
 - Non-interactive autonomous approve/reject policy remains deferred and requires a separate ADR.
@@ -600,9 +539,9 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) | **Accepted:** [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md) |
 | D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) | Proposed |
 | D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) | Proposed |
-| D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | Proposed |
-| D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) | Proposed |
-| D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) | Proposed |
+| D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | **Accepted:** [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md) |
+| D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) | **Accepted:** [ADR-0013](../decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md) |
+| D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) | **Accepted:** [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md) |
 
 Workflow for every decision issue:
 
@@ -626,10 +565,10 @@ Please accept, amend, reject, or defer each item. Recommendations are not yet de
 8. **D8 — state model — Accepted in [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md):** normalized immutable evidence/decisions plus only the mutable lifecycle rows required for identity, inspection, human authority, status, and recovery; no generic event-sourcing, provenance, EAV, plugin, or speculative schema.
 9. **D9 — approval protocol:** transaction/process/workspace-bound one-shot approvals, 30-minute default expiry, atomic claim, all terminal states invalidate leftovers, explicit same-UID residual risk, and human approval remains representable after visibly recorded partial/failed analysis. **Recommended: accept.**
 10. **D10 — scanner/LLM:** immutable versioned deterministic findings; inference-only optional LLM with no decision field/tools; model failure pauses for human but does not autonomously veto. **Recommended: accept.**
-11. **D11 — XDG/cleanup:** exact layout and permissions above, private runtime dirs, 24-hour stale-work recovery, 90-day reports, 30-day/1-GiB reconstructible cache defaults. **Recommended: accept the structure; amend numerical retention defaults if desired.**
-12. **D12 — threat/tests:** adopt the stated threat boundary and require real supported-version, race, TOCTOU, and disposable-Arch integration proof before v1. **Recommended: accept.**
+11. **D11 — XDG/cleanup — Accepted in [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md):** use the exact XDG layout and private ownership/symlink controls above, 24-hour stale-work recovery, and finite configurable retention defaults: 365-day identity/decision/outcome history, 30-day reports/model JSON, 7-day state backups, 14-day or 512-MiB reconstructible recipe cache, and 3-day failed-work metadata.
+12. **D12 — threat/tests — Accepted in [ADR-0013](../decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md):** limit the adversary model to hostile AUR supply-chain input. Before v1, require a benign/suspicious recipe corpus, proof that inspection executes no package content, faithful evidence/error presentation with human authority, and one disposable-Arch review-to-install E2E. The local machine and account are outside the security guarantee.
 
-13. **D13 — local PKGBUILD builds/repositories:** reject `-B`, targetless `-U`, local path targets, modes containing `pkgbuilds`, and any unexpected PKGBUILD record in v1 because Paru may execute `makepkg --printsrcinfo` before the guard; normalize allowed user modes with final trusted reset flags and design safe local-recipe support separately. **Recommended: accept.**
+13. **D13 — local PKGBUILD builds/repositories — Accepted in [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md):** reject `-B`, targetless `-U`, local path targets, modes containing `pkgbuilds`, and any unexpected PKGBUILD record in v1 because Paru may execute `makepkg --printsrcinfo` before the guard; normalize allowed user modes with final trusted reset flags and design safe local-recipe support separately.
 
 ## Sources
 
