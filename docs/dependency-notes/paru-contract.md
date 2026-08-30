@@ -35,7 +35,7 @@ AURoscope must preserve Paru's native selection and resolver while obtaining a m
 
 ## Project rule
 
-Do not parse Paru's human menu. Production interactive-search support requires a stable Paru release containing `d1dfbc4` (or an explicitly supported patched build), plus an executable contract test. Treat exit `1` as expected only for the verified interactive search-selection subprocess when selected stdout is non-empty and valid. For intercepted v1 flows, reject modes containing pkgbuilds and local/path-like targets, then normalize repo-only, AUR-only, or combined intent with final trusted reset flags; reject local/PKGBUILD-repository builds until inspection can precede every makepkg invocation.
+The durable adapter must not parse Paru's human menu and requires a stable release containing `d1dfbc4`, plus executable capability tests. [ADR-0002](../decisions/0002-paru-native-selection-compatibility.md) permits a strictly temporary exception for Paru 2.1.0: an isolated adapter may parse only the verified combined stdout format, must reject ambiguity or format/locale drift, and must be removed after a fixed stable release passes the capability matrix. Treat exit `1` as expected only for the exact verified interactive search-selection subprocess when valid selected targets were recovered and the child was not terminated by a signal. For intercepted v1 flows, reject modes containing pkgbuilds and local/path-like targets, then normalize repo-only, AUR-only, or combined intent with final trusted reset flags; reject local/PKGBUILD-repository builds until inspection can precede every makepkg invocation.
 
 ## Sources consulted
 

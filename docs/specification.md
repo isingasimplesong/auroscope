@@ -43,7 +43,7 @@ Before changing the system, AURoscope identifies:
 - inspections that can be reused and candidates requiring review;
 - dependency consequences of deferring or rejecting a recipe.
 
-Planning and execution are separate Paru resolver runs. After review and approval, Paru resolves the transaction again; AURoscope compares the resulting versions, origins, dependencies, and recipe identities with the approved plan. Any drift stops execution and returns the transaction to review. Only versioned, contract-tested machine-oriented Paru output may be parsed; the human-facing menu is never parsed, and Paru remains the resolver. This boundary is recorded in [`ADR-0003`](decisions/0003-multi-stage-paru-orchestration.md).
+Planning and execution are separate Paru resolver runs. After review and approval, Paru resolves the transaction again; AURoscope compares the resulting versions, origins, dependencies, and recipe identities with the approved plan. Any drift stops execution and returns the transaction to review. Only versioned, contract-tested Paru output may be parsed; human-facing output is excluded except for ADR-0002's isolated, temporary, fail-closed Paru 2.1.0 selection adapter. Paru remains the resolver. These boundaries are recorded in [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md) and [`ADR-0003`](decisions/0003-multi-stage-paru-orchestration.md).
 
 Official Arch repository upgrades must remain supported, complete transactions. AUR packages may be deferred, together with dependants that cannot safely proceed; the reason must be shown.
 
@@ -194,7 +194,12 @@ ${TMPDIR:-/tmp}/auroscope-*/
 - Temporary clones and downloaded audit inputs must be private, bounded, and removed after success, error, interruption, or cancellation. Stale crash residue must be recoverably cleaned. `/tmp` is not assumed to be RAM; no accumulation is the invariant.
 - Human-readable status is generated from SQLite. Markdown and JSON exports are snapshots, never a second state source.
 
-The accepted technology and dependency decisions are recorded in [`ADR-0001`](decisions/0001-go-and-self-hosted-arch-packaging.md), [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md), and [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md).
+Accepted design decisions relevant to these constraints are recorded in:
+
+- [`ADR-0001`](decisions/0001-go-and-self-hosted-arch-packaging.md);
+- [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md);
+- [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md);
+- [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md).
 
 ## 12. Design before implementation
 
