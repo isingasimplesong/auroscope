@@ -43,6 +43,8 @@ Before changing the system, AURoscope identifies:
 - inspections that can be reused and candidates requiring review;
 - dependency consequences of deferring or rejecting a recipe.
 
+Planning and execution are separate Paru resolver runs. After review and approval, Paru resolves the transaction again; AURoscope compares the resulting versions, origins, dependencies, and recipe identities with the approved plan. Any drift stops execution and returns the transaction to review. Only versioned, contract-tested machine-oriented Paru output may be parsed; the human-facing menu is never parsed, and Paru remains the resolver. This boundary is recorded in [`ADR-0003`](decisions/0003-multi-stage-paru-orchestration.md).
+
 Official Arch repository upgrades must remain supported, complete transactions. AUR packages may be deferred, together with dependants that cannot safely proceed; the reason must be shown.
 
 ## 4. Recipe identity and acquisition
@@ -177,6 +179,7 @@ The default status view reports at least:
 
 - AURoscope is implemented in Go and delivered as a small target-specific executable, initially for Arch Linux on `linux/amd64`.
 - Prefer the Go standard library. Direct dependencies must be ordinary, maintained, minimal, and justified by a concrete need; dependency minimization must not cause bespoke reimplementation of fundamental components.
+- Beyond the SQLite driver, the accepted initial direct dependencies are `github.com/pelletier/go-toml/v2` for strict TOML configuration and `github.com/mattn/go-shellwords v1.0.14` only for non-expanding `$VISUAL`/`$EDITOR` argv parsing. Migrations, LLM validation/client code, and logging use the standard library; no PTY or framework dependency is added without demonstrated need.
 - The initial Arch distribution is a self-hosted AUR-style PKGBUILD repository. Publishing to `aur.archlinux.org` is deferred. Go should be a build dependency rather than a runtime dependency where feasible.
 - SQLite remains the authoritative durable state store. The Arch `linux/amd64` v1 uses pinned `github.com/mattn/go-sqlite3` with CGO; schema, migrations, concurrency, and recovery remain separate design-phase decisions.
 - Standard roots are:
@@ -191,7 +194,7 @@ ${TMPDIR:-/tmp}/auroscope-*/
 - Temporary clones and downloaded audit inputs must be private, bounded, and removed after success, error, interruption, or cancellation. Stale crash residue must be recoverably cleaned. `/tmp` is not assumed to be RAM; no accumulation is the invariant.
 - Human-readable status is generated from SQLite. Markdown and JSON exports are snapshots, never a second state source.
 
-The accepted technology decisions are recorded in [`ADR-0001`](decisions/0001-go-and-self-hosted-arch-packaging.md) and [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md).
+The accepted technology and dependency decisions are recorded in [`ADR-0001`](decisions/0001-go-and-self-hosted-arch-packaging.md), [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md), and [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md).
 
 ## 12. Design before implementation
 
