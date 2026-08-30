@@ -192,6 +192,8 @@ This is one executable and one process except for deliberate external commands. 
 - **Direct inherited descriptors:** pass-through uses `Stdin/Stdout/Stderr = os.*`; selection inherits stdin+stderr and captures only stdout. Recommended.
 - **`github.com/creack/pty`:** defer. Add only if an executable contract test proves a required Paru/Pacman prompt refuses inherited descriptors without a controlling terminal.[22]
 
+**Decision:** The one-executable architecture, explicit internal domain packages, standard-library argument/process handling, and no initial PTY dependency were accepted on 2026-08-30. A PTY remains conditional on a failing executable contract test against a supported dependency version. See [`ADR-0006`](../decisions/0006-go-process-architecture.md).
+
 ### SQLite driver options
 
 #### `github.com/mattn/go-sqlite3`
@@ -338,6 +340,8 @@ The accepted specification currently says `PreBuildCommand` verifies "immediatel
 - **Option A — amend the guarantee to the actual security boundary:** the hook is the final complete recipe-content verification before Paru invokes any makepkg/recipe code; `--skipreview` removes Paru's later edit path, and the manifest is computed twice around the atomic claim. Repository dependency installation may occur later. **Recommended**, because no hostile recipe code runs in the interval and the remaining same-UID race is already explicit.
 - **Option B — require an upstream Paru per-build hook:** preserves the literal wording, but blocks production on an upstream change and still cannot defeat a malicious same-UID process after return.
 - **Option C — interpose an AURoscope makepkg proxy:** can reverify immediately before every makepkg invocation, but becomes a materially broader process boundary, must handle multiple source/prepare/build invocations and VCS `pkgver()` mutations, and needs separate chroot handling. Defer unless Mathieu rejects Option A.
+
+**Decision:** Option A was accepted on 2026-08-30. The guard is the final complete recipe-identity verification after AURoscope review and before any recipe-supplied code executes; it is not represented as adjacent to each build. See [`ADR-0005`](../decisions/0005-recipe-identity-guard-boundary.md).
 
 ### Limits and residual risk
 
@@ -600,8 +604,8 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D1 — Paru compatibility | [#2](https://git.2027a.net/2027a/auroscope/issues/2) |
 | D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) |
 | D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) |
-| D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) |
-| D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) |
+| D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) — accepted in [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md) |
+| D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) — accepted in [ADR-0006](../decisions/0006-go-process-architecture.md) |
 | D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) |
 | D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) |
 | D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) |

@@ -54,7 +54,7 @@ For each AUR `pkgbase`, AURoscope collects recipe data without sourcing the `PKG
 - relevant maintainer and source metadata;
 - hashes of all inspected files.
 
-The candidate commit is an immutable identity, not a risk signal. It is used to define the diff, cache inspections, bind human approval, and prevent time-of-check/time-of-use substitution. File hashes additionally detect local or workspace modifications.
+The candidate commit is an immutable identity, not a risk signal. It is used to define the diff, cache inspections, bind human approval, and detect time-of-check/time-of-use substitution at the pre-execution guard. File hashes additionally detect local or workspace modifications. Mutation after the guard by a separate process running as the same Unix user remains outside this guarantee.
 
 A first installation receives a full recipe review. Later reviews primarily compare the last approved/built identity with the candidate, while including enough complete file context to interpret the diff.
 
@@ -134,7 +134,9 @@ If the user modifies recipe content, the prior identity and approval are invalid
 
 After human decisions, AURoscope delegates the executable plan to Paru/Pacman. Deferred or rejected AUR recipes and impossible dependants are omitted with an explanation; official repository upgrades are not fragmented into unsupported partial upgrades.
 
-Paru's `PreBuildCommand` remains as a narrow guard only. Immediately before each build, it verifies that the recipe commit and file hashes exactly match a live AURoscope approval. Any divergence aborts the build and returns the recipe to review.
+Paru's `PreBuildCommand` remains a narrow guard only. After AURoscope review and before any recipe-supplied code is executed, it performs the last complete identity check of every planned recipe against a live AURoscope approval. The check covers the reviewed commit, tree, tracked-file manifest, and file hashes; any divergence aborts the operation and returns the recipe to review.
+
+Paru does not invoke this hook immediately before each individual build: it may perform other trusted orchestration, including official dependency installation, between the hooks and `makepkg`. AURoscope therefore runs the execution phase with `--skipreview` so Paru cannot edit recipe content after the guard. A separate same-UID process can still race the worktree after the guard returns; eliminating that residual race requires a stronger isolation boundary and is outside the current threat model. This accepted boundary is recorded in [`ADR-0005`](decisions/0005-recipe-identity-guard-boundary.md).
 
 ## 10. SQLite and readable filter state
 
@@ -240,7 +242,7 @@ AURoscope is not useful until tests demonstrate that:
 6. all consequential interactive decisions belong to the user;
 7. held recipes and dependency effects are readable through `status`, `held`, and `explain`;
 8. approval applies only to the exact inspected commit and hashes;
-9. a recipe changed after approval is stopped by the pre-build guard;
+9. a recipe changed after approval and before or during the guard is stopped before recipe-supplied code executes;
 10. cancellation leaves no reusable floating approval;
 11. end-to-end fixtures run in a disposable Arch environment without altering the real workstation.
 
