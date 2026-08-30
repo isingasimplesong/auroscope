@@ -122,6 +122,8 @@ Before the user acts, `decision` is null. In the default interactive `human-auth
 
 Non-interactive modes may later apply an explicit configured policy, but cannot change the default interactive semantics.
 
+An explicit approval is transaction-scoped and one-shot. It binds the source/namespace/`pkgbase`, commit and tree, complete canonical recipe manifest and per-file identity, inspection and human decision, workspace, expected Paru process, and expiry. `PKGBUILD` is included but is not sufficient by itself. The default approval lifetime is 30 minutes, with a configurable maximum of 2 hours. The exact binding, atomic claim, replay prevention, and invalidation rules are recorded in [`ADR-0010`](decisions/0010-one-shot-approval-protocol.md).
+
 ## 8. Generic terminal review
 
 Reports use ordinary text, Markdown, unified diffs, and normal files. The review command resolves the viewer in this order:
@@ -141,6 +143,8 @@ After human decisions, AURoscope delegates the executable plan to Paru/Pacman. D
 Paru's `PreBuildCommand` remains a narrow guard only. After AURoscope review and before any recipe-supplied code is executed, it performs the last complete identity check of every planned recipe against a live AURoscope approval. The check covers the reviewed commit, tree, tracked-file manifest, and file hashes; any divergence aborts the operation and returns the recipe to review.
 
 Paru does not invoke this hook immediately before each individual build: it may perform other trusted orchestration, including official dependency installation, between the hooks and `makepkg`. AURoscope therefore runs the execution phase with `--skipreview` so Paru cannot edit recipe content after the guard. A separate same-UID process can still race the worktree after the guard returns; eliminating that residual race requires a stronger isolation boundary and is outside the current threat model. This accepted boundary is recorded in [`ADR-0005`](decisions/0005-recipe-identity-guard-boundary.md).
+
+The handoff carries only a non-secret transaction ID in a private transaction-specific Paru configuration. The guard verifies the recorded Paru process and workspace, computes the complete identity, atomically claims one matching unexpired SQLite approval, and computes the identity again before returning success. Approval progresses only `armed → claimed → consumed`; mismatch, expiry, cancellation, failure, signal, or another terminal transaction state invalidates all reusable approval state. A claimed or consumed approval cannot authorize another process or transaction. This protocol is recorded in [`ADR-0010`](decisions/0010-one-shot-approval-protocol.md).
 
 ## 10. SQLite and readable filter state
 
@@ -202,6 +206,7 @@ Accepted design decisions relevant to these constraints are recorded in:
 - [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md);
 - [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md);
 - [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md);
+- [`ADR-0010`](decisions/0010-one-shot-approval-protocol.md);
 - [`ADR-0014`](decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
 
 ## 12. Design before implementation

@@ -290,6 +290,8 @@ inspection:  running → complete|partial|failed
 
 ## 5. Approval and anti-TOCTOU protocol
 
+**Decision:** The one-shot transaction-ID handoff, complete identity binding, atomic claim, 30-minute default expiry with a configurable 2-hour maximum, and terminal invalidation rules below were accepted on 2026-08-30. See [`ADR-0010`](../decisions/0010-one-shot-approval-protocol.md). The separately accepted final guard timing remains governed by [`ADR-0005`](../decisions/0005-recipe-identity-guard-boundary.md).
+
 ### Identity
 
 An approval binds all of:
@@ -313,13 +315,13 @@ The commit OID is identity, not a safety score. The manifest additionally detect
 
 - **Bearer token in environment:** simple, but inherited by subprocesses and unnecessary before recipe execution. Rejected.
 - **One-shot token file:** limits accidental reuse but adds secret-file lifecycle without defeating the same-UID threat.
-- **Transaction ID plus process/workspace binding in SQLite:** recommended. The transaction ID is not treated as a secret.
+- **Transaction ID plus process/workspace binding in SQLite:** accepted. The transaction ID is not treated as a secret.
 
-### Recommended protocol
+### Accepted protocol
 
 1. Wrapper creates transaction and private runtime directory (`0700`), records its own PID/start time.
 2. It plans, clones, safely collects, scans, obtains optional LLM assessment, and records the user's decision.
-3. For each approved identity it inserts an `armed` approval with a short expiry (recommended: 30 minutes, configurable maximum 2 hours).
+3. For each approved identity it inserts an `armed` approval with a 30-minute default expiry and a configurable maximum of 2 hours.
 4. It writes a transaction-specific Paru config (`0600`) whose `PreBuildCommand` is a fixed shell command equivalent to:
 
    ```text
