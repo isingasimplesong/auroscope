@@ -153,6 +153,8 @@ SQLite is the sole authoritative store for:
 - build/install outcomes;
 - report, model, and prompt-version metadata.
 
+The v1 schema is deliberately instrumental rather than generic. It contains only the identity, inspection, deterministic finding, human decision, transaction/guard, build-artifact, installation-outcome, and migration records needed by an actual v1 workflow, query, or testable invariant. LLM assessment persistence is added only with that feature. Generic event sourcing, provenance/EAV/plugin schemas, and speculative fields are excluded; later features grow the store through forward migrations. The accepted boundary and required approval/artifact invariants are recorded in [`ADR-0009`](decisions/0009-minimal-sqlite-state-model.md).
+
 Human-readable state is generated from SQLite rather than maintained as a second mutable state file:
 
 ```console
@@ -181,7 +183,7 @@ The default status view reports at least:
 - Prefer the Go standard library. Direct dependencies must be ordinary, maintained, minimal, and justified by a concrete need; dependency minimization must not cause bespoke reimplementation of fundamental components.
 - Beyond the SQLite driver, the accepted initial direct dependencies are `github.com/pelletier/go-toml/v2` for strict TOML configuration and `github.com/mattn/go-shellwords v1.0.14` only for non-expanding `$VISUAL`/`$EDITOR` argv parsing. Migrations, LLM validation/client code, and logging use the standard library; no PTY or framework dependency is added without demonstrated need.
 - The initial Arch distribution is a self-hosted AUR-style PKGBUILD repository. Publishing to `aur.archlinux.org` is deferred. Go should be a build dependency rather than a runtime dependency where feasible.
-- SQLite remains the authoritative durable state store. The Arch `linux/amd64` v1 uses pinned `github.com/mattn/go-sqlite3` with CGO; schema, migrations, concurrency, and recovery remain separate design-phase decisions.
+- SQLite remains the authoritative durable state store. The Arch `linux/amd64` v1 uses pinned `github.com/mattn/go-sqlite3` with CGO; the minimal state-model boundary is accepted in ADR-0009, while exact SQL migrations and concurrency/recovery mechanics still require implementation-lane verification.
 - Standard roots are:
 
 ```text
@@ -199,7 +201,8 @@ Accepted design decisions relevant to these constraints are recorded in:
 - [`ADR-0001`](decisions/0001-go-and-self-hosted-arch-packaging.md);
 - [`ADR-0002`](decisions/0002-paru-native-selection-compatibility.md);
 - [`ADR-0007`](decisions/0007-mattn-go-sqlite3-cgo.md);
-- [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md).
+- [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md);
+- [`ADR-0009`](decisions/0009-minimal-sqlite-state-model.md).
 
 ## 12. Design before implementation
 
