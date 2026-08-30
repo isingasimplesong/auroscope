@@ -605,7 +605,7 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) — accepted in [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md) |
 | D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) |
 | D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) — accepted in [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md) |
-| D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) |
+| D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) — accepted in [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md) |
 | D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) |
 | D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) |
 | D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) |
@@ -620,7 +620,7 @@ Workflow for every issue:
 3. Mathieu gives an explicit **go** for that issue.
 4. Only then may Héphaïstos record the accepted decision in an ADR and close the issue after verifying both effects.
 
-Until step 3 is complete for a given item, that item remains **Proposed**. The PR itself is evidence and discussion material, not approval.
+Until step 3 is complete and the resulting ADR is committed for a given item, that item remains **Proposed**. Accepted items below link to their ADR. The PR itself is evidence and discussion material, not approval.
 
 Please accept, amend, reject, or defer each item. Recommendations are not yet decisions.
 
@@ -630,7 +630,7 @@ Please accept, amend, reject, or defer each item. Recommendations are not yet de
 4. **D4 — execution/cache and specification amendment:** accept Paru's actual `PreBuildCommand` point as the last recipe-content check before any makepkg/recipe execution (not literally immediately before each build), run with `--skipreview`, and rebuild unless a cached artifact hash is tied to the exact approved identity. This explicitly amends the current wording in `docs/specification.md`; alternatives are to block production pending an upstream per-build hook or add a makepkg proxy. **Recommended: accept the explicit amendment; do not pretend current Paru offers a later hook.**
 5. **D5 — Go process architecture:** one executable, explicit internal packages, standard-library argv/process handling, no CLI framework and no PTY dependency initially. **Recommended: accept.**
 6. **D6 — SQLite driver — Accepted:** use `mattn/go-sqlite3 v1.14.50` with CGO for Arch `linux/amd64` v1; revisit pure Go only with real cross-target need. Record: [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md).
-7. **D7 — remaining dependencies:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords` with expansions disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework. **Recommended: accept.**
+7. **D7 — remaining dependencies — Accepted:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords v1.0.14` with environment and backtick expansion disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework or PTY dependency without demonstrated need. See [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md).
 8. **D8 — state model:** normalized immutable evidence/history plus explicit transaction/approval/build lifecycle tables; WAL, short writes, application mutator lock, no event-sourcing framework. **Recommended: accept.**
 9. **D9 — approval protocol:** transaction/process/workspace-bound one-shot approvals, 30-minute default expiry, atomic claim, all terminal states invalidate leftovers, explicit same-UID residual risk, and human approval remains representable after visibly recorded partial/failed analysis. **Recommended: accept.**
 10. **D10 — scanner/LLM:** immutable versioned deterministic findings; inference-only optional LLM with no decision field/tools; model failure pauses for human but does not autonomously veto. **Recommended: accept.**
