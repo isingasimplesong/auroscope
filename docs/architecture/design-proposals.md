@@ -339,6 +339,8 @@ The accepted specification currently says `PreBuildCommand` verifies "immediatel
 - **Option B — require an upstream Paru per-build hook:** preserves the literal wording, but blocks production on an upstream change and still cannot defeat a malicious same-UID process after return.
 - **Option C — interpose an AURoscope makepkg proxy:** can reverify immediately before every makepkg invocation, but becomes a materially broader process boundary, must handle multiple source/prepare/build invocations and VCS `pkgver()` mutations, and needs separate chroot handling. Defer unless Mathieu rejects Option A.
 
+**Decision:** Option A was accepted on 2026-08-30. The guard is the final complete recipe-identity verification after AURoscope review and before any recipe-supplied code executes; it is not represented as adjacent to each build. See [`ADR-0005`](../decisions/0005-recipe-identity-guard-boundary.md).
+
 ### Limits and residual risk
 
 - Paru runs all pre-build commands before its own review and before later build steps, not literally immediately before each makepkg exec.[4] `--skipreview` removes the known post-guard edit path.
@@ -600,7 +602,7 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D1 — Paru compatibility | [#2](https://git.2027a.net/2027a/auroscope/issues/2) |
 | D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) |
 | D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) |
-| D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) |
+| D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) — accepted in [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md) |
 | D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) |
 | D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) |
 | D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) |
@@ -618,7 +620,7 @@ Workflow for every issue:
 3. Mathieu gives an explicit **go** for that issue.
 4. Only then may Héphaïstos record the accepted decision in an ADR and close the issue after verifying both effects.
 
-Until step 3, every item below remains **Proposed**. The PR itself is evidence and discussion material, not approval.
+Until step 3 is complete for a given item, that item remains **Proposed**. The PR itself is evidence and discussion material, not approval.
 
 Please accept, amend, reject, or defer each item. Recommendations are not yet decisions.
 
