@@ -81,6 +81,17 @@ Propose unit, contract, PTY, SQLite/migration, scanner, LLM, TOCTOU, failure, an
 8. Produce the detailed implementation plan only after the design decisions are accepted.
 9. Do not start production implementation during this phase unless Mathieu explicitly advances the phase.
 
+## Decision issue protocol
+
+Consequential design choices are discussed in Forgejo issues whose first non-empty line is `MODE: DECISION`.
+
+- Ordinary comments continue a bounded issue discussion; they do not authorize repository changes, ADR acceptance, implementation, or closure.
+- Mathieu accepts the latest concrete proposal by posting a standalone comment exactly equal to `GO DECISION`.
+- The watcher validates Mathieu's pinned Forgejo identity and requires the GO to be the latest external comment, then transfers the issue from `Agent/Human` to `Agent/Hermes` for ADR/docs finalization.
+- Finalization records and verifies the decision, but cannot write production code or the implementation plan.
+- Executable follow-up work uses a separate issue whose first non-empty line is `MODE: EXECUTION`.
+- Missing or contradictory routing fails closed under `Agent/Needs Review`.
+
 Expected design artifacts may include:
 
 ```text
