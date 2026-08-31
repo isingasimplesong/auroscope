@@ -55,7 +55,7 @@ Define the exact commit/hash identity, approval scope and expiry, wrapper-to-`Pr
 
 ### 5. Deterministic scanner and LLM contracts
 
-Propose versioned schemas, initial rule catalogue, evidence semantics, context selection/truncation, prompt-injection boundaries, model/provider configuration, privacy, timeout/failure behavior, and logging. The LLM must never rewrite or suppress deterministic findings.
+The accepted boundary is recorded in [`ADR-0011`](decisions/0011-deterministic-scanner-and-llm-contracts.md). Use immutable versioned deterministic findings, explicit context/truncation state, and optional advisory LLM output that has no decision or action field and cannot rewrite scanner evidence. Support explicit Codex/API/disabled modes and deterministic automatic API-then-Codex selection, with a configurable Codex model defaulting to `5.6-luna`, best-effort exposure reduction, strict local output validation, and visible failure without implicit fallback.
 
 ### 6. Configuration and XDG layout
 
@@ -63,11 +63,11 @@ Propose the config format, defaults, exact paths, permissions, report generation
 
 ### 7. Threat model
 
-Cover hostile Git repositories and recipes, symlinks/path traversal, prompt injection, audit/build substitution, PATH/editor/config manipulation, sudo and privilege boundaries, process concurrency, Pacman locking, secrets, reports, and crash residue.
+The accepted boundary is recorded in [`ADR-0013`](decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md). Cover hostile AUR recipes, repository files, source/upstream material and metadata, non-executing inspection, prompt injection, evidence provenance, analysis failure, and honest residual-risk language. The local machine, account, other local processes, configuration/editors, and general sudo hardening are outside the security guarantee; test their behavior only where ordinary application correctness requires it.
 
 ### 8. Test strategy
 
-Propose unit, contract, PTY, SQLite/migration, scanner, LLM, TOCTOU, failure, and disposable-Arch end-to-end tests. Keep the plan proportional, but require real integration proof for security boundaries.
+Keep ordinary unit, contract, PTY, SQLite/migration, scanner, LLM, identity-guard, and failure tests proportional to their functional contracts. The mandatory v1 security gates are narrower: a benign/suspicious recipe corpus, proof that inspection executes no package content, faithful evidence/error presentation with no automatic decision, and one disposable-Arch review-to-install end-to-end test. Never run that proof against the real workstation.
 
 ## Process and deliverables
 
@@ -80,6 +80,17 @@ Propose unit, contract, PTY, SQLite/migration, scanner, LLM, TOCTOU, failure, an
 7. Record accepted choices as ADRs under `docs/decisions/`.
 8. Produce the detailed implementation plan only after the design decisions are accepted.
 9. Do not start production implementation during this phase unless Mathieu explicitly advances the phase.
+
+## Decision issue protocol
+
+Consequential design choices are discussed in Forgejo issues whose first non-empty line is `MODE: DECISION`.
+
+- Ordinary comments continue a bounded issue discussion; they do not authorize repository changes, ADR acceptance, implementation, or closure.
+- Mathieu accepts the latest concrete proposal by posting a standalone comment exactly equal to `GO DECISION`.
+- The watcher validates Mathieu's pinned Forgejo identity and requires the GO to be the latest external comment, then transfers the issue from `Agent/Human` to `Agent/Hermes` for ADR/docs finalization.
+- Finalization records and verifies the decision, but cannot write production code or the implementation plan.
+- Executable follow-up work uses a separate issue whose first non-empty line is `MODE: EXECUTION`.
+- Missing or contradictory routing fails closed under `Agent/Needs Review`.
 
 Expected design artifacts may include:
 

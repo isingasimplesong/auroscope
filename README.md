@@ -26,7 +26,7 @@ Start with [the design-phase mandate](docs/design-phase.md). Repository agents m
 - Deterministic findings and LLM assessments are advisory evidence, never autonomous decisions.
 - Interactive users retain final authority to approve, inspect, defer, or reject an exact recipe.
 - Approvals bind to immutable Git commits and file hashes.
-- A minimal Paru `PreBuildCommand` prevents changes between review and build.
+- A minimal Paru `PreBuildCommand` verifies the complete reviewed recipe identity at the final boundary before any recipe-supplied code executes.
 - SQLite is the source of truth; readable status views are generated from it.
 - Reports use ordinary text, Markdown, unified diffs, `$VISUAL`, and `$EDITOR` without editor-specific plugins.
 - The implementation language is Go, with minimal justified dependencies and a self-hosted AUR-style PKGBUILD as the initial distribution path.
