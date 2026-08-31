@@ -33,9 +33,9 @@ AURoscope must preserve Paru's native selection and resolver while obtaining a m
 - A benign local `paru -B` with layered config confirmed the final `PreBuildCommand` override, but Paru generated `.SRCINFO` through makepkg before that hook.
 - A configured marker-writing PKGBUILD repository with `PkgbuildsOnly` and `GenerateSrcinfo` remained unexecuted when trusted CLI flags `--repo --mode=aur` were injected; the marker was absent, confirming config mode was reset then limited to repo+AUR on commit `9ac3578`.
 
-## Project rule
+## Current use under ADR-0015
 
-The durable adapter must not parse Paru's human menu and requires a stable release containing `d1dfbc4`, plus executable capability tests. [ADR-0002](../decisions/0002-paru-native-selection-compatibility.md) permits a strictly temporary exception for Paru 2.1.0: an isolated adapter may parse only the verified combined stdout format, must reject ambiguity or format/locale drift, and must be removed after a fixed stable release passes the capability matrix. Treat exit `1` as expected only for the exact verified interactive search-selection subprocess when valid selected targets were recovered and the child was not terminated by a signal. For intercepted v1 flows, reject modes containing pkgbuilds and local/path-like targets, then normalize repo-only, AUR-only, or combined intent with final trusted reset flags; reject local/PKGBUILD-repository builds until inspection can precede every makepkg invocation.
+These findings are historical evidence, not a complete active adapter contract. The first executable task must revalidate one supported Paru version and prove the exact native search/selection, AUR worktree, edit/re-audit, skip/exclusion, final build, and `PreBuildCommand` path required by [ADR-0015](../decisions/0015-minimal-llm-first-wrapper.md). Do not carry forward the transitional human-menu parser, broad mode classifier, or closure machinery merely because they were explored here.
 
 ## Sources consulted
 
