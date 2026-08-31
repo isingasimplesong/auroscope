@@ -8,7 +8,7 @@ Before acting, read in full:
 2. `docs/specification.md`
 3. `docs/architecture/minimal-v1.md`
 4. `docs/design-phase.md`
-5. active ADRs under `docs/decisions/`
+5. `docs/decisions/README.md` and the active ADRs it lists
 
 Rules:
 
