@@ -79,13 +79,21 @@ Local rules emit immutable, evidence-backed findings with at least:
 
 Rules may detect direct execution of downloads, obfuscation, sensitive home-directory access, new domains, `SKIP` checksums, install scripts, systemd/udev/polkit/sudoers changes, dangerous permissions, setuid/capabilities, and changes to `provides`, `conflicts`, or `replaces`.
 
-A finding is an observation, never a decision. Its evidence and rule-defined severity cannot be silently rewritten, removed, upgraded, or downgraded by the LLM or an aggregate score.
+A finding is an observation, never a decision. Its stable identity binds the versioned rule, recipe location, and evidence digest rather than mutable prose. Its evidence and rule-defined severity cannot be silently rewritten, removed, upgraded, or downgraded by the LLM or an aggregate score.
+
+Initial context ceilings are 256 KiB per file, 2 MiB aggregate text, 512 KiB diff, and 200 files. They must be benchmarked before v1 and versioned if changed incompatibly. Relevant truncation or omission makes the inspection visibly `partial`, produces an `unknown` or `caution` signal, and pauses for human review; it never silently becomes `clear`.
 
 ## 6. Constrained LLM assessment
 
-The model receives the diff, necessary changed-file context, selected metadata, and deterministic findings explicitly labelled as untrusted package content and immutable scanner output.
+The model receives the diff, necessary changed-file context, selected metadata, and deterministic findings explicitly labelled as untrusted package content and immutable scanner output. Unnecessary host paths, environment values, credentials, and unrelated local content are excluded.
 
-It may explain changes, identify contextual relationships, highlight uncertainty, and suggest points for human attention. It may not decide installation, modify deterministic findings, invoke tools, access the host/network/secrets, or present its output as proof. Its response must pass a strict JSON schema.
+It may explain changes, identify contextual relationships, highlight uncertainty, and suggest points for human attention. It may not decide installation, modify deterministic findings, trigger an action, or present its output as proof. Its bounded response has no approval/allow/deny/action field and must pass strict local schema, size, path, and line-reference validation.
+
+An explicitly configured backend wins: `codex`, a supported API backend, or `disabled`. Automatic mode prefers a complete OpenAI, OpenRouter, or custom OpenAI-compatible configuration with provider/endpoint, API-key reference, and model; otherwise it uses an installed and authenticated Codex CLI. The Codex model is configurable and defaults to exactly `5.6-luna`.
+
+Codex runs outside the recipe repository in a private temporary directory containing only the bounded, redacted assessment input. AURoscope reduces exposure but does not claim to sandbox Codex or disable all of its normal tools. HTTP remains the narrower inference path. Both outputs are untrusted until locally validated.
+
+An incomplete explicit backend, unauthenticated Codex, timeout, transport/provider failure, or invalid response is shown with a remedy, produces LLM signal `unknown`, and pauses for the user. There is no silent backend/model fallback, autonomous veto, or silent approval. These accepted contracts are recorded in [`ADR-0011`](decisions/0011-deterministic-scanner-and-llm-contracts.md).
 
 ## 7. State model and human authority
 
@@ -187,7 +195,7 @@ The default status view reports at least:
 
 - AURoscope is implemented in Go and delivered as a small target-specific executable, initially for Arch Linux on `linux/amd64`.
 - Prefer the Go standard library. Direct dependencies must be ordinary, maintained, minimal, and justified by a concrete need; dependency minimization must not cause bespoke reimplementation of fundamental components.
-- Beyond the SQLite driver, the accepted initial direct dependencies are `github.com/pelletier/go-toml/v2` for strict TOML configuration and `github.com/mattn/go-shellwords v1.0.14` only for non-expanding `$VISUAL`/`$EDITOR` argv parsing. Migrations, LLM validation/client code, and logging use the standard library; no PTY or framework dependency is added without demonstrated need.
+- Beyond the SQLite driver, the accepted initial direct dependencies are `github.com/pelletier/go-toml/v2` for strict TOML configuration and `github.com/mattn/go-shellwords v1.0.14` only for non-expanding `$VISUAL`/`$EDITOR` argv parsing. Migrations, LLM validation, HTTP client code, Codex process invocation, and logging use the standard library; no LLM SDK, PTY, or framework dependency is added without demonstrated need.
 - The initial Arch distribution is a self-hosted AUR-style PKGBUILD repository. Publishing to `aur.archlinux.org` is deferred. Go should be a build dependency rather than a runtime dependency where feasible.
 - SQLite remains the authoritative durable state store. The Arch `linux/amd64` v1 uses pinned `github.com/mattn/go-sqlite3` with CGO; the minimal state-model boundary is accepted in ADR-0009, while exact SQL migrations and concurrency/recovery mechanics still require implementation-lane verification.
 - The accepted concrete storage layout is:
@@ -216,6 +224,7 @@ Accepted design decisions relevant to these constraints are recorded in:
 - [`ADR-0008`](decisions/0008-minimal-direct-go-dependencies.md);
 - [`ADR-0009`](decisions/0009-minimal-sqlite-state-model.md);
 - [`ADR-0010`](decisions/0010-one-shot-approval-protocol.md);
+- [`ADR-0011`](decisions/0011-deterministic-scanner-and-llm-contracts.md);
 - [`ADR-0012`](decisions/0012-xdg-layout-permissions-retention.md);
 - [`ADR-0013`](decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md);
 - [`ADR-0014`](decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).

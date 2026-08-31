@@ -177,7 +177,7 @@ internal/process       argv-only subprocesses, process groups, signals
 internal/paru          versioned Paru adapter and parsers
 internal/recipe        Git identity, safe manifest, diff/context
 internal/scanner       deterministic immutable findings
-internal/llm           inference-only HTTP contract and validation
+internal/llm           HTTP/Codex backend selection and validation
 internal/review        terminal presentation and human decisions
 internal/store         SQLite transactions, migrations, queries
 internal/approval      approval lifecycle and guard command
@@ -219,7 +219,7 @@ This is one executable and one process except for deliberate external commands. 
 | PTY | none initially | inherited descriptors satisfy the post-fix Paru selection contract |
 | migrations | none | ordered SQL files embedded with `//go:embed`, applied transactionally |
 | JSON Schema runtime | none initially | typed `encoding/json`, `DisallowUnknownFields`, size bounds, enum/range/cross-field validation |
-| LLM SDK | none | a narrow OpenAI-compatible HTTP adapter is smaller and easier to constrain |
+| LLM SDK | none | standard-library HTTP plus optional Codex process invocation implement ADR-0011 without a Go SDK/framework |
 | logging framework | none | structured records in SQLite plus concise stderr diagnostics |
 | shell-word parser | `github.com/mattn/go-shellwords v1.0.14` | parse common `$VISUAL`/`$EDITOR` values with arguments without invoking a shell; environment and backtick expansion must remain disabled.[27] |
 
@@ -353,6 +353,8 @@ The accepted specification currently says `PreBuildCommand` verifies "immediatel
 
 ## 6. Deterministic scanner and LLM contracts
 
+**Accepted:** the contracts in this section, including the amended dual-backend selection and Codex exposure boundary, are recorded in [ADR-0011](../decisions/0011-deterministic-scanner-and-llm-contracts.md).
+
 ### Deterministic finding schema v1
 
 ```json
@@ -389,14 +391,14 @@ Regex-only rules are insufficient for shell semantics. V1 may combine lexical pa
 ### Context and truncation
 
 - Always include manifest, metadata, deterministic findings, changed files, unified diff, and full context for executable recipe files within limits.
-- Default proposal: 256 KiB/file, 2 MiB aggregate text, 512 KiB diff, 200 files. These are starting limits to benchmark, not accepted constants.
+- Initial accepted ceilings are 256 KiB/file, 2 MiB aggregate text, 512 KiB diff, and 200 files. They remain subject to pre-v1 corpus benchmarks; incompatible changes require a new scanner/context contract version.
 - Binary files get metadata/hash/type only unless a dedicated parser exists.
 - Truncation or omitted relevant files sets inspection `partial`, advisory `unknown|caution`, and always pauses for human review. It never silently becomes clear.
 - First install compares against an empty baseline and includes full relevant text. Later inspection uses last approved/built identity plus complete changed-file context.
 
 ### LLM request/response
 
-Use an inference-only HTTP adapter. Do not grant tools, shell, filesystem, browser, plugins, or agent loops. Send only selected recipe data; strip host absolute paths, usernames, environment, credentials, and unrelated comments by policy. Package content is serialized inside a JSON data object and labelled untrusted; prompt-injection text remains data, never policy.
+Support a narrow HTTP adapter and a Codex CLI adapter. Send only selected recipe data; strip unnecessary host absolute paths, usernames, environment, credentials, and unrelated local content by policy. Package content is serialized inside a JSON data object and labelled untrusted; prompt-injection text remains data, never policy.
 
 Response v1 contains only:
 
@@ -411,13 +413,16 @@ uncertainties[]
 
 It contains no `approve`, `allow`, `deny`, or final decision field. Local validation requires known paths, real line ranges, bounded strings/counts, no extra fields, and valid UTF-8. Deterministic findings are supplied read-only and are not echoed as authoritative replacements.
 
-### Provider/config/privacy options
+### Provider/config/privacy contract
 
-- **Provider SDK/agent CLI:** feature-rich but expands behavior and credential surface. Not recommended as default.
-- **OpenAI-compatible HTTP:** small, inference-only, explicit endpoint/model/key environment name. Recommended.
-- **Disabled LLM:** supported; inspection may still be complete from deterministic scanning, with advisory level derived without pretending model evidence exists.
+- Explicit backend selection always wins: `codex`, a supported API backend, or `disabled`.
+- Automatic mode prefers a complete OpenAI, OpenRouter, or custom OpenAI-compatible configuration consisting of provider/endpoint, API-key reference, and model. Without one, it uses an installed and authenticated Codex CLI.
+- The Codex model is configurable and defaults to exactly `5.6-luna` when omitted.
+- Explicitly incomplete configuration, unauthenticated Codex, timeout, transport failure, provider refusal, or invalid output is visible and actionable. It yields LLM signal `unknown` and a human pause, with no silent backend or model fallback.
+- Run Codex outside the recipe repository in a private temporary directory containing only bounded redacted input. Do not deliberately pass business secrets or unnecessary host paths. Codex may retain its normal tools; this is exposure reduction, not a sandbox guarantee. Its output remains untrusted and must pass the same local schema and reference validation as HTTP output.
+- `disabled` is supported; deterministic inspection remains distinct and does not pretend model evidence exists.
 
-Default failure behavior: timeout, transport error, schema failure, truncation, or provider refusal records LLM status `failed`, overall inspection `partial` only if model analysis was required by policy, advisory `unknown`, and pauses for human decision. Human approval remains possible after visible failure in interactive human-authority mode; failure is neither veto nor approval.
+Human approval remains possible after a visible model failure in interactive human-authority mode; failure is neither veto nor approval.
 
 Log request/response hashes and bounded redacted metadata. Raw prompts/responses are `0600`, retained by explicit policy, and omitted entirely when privacy mode disables them. Secrets are referenced by environment-variable name, never stored in TOML or SQLite.
 
@@ -425,7 +430,7 @@ Log request/response hashes and bounded redacted metadata. Raw prompts/responses
 
 From `2027a/paru-llm-audit`, retain only proven ideas/fixtures: tracked-artifact inventory, no-follow collection, escaped terminal output, visible truncation findings, prompt-injection fixtures, strict model output validation, and before/after snapshot comparison.[24]
 
-Do **not** inherit its hook-centered architecture, aggregate automatic allow/block policy, Codex CLI backend, Python code, or mutable acceptance state. AURoscope has a different human-authority and transaction model.
+Do **not** inherit its hook-centered architecture, aggregate automatic allow/block policy, Python code, or mutable acceptance state. AURoscope's accepted Codex adapter is a new bounded backend contract under its different human-authority and transaction model, not inherited code or policy.
 
 ## 7. Configuration, XDG, reports, and cleanup
 
@@ -493,7 +498,7 @@ Supply-chain abuse cases in scope are deliberately narrow:
 | Hostile AUR input | Required behavior | Residual risk/proof |
 |---|---|---|
 | suspicious or obfuscated recipe behavior | deterministic corpus covers every advertised indicator and preserves evidence provenance | indicators can miss malicious behavior; no “safe” verdict |
-| recipe/source content attempting prompt injection | package content remains delimited data; model has no tools or decision field; output is strictly validated | model advice can still be wrong |
+| recipe/source content attempting prompt injection | package content remains delimited data; the model has no decision/action field; output is strictly validated; Codex receives only bounded redacted input outside the repository | model advice can still be wrong; Codex tools are not sandboxed |
 | `PKGBUILD`, source, symlink, path, or filename causing execution during inspection | collection and analysis never source or execute package content; rendering is escaped and bounded | marker fixtures provide executable proof |
 | malformed, oversized, partial, or failed analysis | explicit visible failure/limitation; no silent approval and no automatic veto | user still decides with incomplete evidence |
 | confusing or unattributed findings | readable report separates deterministic and LLM evidence and identifies indicator provenance | presentation tests cover the decision surface |
@@ -538,7 +543,7 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) | **Accepted:** [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md) |
 | D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) | **Accepted:** [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md) |
 | D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) | Proposed |
-| D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) | Proposed |
+| D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) | **Accepted:** [ADR-0011](../decisions/0011-deterministic-scanner-and-llm-contracts.md) |
 | D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | **Accepted:** [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md) |
 | D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) | **Accepted:** [ADR-0013](../decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md) |
 | D13 — local PKGBUILD scope | [#14](https://git.2027a.net/2027a/auroscope/issues/14) | **Accepted:** [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md) |
@@ -564,7 +569,7 @@ Please accept, amend, reject, or defer each item. Recommendations are not yet de
 7. **D7 — remaining dependencies — Accepted:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords v1.0.14` with environment and backtick expansion disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework or PTY dependency without demonstrated need. See [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md).
 8. **D8 — state model — Accepted in [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md):** normalized immutable evidence/decisions plus only the mutable lifecycle rows required for identity, inspection, human authority, status, and recovery; no generic event-sourcing, provenance, EAV, plugin, or speculative schema.
 9. **D9 — approval protocol:** transaction/process/workspace-bound one-shot approvals, 30-minute default expiry, atomic claim, all terminal states invalidate leftovers, explicit same-UID residual risk, and human approval remains representable after visibly recorded partial/failed analysis. **Recommended: accept.**
-10. **D10 — scanner/LLM:** immutable versioned deterministic findings; inference-only optional LLM with no decision field/tools; model failure pauses for human but does not autonomously veto. **Recommended: accept.**
+10. **D10 — scanner/LLM — Accepted in [ADR-0011](../decisions/0011-deterministic-scanner-and-llm-contracts.md):** immutable versioned deterministic findings; optional advisory LLM with no decision/action field; explicit `codex`, supported API, and `disabled` modes plus automatic “complete API, otherwise Codex” selection; configurable Codex model defaulting to `5.6-luna`; bounded best-effort Codex exposure; strict local output validation; visible failure and human pause without implicit fallback or autonomous veto.
 11. **D11 — XDG/cleanup — Accepted in [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md):** use the exact XDG layout and private ownership/symlink controls above, 24-hour stale-work recovery, and finite configurable retention defaults: 365-day identity/decision/outcome history, 30-day reports/model JSON, 7-day state backups, 14-day or 512-MiB reconstructible recipe cache, and 3-day failed-work metadata.
 12. **D12 — threat/tests — Accepted in [ADR-0013](../decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md):** limit the adversary model to hostile AUR supply-chain input. Before v1, require a benign/suspicious recipe corpus, proof that inspection executes no package content, faithful evidence/error presentation with human authority, and one disposable-Arch review-to-install E2E. The local machine and account are outside the security guarantee.
 

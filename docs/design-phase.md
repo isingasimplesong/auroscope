@@ -55,7 +55,7 @@ Define the exact commit/hash identity, approval scope and expiry, wrapper-to-`Pr
 
 ### 5. Deterministic scanner and LLM contracts
 
-Propose versioned schemas, initial rule catalogue, evidence semantics, context selection/truncation, prompt-injection boundaries, model/provider configuration, privacy, timeout/failure behavior, and logging. The LLM must never rewrite or suppress deterministic findings.
+The accepted boundary is recorded in [`ADR-0011`](decisions/0011-deterministic-scanner-and-llm-contracts.md). Use immutable versioned deterministic findings, explicit context/truncation state, and optional advisory LLM output that has no decision or action field and cannot rewrite scanner evidence. Support explicit Codex/API/disabled modes and deterministic automatic API-then-Codex selection, with a configurable Codex model defaulting to `5.6-luna`, best-effort exposure reduction, strict local output validation, and visible failure without implicit fallback.
 
 ### 6. Configuration and XDG layout
 

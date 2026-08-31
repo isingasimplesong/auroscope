@@ -69,4 +69,4 @@ The v1 security quality gates are deliberately limited to:
 - A malicious package can evade the advertised indicators or appear benign; advisory evidence is not proof of safety.
 - Upstream source and compiled behavior are not exhaustively analyzed in v1.
 - A compromised local account or machine can tamper with AURoscope, its state, its display, or the package-management flow.
-- The LLM may be wrong or manipulated by package content; strict isolation and validation constrain its role but do not make its advice authoritative.
+- The LLM may be wrong or manipulated by package content; bounded input, local output validation, and the no-decision contract constrain its role but do not make its advice authoritative. Codex exposure reduction is best effort under ADR-0011, not a sandbox guarantee.

@@ -21,11 +21,11 @@ AURoscope will not initially add direct dependencies for:
 
 - migrations, which use ordered SQL embedded with `go:embed` and are applied transactionally;
 - LLM response validation, which uses typed `encoding/json`, `DisallowUnknownFields`, explicit bounds, and semantic validation;
-- the LLM client, which is a narrow inference-only OpenAI-compatible HTTP adapter;
+- LLM backends, which use a narrow standard-library OpenAI-compatible HTTP adapter and optional standard-library Codex process invocation under [ADR-0011](0011-deterministic-scanner-and-llm-contracts.md);
 - logging, which uses concise stderr diagnostics plus structured SQLite state;
 - PTY handling, unless an executable dependency contract proves inherited descriptors insufficient.
 
-No CLI, configuration, migration, logging, or LLM framework is accepted. Any future direct dependency requires a concrete need; a structurally consequential addition requires its own ADR.
+No CLI, configuration, migration, logging, or LLM framework is accepted. Codex CLI is an optional external executable backend, not a Go module or framework dependency. Any future direct dependency requires a concrete need; a structurally consequential addition requires its own ADR.
 
 ## Options considered
 
