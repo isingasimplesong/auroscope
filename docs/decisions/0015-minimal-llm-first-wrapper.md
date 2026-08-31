@@ -16,7 +16,7 @@ Build v1 as a minimal LLM-first wrapper:
 
 1. Official repository updates and installs remain native Paru/Pacman operations with no audit.
 2. Search and numbered selection remain Paru-native.
-3. Only selected AUR package bases enter AURoscope's audit path.
+3. Every AUR package base in Paru's resolved build set—explicit target or dependency—enters AURoscope's audit path; official package dependencies never do.
 4. Codex CLI is the single mandatory v1 LLM backend. There is no HTTP backend, automatic fallback, disabled audit mode, or competing deterministic security scanner.
 5. AURoscope compares each exact recipe worktree with the last successfully approved/built commit, or audits the full recipe on first use.
 6. The user chooses `approve`, `inspect`, `edit` and re-audit, `skip`, or `cancel` per package base.

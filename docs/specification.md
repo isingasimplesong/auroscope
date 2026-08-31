@@ -54,7 +54,7 @@ V1 supports one explicitly versioned Paru machine-readable surface. Unsupported 
 
 ## 5. AUR audit input
 
-For every selected AUR `pkgbase`, AURoscope audits the exact worktree intended for the final Paru build.
+For every AUR `pkgbase` in Paru's resolved build set—explicit target or dependency—AURoscope audits the exact worktree intended for the final Paru build.
 
 The audit bundle contains only bounded required data:
 

@@ -34,7 +34,7 @@ There is no separate resolver, rule engine, backend abstraction, approval servic
 
 ## Audit
 
-For each exact AUR worktree, compare against the last successfully approved/built commit. First use sends the complete recipe. Build a bounded bundle of the diff, needed files, untrusted `.SRCINFO`, minimal metadata, commit, and manifest digest.
+For each exact AUR worktree in Paru's resolved build set, including AUR dependencies, compare against the last successfully approved/built commit. First use sends the complete recipe. Build a bounded bundle of the diff, needed files, untrusted `.SRCINFO`, minimal metadata, commit, and manifest digest. Official dependencies are never audited.
 
 Codex CLI is the single v1 backend. It runs outside the recipe worktree and returns validated structured JSON. If Codex fails, the user can retry, skip, or cancel; there is no silent bypass.
 
