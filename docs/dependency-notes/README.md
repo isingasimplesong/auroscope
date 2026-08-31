@@ -2,7 +2,8 @@
 
 Version-specific findings gathered from upstream sources and disposable spikes.
 
-- [`paru-contract.md`](paru-contract.md) — Paru 2.1.0/post-2.1 selection, planning, pre-build, cache, and libalpm behavior. Historical findings must be revalidated by the ADR-0015 spike before they become implementation requirements.
+- [`paru-contract.md`](paru-contract.md) — historical Paru 2.1.0/post-2.1 selection, planning, pre-build, cache, and libalpm findings.
+- [`paru-issue-21-spike.md`](paru-issue-21-spike.md) — active pinned Paru surface and disposable-Arch proof for search, exact worktree reuse, edit/re-audit, guard, skip, final build, and official-only passthrough.
 - [`pacman-makepkg-contract.md`](pacman-makepkg-contract.md) — Pacman/makepkg 7.1 transaction and PKGBUILD execution boundaries.
 - [`sqlite-go-driver.md`](sqlite-go-driver.md) — SQLite driver comparison retained by active ADR-0007.
 
