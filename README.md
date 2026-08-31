@@ -33,6 +33,19 @@ AURoscope does not replace Paru's search UI, resolver, build machinery, or Pacma
 
 The accepted architecture is in [`docs/architecture/minimal-v1.md`](docs/architecture/minimal-v1.md) and [`ADR-0015`](docs/decisions/0015-minimal-llm-first-wrapper.md). A narrow disposable-Arch Paru worktree spike must be completed before the new implementation plan is written.
 
+## Current implementation
+
+The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` and `internal/app`.
+
+```console
+CGO_ENABLED=1 go test ./...
+go vet ./...
+AUROSCOPE_E2E_DISPOSABLE_ARCH=1 scripts/e2e-disposable-arch.sh
+AUROSCOPE_E2E_SUPPORTED_PARU=1 scripts/e2e-supported-paru.sh
+```
+
+Both disposable scripts require Docker and explicit guard variables. The first is a fast fake-Paru/fake-Codex integration smoke. The supported-version gate builds pinned Paru commit `9ac3578807a87858651e81a02586ceb947686e7c`, uses real AUR acquisition/resolution/build and Pacman installation only inside the disposable container, proves the real guard and drift rejection, and confirms that official-only work invokes no Codex audit.
+
 ## Previous design
 
 The earlier architecture was intentionally superseded because it made the LLM optional and accumulated resolver, approval, state, recovery, and test machinery outside the product's purpose. Historical material remains under [`docs/archive/pre-llm-first/`](docs/archive/pre-llm-first/).

@@ -80,3 +80,14 @@ audits(pkgbase, commit, previous_commit, codex_json, decision, created_at)
 ## Explicit non-goals
 
 No deterministic rule engine, HTTP/backend abstraction, resolver, direct makepkg/Pacman replacement, durable approval protocol, autonomous implementation loop, plugin system, daemon, artifact cache, or same-UID hardening enters v1.
+
+## Issue #24 implementation status
+
+Implemented on branch `work/issue-24-implement-auroscope-v1-from-the-merged-initial-p` as one executable and one `internal/app` package.
+
+- Slice 1: terminal-preserving passthrough, signal/status forwarding, official bare-update phase, pinned Paru selection/order/acquisition parsing.
+- Slice 2: first-use recipe bundle, Codex CLI JSON validation, approve/cancel review, transaction file, `--skipreview` final handoff, guard identity check.
+- Slice 3: SQLite `packages` and `audits` only; differential bundles use the last successful baseline; baselines advance only after final Paru success.
+- Slice 4: inspect, edit and local commit snapshot, re-audit, skip, and cancel decisions.
+- Slice 5: bare update pending-AUR discovery, search selection, mixed official/AUR targets, and AUR dependency review through Paru order records.
+- Slice 6: pinned Codex CLI 0.150.1 contract, deterministic fake-Paru/fake-Codex tests, the guarded fast disposable integration smoke, and `scripts/e2e-supported-paru.sh`, which builds the pinned issue-21 Paru commit and exercises real acquisition, build/install, guard drift rejection, skip, and audit-free official installation in disposable Arch.
