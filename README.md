@@ -42,13 +42,16 @@ The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` 
 The self-hosted AUR-style recipe lives in [`2027a/auroscope-aur`](https://git.2027a.net/2027a/auroscope-aur). Publication on `aur.archlinux.org` remains deferred.
 
 ```console
+# Install Codex by any supported method, for example:
+npm install -g @openai/codex
+
+# Then install AURoscope:
 git clone https://git.2027a.net/2027a/auroscope-aur.git
 cd auroscope-aur
-paru -S --needed openai-codex-bin
 makepkg -si
 ```
 
-Codex must be authenticated for the user who runs AURoscope. During the first desktop trial, invoke `auroscope` explicitly rather than replacing `paru` with an alias.
+Codex is deliberately not a Pacman dependency: AURoscope uses the `codex` executable found on `PATH`, whether it came from npm, an Arch package, or another installation method. `codex --version` must report an exact supported version, and Codex must be authenticated for the user who runs AURoscope. During the first desktop trial, invoke `auroscope` explicitly rather than replacing `paru` with an alias.
 
 ## Development verification
 
