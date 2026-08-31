@@ -139,14 +139,20 @@ Cancellation is `1` plus empty selection and maps to AURoscope `cancelled`, not 
 
 Keeps one combined flow, but refresh may occur before AUR review, failure after refresh leaves the user responsible for completing the upgrade, and deriving a stable complete plan is weak.[1][2]
 
-#### Option B — explicit repository phase, then AUR phase
+#### Option B — provisional AUR review, then repository and AUR phases
 
-1. Before any package transaction, discover AUR updates with the exact supported Paru query adapter (for the inspected branch, quiet AUR upgrades are emitted one package name per line by `paru -Quaq`), force supported `aur,repo` mode, feed AUR names through the version-gated `--order` planner, clone, inspect, and collect human decisions. This preliminary plan uses the current repository databases and explicitly labels dependency consequences provisional.
-2. Run the complete official repository upgrade through Paru's repository-only mode (`paru -Syu --repo`) with inherited terminal and exact child status.
-3. Re-query and re-plan the AUR phase against the now-current repository state. Any new candidate, changed identity, origin/provider change, or dependency-closure change returns to human review before AUR execution.
-4. Compute the exclusion closure from the final proven plan (every package emitted by a held `pkgbase`, plus dependants that cannot resolve without it), then execute `paru -Sua` with one exact `--ignore` value for each excluded package; reject any unplanned guard call. If Paru's fresh resolution reports a different closure, stop and return to review rather than installing a guessed subset.
+Discover, plan, and review AUR updates before the official transaction, run the complete repository upgrade, then repeat AUR planning and review against the resulting state.
 
-**Recommendation:** Option B. It preserves the supported complete repository transaction and makes AUR deferral honest. The trade-off is two visible phases and the possibility that an AUR package is temporarily incompatible after the official upgrade. That residual risk must be shown before phase 1 when known, but must not be “fixed” by withholding official repository packages and creating a partial upgrade.
+This exposes possible AUR consequences before any mutation, but the first plan is necessarily provisional. Official package versions, providers, origins, and dependency closure can change, so the duplicated review does not eliminate the intermediate compatibility risk.
+
+#### Option C — native repository phase, then AUR review and execution
+
+1. Run the complete official repository upgrade through Paru's repository-only mode (`paru -Syu --repo`, or a contract-tested equivalent) with inherited terminal and exact child status. AURoscope adds no audit or approval layer to this official phase and excludes no official package.
+2. Only after that phase succeeds, discover AUR updates with the exact supported Paru query adapter (for the inspected branch, quiet AUR upgrades are emitted one package name per line by `paru -Quaq`), force supported `aur,repo` mode, and feed AUR names through the version-gated `--order` planner.
+3. Clone and inspect the exact AUR recipes against the current post-upgrade state, then collect human decisions. Any later candidate, identity, origin/provider, or dependency-closure drift returns to human review before AUR execution.
+4. Compute the exclusion closure from the proven AUR plan (every package emitted by a held `pkgbase`, plus dependants that cannot resolve without it), then execute `paru -Sua` with one exact `--ignore` value for each excluded package; reject any unplanned guard call. If Paru's fresh resolution reports a different closure, stop and return to review rather than installing a guessed subset.
+
+**Decision:** Option C was accepted on 2026-08-30. It keeps the official transaction native and complete, audits only AUR work, and avoids a knowingly provisional pre-upgrade review. The accepted residual risk is that an already-installed AUR package may be temporarily incompatible after the official upgrade; withholding official packages is not an allowed mitigation. See [`ADR-0004`](../decisions/0004-official-upgrade-before-aur-review.md).
 
 ### Execution hardening and cache behavior
 
@@ -536,7 +542,7 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 |---|---|---|
 | D1 — Paru compatibility | [#2](https://git.2027a.net/2027a/auroscope/issues/2) | **Accepted:** [ADR-0002](../decisions/0002-paru-native-selection-compatibility.md) |
 | D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) | **Accepted:** [ADR-0003](../decisions/0003-multi-stage-paru-orchestration.md) |
-| D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) | Proposed |
+| D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) | **Accepted:** [ADR-0004](../decisions/0004-official-upgrade-before-aur-review.md) |
 | D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) | **Accepted:** [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md) |
 | D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) | Proposed |
 | D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) | **Accepted:** [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md) |
@@ -562,7 +568,7 @@ Please accept, amend, reject, or defer each item. Recommendations are not yet de
 
 1. **D1 — Paru compatibility — Accepted in [ADR-0002](../decisions/0002-paru-native-selection-compatibility.md):** retain the first stable Paru release containing `d1dfbc4` as the durable floor; meanwhile permit an isolated, temporary, fail-closed adapter for verified 2.1.0 output. Detect capability behaviorally and remove the adapter after a fixed stable release passes the contract matrix. A pinned post-fix commit remains design/test-only.
 2. **D2 — orchestration — Accepted in [ADR-0003](../decisions/0003-multi-stage-paru-orchestration.md):** adopt two-stage Paru planning/review/execution; do not parse Paru's human UI beyond ADR-0002's temporary 2.1.0 exception, and never replace its resolver.
-3. **D3 — upgrades:** review a provisional AUR plan before mutation, execute a complete repository-only `-Syu` phase, then re-plan/revalidate before the independently deferrable AUR phase. **Recommended: accept.**
+3. **D3 — upgrades — Accepted in [ADR-0004](../decisions/0004-official-upgrade-before-aur-review.md):** run the complete official repository upgrade first with native Paru/Pacman behavior and no added AURoscope review; only then plan, inspect, approve, and independently defer AUR work against the resulting system state.
 4. **D4 — execution/cache and specification amendment — Accepted in [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md):** treat the guard as the final complete recipe-identity verification after AURoscope review and before any recipe-supplied code executes, without claiming that it is adjacent to each build; run with `--skipreview`, and rebuild unless a cached artifact hash is tied to the exact approved identity.
 5. **D5 — Go process architecture:** one executable, explicit internal packages, standard-library argv/process handling, no CLI framework and no PTY dependency initially. **Recommended: accept.**
 6. **D6 — SQLite driver — Accepted:** use `mattn/go-sqlite3 v1.14.50` with CGO for Arch `linux/amd64` v1; revisit pure Go only with real cross-target need. Record: [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md).
