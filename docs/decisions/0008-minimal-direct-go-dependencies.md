@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-0015](0015-minimal-llm-first-wrapper.md) on 2026-08-30.
 
 ## Context
 

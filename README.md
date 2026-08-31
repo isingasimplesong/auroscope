@@ -1,43 +1,38 @@
 # AURoscope
 
-AURoscope is a terminal-first safety review wrapper around [Paru](https://github.com/Morganamilo/paru) and Pacman.
-
-It preserves Paru's normal command-line and interactive package-selection experience, while inspecting AUR recipe changes before they are built. Deterministic checks and constrained LLM analysis provide evidence; the user always makes the final decision.
+AURoscope is a small terminal wrapper around [Paru](https://github.com/Morganamilo/paru) and Pacman. Its purpose is narrow: before Paru builds an AUR recipe, AURoscope asks Codex CLI to audit the exact recipe change, shows the result to the user, and records a per-package decision.
 
 ## Intended interface
 
 ```console
-auroscope                    # normal system upgrade, like bare paru
-auroscope <search terms>     # Paru's interactive numbered selection
+auroscope                    # native official update, then audited AUR updates
+auroscope <search terms>     # Paru-native search and numbered selection
 auroscope -S <packages>      # explicit installation
-auroscope status             # human-readable current filter state
-auroscope held               # recipes currently awaiting a decision
-auroscope explain <package>  # findings and decision history
+auroscope <other Paru args>  # transparent passthrough when no AUR build occurs
 ```
 
-AURoscope is currently a specification-first, from-scratch project in its **design phase**. No production implementation exists yet. The next phase must ground and propose the Paru contract, Go architecture, SQLite model, approval protocol, scanner/LLM contracts, threat model, and test strategy before an implementation plan is accepted.
+## Product flow
 
-Start with [the design-phase mandate](docs/design-phase.md). Repository agents must also follow [AGENTS.md](AGENTS.md).
+1. Official repository updates and installs remain native Paru/Pacman operations. They receive no AURoscope audit.
+2. Paru identifies the AUR package bases that would be built.
+3. AURoscope compares each exact recipe with the last successfully approved commit, or sends the full recipe on first use.
+4. Codex CLI returns a structured audit of the diff and relevant files.
+5. The user chooses `approve`, `inspect`, `edit` and re-audit, `skip`, or `cancel` per AUR package base.
+6. AURoscope relaunches Paru with the official targets and approved AUR targets. Paru resolves dependencies, calls `makepkg`, and installs through Pacman normally.
+7. A minimal `PreBuildCommand` rejects a recipe whose identity differs from the audited one.
 
-## Design principles
+AURoscope does not replace Paru's search UI, resolver, build machinery, or Pacman. It does not audit official packages.
 
-- Paru remains the selector, dependency resolver, AUR builder, and Pacman frontend.
-- Pacman remains authoritative for official repository transactions.
-- Deterministic findings and LLM assessments are advisory evidence, never autonomous decisions.
-- Interactive users retain final authority to approve, inspect, defer, or reject an exact recipe.
-- Approvals bind to immutable Git commits and file hashes.
-- A minimal Paru `PreBuildCommand` verifies the complete reviewed recipe identity at the final boundary before any recipe-supplied code executes.
-- SQLite is the source of truth; readable status views are generated from it.
-- Reports use ordinary text, Markdown, unified diffs, `$VISUAL`, and `$EDITOR` without editor-specific plugins.
-- The implementation language is Go, with minimal justified dependencies and a self-hosted AUR-style PKGBUILD as the initial distribution path.
-- Configuration, durable state, reconstructible cache, and disposable work follow the standard XDG roots; downloaded audit work must not accumulate.
+## V1 shape
 
-See [the product specification](docs/specification.md) for the agreed behavior.
+- Go executable for Arch Linux `linux/amd64`.
+- Codex CLI is the only LLM backend.
+- SQLite stores only the last successful recipe baseline and audit history.
+- One internal Go package initially; split only when demonstrated behavior requires it.
+- No deterministic rule engine, plugin system, build sandbox, cached artifact reuse, or same-UID security protocol.
 
-## Previous project
+The accepted architecture is in [`docs/architecture/minimal-v1.md`](docs/architecture/minimal-v1.md) and [`ADR-0015`](docs/decisions/0015-minimal-llm-first-wrapper.md). A narrow disposable-Arch Paru worktree spike must be completed before the new implementation plan is written.
 
-AURoscope starts from scratch rather than evolving the earlier hook-centered implementation. The previous project remains available as a technical reference:
+## Previous design
 
-- [2027a/paru-llm-audit](https://git.2027a.net/2027a/paru-llm-audit)
-
-Its scanner ideas, fixtures, and lessons may be consulted deliberately, but its architecture and code are not inherited by default.
+The earlier architecture was intentionally superseded because it made the LLM optional and accumulated resolver, approval, state, recovery, and test machinery outside the product's purpose. Historical material remains under [`docs/archive/pre-llm-first/`](docs/archive/pre-llm-first/).

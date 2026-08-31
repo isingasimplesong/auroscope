@@ -32,7 +32,7 @@ Revisit the driver only if cross-target releases become an actual supported requ
 
 - `github.com/mattn/go-sqlite3` source/documentation at the tested `v1.14.50` module version
 - `modernc.org/sqlite` source/documentation at the tested `v1.57.0` module version
-- [`docs/architecture/design-proposals.md`](../architecture/design-proposals.md), including the recorded disposable spike
+- [`docs/archive/pre-llm-first/design-proposals.md`](../archive/pre-llm-first/design-proposals.md), including the recorded disposable spike
 - [decision issue #7](https://git.2027a.net/2027a/auroscope/issues/7)
 
 ## Required verification in the implementation lane

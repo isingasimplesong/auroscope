@@ -1,9 +1,11 @@
 # Dependency notes
 
-Project-validated, version-specific findings used by AURoscope's design and future implementation.
+Version-specific findings gathered from upstream sources and disposable spikes.
 
-- [`paru-contract.md`](paru-contract.md) — Paru 2.1.0/post-2.1 selection, planning, pre-build, cache, and libalpm behavior.
+- [`paru-contract.md`](paru-contract.md) — Paru 2.1.0/post-2.1 selection, planning, pre-build, cache, and libalpm behavior. Historical findings must be revalidated by the ADR-0015 spike before they become implementation requirements.
 - [`pacman-makepkg-contract.md`](pacman-makepkg-contract.md) — Pacman/makepkg 7.1 transaction and PKGBUILD execution boundaries.
-- [`go-direct-dependencies.md`](go-direct-dependencies.md) — strict TOML decoding and non-expanding editor argv parsing contracts.
+- [`sqlite-go-driver.md`](sqlite-go-driver.md) — SQLite driver comparison retained by active ADR-0007.
 
-These notes preserve distilled findings and spike results, not copied upstream source. Revalidate them when supported versions change.
+The former TOML/shellwords dependency selection is archived under [`../archive/pre-llm-first/go-direct-dependencies.md`](../archive/pre-llm-first/go-direct-dependencies.md).
+
+These notes preserve evidence, not active architecture. Revalidate exact versions and commands before implementation.
