@@ -200,6 +200,8 @@ This is one executable and one process except for deliberate external commands. 
 - **Direct inherited descriptors:** pass-through uses `Stdin/Stdout/Stderr = os.*`; selection inherits stdin+stderr and captures only stdout. Recommended.
 - **`github.com/creack/pty`:** defer. Add only if an executable contract test proves a required Paru/Pacman prompt refuses inherited descriptors without a controlling terminal.[22]
 
+**Decision:** The one-executable architecture, explicit internal domain packages, standard-library argument/process handling, and no initial PTY dependency were accepted on 2026-08-30. A PTY remains conditional on a failing executable contract test against a supported dependency version. See [`ADR-0006`](../decisions/0006-go-process-architecture.md).
+
 ### SQLite driver options
 
 #### `github.com/mattn/go-sqlite3`
@@ -544,7 +546,7 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D2 — orchestration | [#3](https://git.2027a.net/2027a/auroscope/issues/3) | **Accepted:** [ADR-0003](../decisions/0003-multi-stage-paru-orchestration.md) |
 | D3 — upgrades | [#4](https://git.2027a.net/2027a/auroscope/issues/4) | **Accepted:** [ADR-0004](../decisions/0004-official-upgrade-before-aur-review.md) |
 | D4 — TOCTOU timing | [#5](https://git.2027a.net/2027a/auroscope/issues/5) | **Accepted:** [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md) |
-| D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) | Proposed |
+| D5 — Go/process architecture | [#6](https://git.2027a.net/2027a/auroscope/issues/6) | **Accepted:** [ADR-0006](../decisions/0006-go-process-architecture.md) |
 | D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) | **Accepted:** [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md) |
 | D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) | **Accepted:** [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md) |
 | D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) | **Accepted:** [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md) |
@@ -564,13 +566,13 @@ Workflow for every decision issue:
 
 Issues without an exact mode marker fall back to a single existing routing label; missing or conflicting routing is classified `Agent/Needs Review` and executes nothing. Until step 3 is complete and the resulting ADR is committed for a given decision, that item remains **Proposed**. Accepted items below link to their ADR. The PR itself is evidence and discussion material, not approval.
 
-Please accept, amend, reject, or defer each item. Recommendations are not yet decisions.
+Please accept, amend, reject, or defer each unresolved item. Recommendations without an accepted ADR are not decisions.
 
 1. **D1 — Paru compatibility — Accepted in [ADR-0002](../decisions/0002-paru-native-selection-compatibility.md):** retain the first stable Paru release containing `d1dfbc4` as the durable floor; meanwhile permit an isolated, temporary, fail-closed adapter for verified 2.1.0 output. Detect capability behaviorally and remove the adapter after a fixed stable release passes the contract matrix. A pinned post-fix commit remains design/test-only.
 2. **D2 — orchestration — Accepted in [ADR-0003](../decisions/0003-multi-stage-paru-orchestration.md):** adopt two-stage Paru planning/review/execution; do not parse Paru's human UI beyond ADR-0002's temporary 2.1.0 exception, and never replace its resolver.
 3. **D3 — upgrades — Accepted in [ADR-0004](../decisions/0004-official-upgrade-before-aur-review.md):** run the complete official repository upgrade first with native Paru/Pacman behavior and no added AURoscope review; only then plan, inspect, approve, and independently defer AUR work against the resulting system state.
 4. **D4 — execution/cache and specification amendment — Accepted in [ADR-0005](../decisions/0005-recipe-identity-guard-boundary.md):** treat the guard as the final complete recipe-identity verification after AURoscope review and before any recipe-supplied code executes, without claiming that it is adjacent to each build; run with `--skipreview`, and rebuild unless a cached artifact hash is tied to the exact approved identity.
-5. **D5 — Go process architecture:** one executable, explicit internal packages, standard-library argv/process handling, no CLI framework and no PTY dependency initially. **Recommended: accept.**
+5. **D5 — Go process architecture — Accepted in [ADR-0006](../decisions/0006-go-process-architecture.md):** use one executable, explicit internal packages, standard-library argv/process handling, no CLI framework, and no PTY dependency initially.
 6. **D6 — SQLite driver — Accepted:** use `mattn/go-sqlite3 v1.14.50` with CGO for Arch `linux/amd64` v1; revisit pure Go only with real cross-target need. Record: [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md).
 7. **D7 — remaining dependencies — Accepted:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords v1.0.14` with environment and backtick expansion disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework or PTY dependency without demonstrated need. See [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md).
 8. **D8 — state model — Accepted in [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md):** normalized immutable evidence/decisions plus only the mutable lifecycle rows required for identity, inspection, human authority, status, and recovery; no generic event-sourcing, provenance, EAV, plugin, or speculative schema.
