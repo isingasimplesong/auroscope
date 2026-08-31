@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bufio"
 	"bytes"
 	"database/sql"
 	"encoding/json"
@@ -46,15 +45,54 @@ func TestApprovedAURPackageEndToEndWithFirstAudit(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "AURoscope: acquiring AUR recipe hello with Paru...") ||
 		!strings.Contains(stdout.String(), "AURoscope: auditing hello with Codex (timeout 5m0s)...") ||
-		!strings.Contains(stdout.String(), "AURoscope: Codex audit completed for hello.") ||
-		!strings.Contains(stdout.String(), "Package: hello") {
+		!strings.Contains(stdout.String(), "AUR audit: hello") ||
+		!strings.Contains(stdout.String(), "Assessment: looks bounded") ||
+		!strings.Contains(stdout.String(), "Risk: low") {
 		t.Fatalf("stdout = %q", stdout.String())
+	}
+	for _, unwanted := range []string{"commit:", "manifest:", "Inspect:", "Diff:"} {
+		if strings.Contains(stdout.String(), unwanted) {
+			t.Fatalf("default review unexpectedly contains %q: %s", unwanted, stdout.String())
+		}
 	}
 	assertBaseline(t, filepath.Join(dir, "state.sqlite3"), "hello")
 	var bundle auditBundle
 	readJSON(t, filepath.Join(dir, "bundle.json"), &bundle)
 	if bundle.Mode != "full" || bundle.Identity.Pkgbase != "hello" || len(bundle.Files) == 0 {
 		t.Fatalf("bundle = %#v", bundle)
+	}
+}
+
+func TestInspectShowsFullReportWithoutRerunningCodex(t *testing.T) {
+	dir := t.TempDir()
+	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\npkgver=1\n")
+	calls := filepath.Join(dir, "calls")
+	codexCalls := filepath.Join(dir, "codex-calls")
+	t.Setenv("CODEX_CALLS", codexCalls)
+	paruPath := fakeParu(t, dir, calls, repo, "AUR TARGET hello hello\n")
+	codexPath := fakeCodex(t, dir, filepath.Join(dir, "bundle.json"), `{"summary":"packaging looks conventional","risk":"low","findings":[{"file":"PKGBUILD","line":1,"range":"1-1","evidence":"pkgname=hello","explanation":"ordinary metadata"}],"uncertainty":"none","inspect":["PKGBUILD"]}`)
+
+	var stdout, stderr bytes.Buffer
+	status := run([]string{"-S", "hello"}, runConfig{
+		paruPath:    paruPath,
+		codexPath:   codexPath,
+		statePath:   filepath.Join(dir, "state.sqlite3"),
+		cloneDir:    filepath.Join(dir, "clones"),
+		stdin:       strings.NewReader(""),
+		reviewInput: strings.NewReader("2\n1\n"),
+		stdout:      &stdout,
+		stderr:      &stderr,
+	})
+	if status != 0 {
+		t.Fatalf("status = %d; stdout = %s; stderr = %s", status, stdout.String(), stderr.String())
+	}
+	if got := strings.Count(readString(t, codexCalls), "audit\n"); got != 1 {
+		t.Fatalf("Codex audit count = %d, want 1", got)
+	}
+	for _, want := range []string{"commit:", "manifest:", "evidence: pkgname=hello", "Uncertainty:", "Inspect:"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("full report missing %q:\n%s", want, stdout.String())
+		}
 	}
 }
 
@@ -641,7 +679,7 @@ printf '{"summary":"from final file","risk":"low","findings":[],"uncertainty":""
 		t.Fatalf("report = %#v", report)
 	}
 	args := readString(t, argsFile)
-	for _, want := range []string{"exec --json --ephemeral --sandbox read-only --skip-git-repo-check --output-schema ", " --output-last-message ", "AUR packaging security", "upstream software as outside this packaging audit's scope"} {
+	for _, want := range []string{"exec --json --ephemeral --sandbox read-only --skip-git-repo-check --output-schema ", " --output-last-message "} {
 		if !strings.Contains(args, want) {
 			t.Fatalf("args = %q", args)
 		}
@@ -688,106 +726,6 @@ printf 'codex-cli 9.9.9\n'
 	}
 }
 
-func TestDecisionMenuAcceptsNumbersInitialsAndWords(t *testing.T) {
-	tests := []struct {
-		name    string
-		allowed []string
-		input   string
-		want    string
-	}{
-		{name: "number", allowed: []string{"approve", "inspect", "edit", "skip", "cancel"}, input: "2\n", want: "inspect"},
-		{name: "initial", allowed: []string{"approve", "inspect", "edit", "skip", "cancel"}, input: "A\n", want: "approve"},
-		{name: "word", allowed: []string{"retry", "skip", "cancel"}, input: "retry\n", want: "retry"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var stdout, stderr bytes.Buffer
-			got := askDecision(bufio.NewReader(strings.NewReader(test.input)), runConfig{stdout: &stdout, stderr: &stderr}, test.allowed)
-			if got != test.want {
-				t.Fatalf("decision = %q, want %q", got, test.want)
-			}
-			if !strings.Contains(stdout.String(), "1/") || !strings.Contains(stdout.String(), test.allowed[0]) {
-				t.Fatalf("menu is not concise and numbered: %q", stdout.String())
-			}
-		})
-	}
-}
-
-func TestReviewDefaultsToSummaryAndInspectReturnsToDecisionMenu(t *testing.T) {
-	dir := t.TempDir()
-	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\n")
-	calls := filepath.Join(dir, "calls")
-	paruPath := fakeParu(t, dir, calls, repo, "AUR TARGET hello hello\n")
-	report := `{"summary":"packaging provenance unchanged","risk":"low","findings":[{"file":"PKGBUILD","line":1,"evidence":"source URL","explanation":"official source"}],"uncertainty":"upstream binary not inspected","inspect":["PKGBUILD"]}`
-
-	var stdout, stderr bytes.Buffer
-	status := run([]string{"-S", "hello"}, runConfig{
-		paruPath:    paruPath,
-		codexPath:   fakeCodex(t, dir, filepath.Join(dir, "bundle.json"), report),
-		statePath:   filepath.Join(dir, "state.sqlite3"),
-		cloneDir:    filepath.Join(dir, "clones"),
-		stdin:       strings.NewReader(""),
-		reviewInput: strings.NewReader("i\n1\n"),
-		stdout:      &stdout,
-		stderr:      &stderr,
-	})
-	if status != 0 {
-		t.Fatalf("status = %d; stdout = %s; stderr = %s", status, stdout.String(), stderr.String())
-	}
-	output := stdout.String()
-	if !strings.Contains(output, "Package: hello") || !strings.Contains(output, "Summary: packaging provenance unchanged") || !strings.Contains(output, "Risk: low") {
-		t.Fatalf("compact review missing required fields:\n%s", output)
-	}
-	fullAt := strings.Index(output, "Full audit report: hello")
-	firstMenuAt := strings.Index(output, "Decision:")
-	if fullAt < 0 || firstMenuAt < 0 || fullAt < firstMenuAt {
-		t.Fatalf("full report was not deferred until after the first menu:\n%s", output)
-	}
-	for _, want := range []string{"commit: ", "manifest: ", "evidence: source URL", "Uncertainty:", "Diff:"} {
-		if !strings.Contains(output[fullAt:], want) {
-			t.Fatalf("full report missing %q:\n%s", want, output)
-		}
-	}
-	if strings.Count(output, "Decision:") != 2 {
-		t.Fatalf("inspect did not return to decision menu:\n%s", output)
-	}
-}
-
-func TestAuditFailureMenuIsCompactAndAcceptsInitial(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	got := askDecision(bufio.NewReader(strings.NewReader("s\n")), runConfig{stdout: &stdout, stderr: &stderr}, []string{"retry", "skip", "cancel"})
-	if got != "skip" {
-		t.Fatalf("decision = %q", got)
-	}
-	menu := stdout.String()
-	for _, want := range []string{"1/r retry", "2/s skip", "3/c cancel"} {
-		if !strings.Contains(menu, want) {
-			t.Fatalf("failure menu missing %q: %q", want, menu)
-		}
-	}
-}
-
-func TestAuditPromptScopesAssessmentToAURPackaging(t *testing.T) {
-	for _, want := range []string{
-		"AUR packaging security",
-		"PKGBUILD",
-		"auxiliary files",
-		"install scripts",
-		"URL provenance and URL changes",
-		"checksums and signatures",
-		"build and package commands",
-		"permissions and persistence",
-		"Do not raise risk merely because an upstream binary cannot be inspected",
-		"unchanged URL",
-		"expected official source",
-		"outside this packaging audit's scope",
-	} {
-		if !strings.Contains(auditPrompt, want) {
-			t.Fatalf("audit prompt missing %q:\n%s", want, auditPrompt)
-		}
-	}
-}
-
 func TestPrintReviewEscapesTerminalControlsAndShowsEvidence(t *testing.T) {
 	var stdout bytes.Buffer
 	report := auditReport{
@@ -797,7 +735,7 @@ func TestPrintReviewEscapesTerminalControlsAndShowsEvidence(t *testing.T) {
 		Uncertainty: "unknown",
 		Inspect:     []string{"PKGBUILD"},
 	}
-	printFullReview(runConfig{stdout: &stdout}, "hello", auditBundle{Identity: recipeIdentity{Commit: strings.Repeat("a", 40), ManifestDigest: strings.Repeat("b", 64)}}, report)
+	printReview(runConfig{stdout: &stdout}, "hello", auditBundle{Identity: recipeIdentity{Commit: strings.Repeat("a", 40), ManifestDigest: strings.Repeat("b", 64)}}, report)
 	got := stdout.String()
 	for _, want := range []string{"evidence: evil\\u202ereorder", "explanation: explain", "Uncertainty:", "Inspect:", "\\u001b[31m"} {
 		if !strings.Contains(got, want) {
@@ -1004,6 +942,9 @@ func fakeCodex(t *testing.T, dir, bundleCopy, output string) string {
 if test "$1" = "--version"; then
   printf 'codex-cli 0.150.1\n'
   exit 0
+fi
+if test -n "${CODEX_CALLS:-}"; then
+  printf 'audit\n' >> "$CODEX_CALLS"
 fi
 cp bundle.json "$BUNDLE_COPY"
 out=''
