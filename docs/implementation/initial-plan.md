@@ -1,632 +1,534 @@
-# AURoscope initial implementation plan
+# AURoscope v1 implementation plan
 
-**Status:** Proposed for implementation sequencing review under [execution issue #17](https://git.2027a.net/2027a/auroscope/issues/17). This document is a plan, not authorization to write production code.
+**Status:** Definitive implementation plan, pending acceptance and merge of [PR #18](https://git.2027a.net/2027a/auroscope/pulls/18). This document is executable guidance, not authorization to write production code. Implementation starts only after this plan is merged and Mathieu explicitly starts the execution loop.
 
-**Design baseline:** `main` at merge commit `31e73bd3f63d7e4a6a1d21061f719e3f7703a541`, with [ADR-0001](../decisions/0001-go-and-self-hosted-arch-packaging.md) through [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md) accepted.
+**Design baseline:** [`README.md`](../../README.md), [`docs/specification.md`](../specification.md), [`docs/design-phase.md`](../design-phase.md), and accepted [ADR-0001](../decisions/0001-go-and-self-hosted-arch-packaging.md) through [ADR-0014](../decisions/0014-reject-local-pkgbuild-inputs-in-v1.md).
 
-## 1. Goal and non-negotiable boundaries
+## 1. Mission
 
-Deliver a first useful Arch Linux `linux/amd64` release that can replace bare Paru for the supported surface while keeping Paru/Pacman authoritative, reviewing exact AUR recipes before recipe-supplied code executes, and leaving every consequential interactive decision to the user.
+Build a dependable personal Arch Linux tool, not a demonstration and not a general package-management platform.
 
-The implementation must preserve these boundaries throughout the sequence:
+AURoscope v1 must be useful as Mathieu's normal Paru entry point for the supported surface. It must inspect exact AUR recipes before recipe-supplied code executes, present deterministic and optional LLM evidence without making a decision, bind explicit human approval to the reviewed identity, and delegate selection, dependency resolution, builds, and installation to Paru/Pacman.
 
-- package content, metadata, filenames, diffs, fixtures, and model input are hostile data, never instructions;
-- inspection never executes or sources `PKGBUILD`, package source material, or any recipe-supplied file;
-- official repository upgrades happen first as one complete native Paru/Pacman phase; AUR planning and review happen only after it succeeds;
-- Paru remains selector, resolver, builder, and Pacman frontend; AURoscope never grows a second resolver;
-- deterministic findings, aggregate advisory signal, LLM assessment, technical status, and human decision remain distinct;
-- only an explicit human `approve` decision may arm a one-shot approval for the exact identity reviewed;
-- a `clear` advisory signal may make review concise or batched, but it never creates approval automatically: every recipe handed to the guard still needs an append-only explicit human `approve` decision, and Paru/Pacman's later native confirmation remains intact;
-- local PKGBUILD operations and configured PKGBUILD-repository records remain rejected in v1;
-- a fresh pre-execution plan comparison narrows drift but is not atomic with Paru's subsequent resolver run; implementation must prove a supported observation/guard surface or stop for a design amendment rather than claim complete closure equality;
-- package artifact reuse stays disabled unless a supported post-build surface proves the exact files and hashes without invoking unsafe makepkg introspection or parsing unrestricted human output;
-- no implementation slice may claim sandboxing, local-host protection, package safety, or per-build-adjacent guard timing;
-- the real workstation Pacman database, root, cache, and package state must never be used by automated integration or end-to-end tests.
+The project is personal software:
 
-Any implementation finding that contradicts an accepted ADR stops the affected slice. It requires a separate `MODE: DECISION` issue and an accepted amendment or superseding ADR; it must not be “fixed” silently in code.
+- correctness at the recipe-review and approval boundary matters;
+- ordinary failures must be diagnosable and recoverable;
+- the implementation must remain small enough for one maintainer to understand;
+- abstractions, compatibility layers, test suites, and release machinery need a demonstrated v1 use;
+- there is no requirement to build a generic framework, enterprise release process, or hostile-local-account security boundary.
 
-## 2. Delivery and branch policy
+## 2. Non-negotiable product boundaries
 
-This planning PR contains documentation only. After Mathieu accepts it:
+Every milestone preserves these accepted constraints:
 
-1. Before Slice 00, require a `MODE: EXECUTION` issue in which Mathieu explicitly advances the repository from design to implementation; the marker alone is not a phase transition. That first implementation PR updates the phase statements in `AGENTS.md`, `README.md`, and `docs/design-phase.md` without rewriting accepted design history.
-2. Create one Forgejo issue per numbered slice. Its first non-empty line must be `MODE: EXECUTION` and its body must link this plan, list the exact slice, prerequisites, and acceptance gates.
-3. Create `execution/issue-<number>-<slug>` from current `origin/main` only after prerequisites are merged.
-4. Keep one coherent slice per branch and PR. Do not stack later slices on an unmerged feature branch unless Mathieu explicitly authorizes it.
-5. Use strict RED → GREEN → REFACTOR commits or preserve that trace in the PR description when a coherent commit cannot remain red.
-6. Push signed commits with the Hephaistos identity. Open a Forgejo PR against `main`; agents do not merge their own PRs.
-7. Rebase or merge current `origin/main` before final verification according to repository policy; never force-push by default.
-8. A PR is reviewable only when the slice-specific commands and the cumulative baseline pass. A green unit suite never substitutes for a required live contract or disposable-Arch gate.
-9. Update this plan only when dependencies, scope, or acceptance criteria materially change. Record the reason and affected later slices.
+- Paru remains selector, resolver, builder, and Pacman frontend. AURoscope does not implement another resolver.
+- Official repository upgrades run first as one complete native phase. AUR review begins only after that phase succeeds.
+- Inspection never executes or sources `PKGBUILD`, package source material, or another recipe-supplied file.
+- Package content, metadata, paths, diffs, fixtures, and model input are hostile data, never instructions.
+- Technical status, deterministic findings, aggregate signal, LLM assessment, and human decision remain separate.
+- Only an explicit human `approve` decision may arm an approval. A clear signal is not an approval.
+- Approval binds the exact recipe identity accepted in ADR-0010 and is one-shot.
+- The final guard verifies the complete identity before recipe-supplied code executes and execution uses `--skipreview`.
+- Local/path PKGBUILD inputs and configured PKGBUILD-repository records remain unsupported and fail closed in v1.
+- Automated package-manager tests never touch the real workstation root, Pacman database, or package cache.
+- AURoscope says a recipe was reviewed; it never says a package is safe.
 
-Recommended PR size is one numbered slice. Slices 00 and 01 may be combined only if their combined diff remains bootstrap-sized; the security proof, guard protocol, upgrade workflow, and release gate must remain separate review units.
+If executable evidence contradicts an accepted ADR, implementation stops at that boundary. The agent opens a separate `MODE: DECISION` issue with the evidence and does not improvise a new architecture in code.
 
-## 3. TDD and verification policy
+## 3. Deliberate simplifications
 
-Every slice follows the same loop:
+These choices keep v1 substantial but proportionate.
 
-1. **RED:** add the smallest failing unit, fuzz, contract, integration, or end-to-end test that states the next accepted behavior. Record the observed failure in the PR description.
-2. **GREEN:** implement only enough production behavior to pass that test without broad speculative abstractions.
-3. **REFACTOR:** remove duplication, tighten names and boundaries, then rerun the focused test and cumulative baseline.
-4. **VERIFY:** execute the slice commands on the required environment and preserve relevant logs as CI artifacts when a live dependency is involved.
+### 3.1 Vertical delivery before subsystem breadth
 
-The numbered slices are mergeable delivery envelopes, not permission to implement every RED clause in one batch. Within a slice, treat each separately stated behavior as an ordered micro-slice: write one focused failing test, observe the intended failure, make only that test pass, refactor while green, and commit before advancing. Split any clause that cannot remain a small reviewable change into named subtests/subcommits inside the same execution issue.
+The first real implementation path is one explicit AUR target through planning, collection, deterministic review, explicit approval, guard, rebuild, and execution in disposable Arch. Search, bare upgrades, the full rule catalogue, LLM backends, retention, and packaging expand that working path later.
 
-Cumulative local baseline after Go bootstrap:
+### 3.2 Prove Paru execution feasibility first
+
+Before durable application architecture grows around it, an executable disposable-Arch spike must prove:
+
+1. native planning and the second resolution run;
+2. the observable closure used by the actual execution invocation;
+3. the private `PARU_CONF` handoff;
+4. `PreBuildCommand` invocation before recipe code;
+5. `--skipreview` behavior;
+6. fail-closed detection of an unplanned or changed package base.
+
+If the actual execution closure cannot be bounded by a supported Paru surface, the loop stops after the spike and requests a design amendment. It does not build SQLite, scanner, LLM, or review layers around an unproved assumption.
+
+### 3.3 No package-artifact reuse in v1
+
+V1 always forces AUR rebuilds. A cached or previously built package is never reused because a recipe was approved.
+
+Build and installation outcomes are recorded only to the extent supported by bounded evidence needed by `status` or `explain`. Exact artifact hashes may be recorded when a supported surface provides them, but they do not authorize reuse. A reusable-artifact feature belongs to a later decision and implementation slice.
+
+### 3.4 LLM is additive, not on the critical path
+
+The deterministic workflow and human decision path work completely with LLM mode `disabled`. HTTP and Codex adapters are added only after guarded execution works end to end. LLM failure remains visible evidence about assessment completeness, never a blocker imposed by architecture and never an autonomous decision.
+
+### 3.5 Configuration and schema grow with consumers
+
+Strict TOML, forward SQL migrations, and accepted XDG roots remain. Configuration keys, tables, columns, and operational machinery appear only in the milestone that consumes them. No up-front skeleton is created for future scanner, LLM, retention, compatibility, or release features.
+
+### 3.6 Proportionate verification
+
+- Pure logic receives focused unit/table/fuzz-seed tests.
+- External Paru/Pacman/makepkg behavior receives one supported-version contract suite.
+- Cross-package behavior uses one integration harness grown incrementally.
+- ADR-0013 receives one disposable-Arch E2E path plus critical abort cases.
+- Targeted race tests run where concurrency exists. The full race suite runs at milestone checkpoints and release, not after every small edit.
+- TDD is the implementation method; intentionally red commits and repeated failure transcripts are not deliverables.
+- Generated reports are private, closed, and atomically renamed. SQLite and migrations are the durability boundary; reconstructible reports do not need database-grade directory synchronization.
+
+## 4. Delivery model: one autonomous implementation loop
+
+### 4.1 Durable sources of truth
+
+The loop relies only on durable state a fresh session can read:
+
+1. this plan and the accepted ADRs;
+2. one Forgejo umbrella issue whose first non-empty line is `MODE: EXECUTION` and which records Mathieu's explicit advance from design to implementation; the marker alone is not a phase transition;
+3. one long-lived branch, `implementation/v1`;
+4. one draft PR from `implementation/v1` to `main`;
+5. `docs/implementation/v1-status.md` on that branch;
+6. commits, test output summaries, and Forgejo comments.
+
+Chat history is never required to resume.
+
+### 4.2 Why one branch and one PR
+
+The seven milestones below are implementation checkpoints, not seven mandatory merge queues and not dozens of subsystem PRs. The default autonomous path uses one branch and one draft PR so the loop can continue without asking Mathieu to merge intermediate scaffolding.
+
+Each milestone ends in one or more coherent green commits and a concise PR progress comment. The agent never merges the final PR. Mathieu reviews the complete branch or may request an intermediate review at any checkpoint.
+
+### 4.3 Preferred Hermes execution mode
+
+On Mathieu's Hermes host, bootstrap the work as a serial Kanban chain:
+
+- one orchestrator task owns the umbrella issue, branch, draft PR, and status file;
+- one worker task is created for each milestone below;
+- task dependencies enforce milestone order; only one implementation task may be ready or claimed at a time, and implementation workers never run concurrently against `implementation/v1` or its worktree;
+- every task carries the exact repository path, branch, umbrella issue, draft PR, plan path, and current status-file path so a worker does not infer them from chat;
+- each worker reads the repository and live status, completes or resumes exactly one milestone, verifies it, commits, pushes, updates status, and completes or blocks its task;
+- the dispatcher advances the next ready task automatically;
+- the orchestrator verifies milestone evidence and only intervenes to repair routing, record a blocker, or finalize the release-candidate handoff. It does not duplicate worker implementation.
+
+A persistent `/goal` session may execute the same state machine directly when Kanban is unavailable. The repository status file and Forgejo objects remain authoritative in either mode.
+
+### 4.4 Loop state file
+
+`docs/implementation/v1-status.md` is created by the bootstrap session on `implementation/v1`. Keep it short and overwrite current state rather than accumulating a journal.
+
+It records:
+
+```markdown
+# AURoscope v1 execution status
+
+- umbrella issue: <URL>
+- draft PR: <URL>
+- branch: implementation/v1
+- current milestone: <number and name>
+- state: pending | active | blocked | complete
+- last verified commit: <SHA>
+- last checks: <commands and results>
+- next action: <one concrete action>
+- blocker/decision issue: <none or URL>
+```
+
+Forgejo comments provide the history; this file provides the restart point.
+
+### 4.5 Worker cycle
+
+For each milestone, the worker must:
+
+1. verify repository, branch, identity, worktree, umbrella issue, draft PR, and current status;
+2. read this plan, relevant ADRs, existing code/tests, and the previous milestone report;
+3. confirm the milestone Definition of Ready;
+4. split the milestone internally into small RED → GREEN → REFACTOR cycles;
+5. implement the smallest vertical behavior that reaches the milestone Definition of Done;
+6. run focused checks while editing, then the milestone verification matrix;
+7. review the diff for scope, unsafe package-content handling, hidden design changes, and unnecessary abstraction;
+8. update `v1-status.md`;
+9. create signed, coherent, green commits and push `implementation/v1` without force;
+10. update the draft PR with the milestone result and immediately advance the next ready milestone.
+
+The loop does not stop merely because one task, test, or commit completed. If a worker reaches its session or tool budget before the milestone DoD, it commits and pushes only a coherent green checkpoint, leaves the milestone task incomplete with a resume comment, and the orchestrator requeues that same milestone from `v1-status.md`; the next milestone must not become ready.
+
+### 4.6 Autonomous continue and stop policy
+
+Continue without asking Mathieu when:
+
+- the next action is inside an accepted milestone;
+- failures are ordinary implementation defects with a safe local fix;
+- tests or supported-version contracts reveal missing code but not a design contradiction;
+- a refactor is local and reduces duplication without changing public behavior;
+- a session limit requires a clean checkpoint and resumption from `v1-status.md`.
+
+Stop and report when:
+
+- Milestone 0 cannot prove the execution-closure contract;
+- evidence contradicts an accepted ADR or requires a consequential product choice;
+- a new direct dependency, PTY, resolver behavior, local PKGBUILD support, artifact reuse, or threat-model expansion appears necessary;
+- a test would risk the real workstation package state;
+- credentials or external infrastructure required by a mandatory gate are unavailable after safe alternatives are exhausted;
+- the same blocker survives two bounded implementation attempts;
+- the release candidate is ready for Mathieu's review and tag authorization.
+
+When blocked, preserve a coherent branch, update `v1-status.md`, push the checkpoint, comment the evidence on the umbrella issue/PR, and create a focused `MODE: DECISION` issue only when a real accepted-design change is needed.
+
+## 5. Repository shape
+
+Create packages only when the working vertical path needs them. The accepted ADR-0006 domain boundaries remain the intended final shape:
+
+```text
+cmd/auroscope
+internal/cli
+internal/config
+internal/process
+internal/paru
+internal/recipe
+internal/scanner
+internal/llm
+internal/review
+internal/store
+internal/approval
+internal/report
+```
+
+These are domain packages, not interface requirements. Interfaces exist only at nondeterministic boundaries tests must replace: clock/randomness, process execution, model transport, and short store transactions.
+
+This plan intentionally names stable package roots and milestone artifacts rather than preallocating dozens of source files. Each worker chooses the smallest concrete files required by the next failing test and records the resulting paths in the milestone report.
+
+Tests live beside their package by default. Use shared `test/contract`, `test/integration`, `test/e2e`, and `testdata` only when a real process or dependency boundary justifies them.
+
+## 6. Common verification commands
+
+After bootstrap, the ordinary local baseline is:
 
 ```console
 CGO_ENABLED=1 go test ./...
-CGO_ENABLED=1 go test -race ./...
 go vet ./...
-test -z "$(git ls-files -co --exclude-standard -- '*.go' | xargs -r gofmt -l)"
+test -z "$(git ls-files -z '*.go' | xargs -0 -r gofmt -l)"
 git diff --check
 ```
 
-Additional rules:
+Use targeted race checks while implementing process, store, and approval concurrency. At milestones 2, 3, 5, and 6 run:
 
-- Fuzz targets must ship with deterministic seed corpora and bounded input sizes. CI runs seed regression on every PR; scheduled/release CI runs time-bounded fuzzing.
-- Tests that spawn commands use argv arrays and controlled temporary directories. Shell scripts are confined to test/packaging harnesses and must not interpolate hostile fixture text.
-- Live Paru/Pacman/makepkg tests run only in an ephemeral Arch container or disposable VM. They must require an explicit private Pacman root/database and abort if `/`, `/var/lib/pacman`, or the host cache would be targeted.
-- Network-dependent contract tests pin exact upstream commits/package versions and are separate from deterministic unit tests.
-- Race tests do not make SQLite or the approval protocol secure against a hostile local account; they verify ordinary correctness only.
-
-## 4. Planned repository layout
-
-The sequence introduces only files needed by implemented behavior:
-
-```text
-cmd/auroscope/
-internal/approval/
-internal/cli/
-internal/config/
-internal/llm/
-internal/paru/
-internal/process/
-internal/recipe/
-internal/report/
-internal/review/
-internal/scanner/
-internal/store/
-internal/store/migrations/
-internal/testutil/
-testdata/recipes/
-testdata/paru/
-testdata/llm/
-test/contract/
-test/integration/
-test/e2e/
-packaging/arch/
-scripts/
-.gitea/workflows/
+```console
+CGO_ENABLED=1 go test -race ./...
 ```
 
-Test files live beside their package unless they require a real dependency or process boundary, in which case they live under `test/contract`, `test/integration`, or `test/e2e`. New package-level interfaces are allowed only for clock/randomness, process execution, model transport, and store transactions when a test needs the boundary.
+Live Paru/Pacman/makepkg and installation tests run only through the disposable-Arch harness with explicit private root, database, and cache. The harness must abort before starting if it could target `/`, `/var/lib/pacman`, or the host package cache.
 
-## 5. Dependency-ordered implementation slices
+Network/live-provider checks remain opt-in unless they are part of the supported-version release gate. Deterministic tests must not require the network.
 
-### 00 — Reproducible Go and CI bootstrap
+## 7. Milestones
 
-**Prerequisites:** accepted plan; a dedicated execution issue containing Mathieu's explicit phase advance; clean `main`; Arch `linux/amd64` target.
+### Milestone 0 — Bootstrap and prove the Paru execution contract
 
-**Files:**
+**Objective:** establish a minimal Go/CI skeleton and prove the highest-risk external contract before durable architecture grows around it.
 
-- create `go.mod`, `go.sum`;
-- create `cmd/auroscope/main.go`, `cmd/auroscope/main_test.go`;
-- create `internal/testutil/testutil.go`;
-- create `scripts/check.sh`;
-- create `scripts/check-docs.sh`;
-- create `.gitea/workflows/verify.yml`;
-- update `AGENTS.md`, `README.md`, and `docs/design-phase.md` to record the authorized implementation phase; add only verified developer commands.
+**Definition of Ready:**
 
-**RED:** add tests for deterministic build metadata formatting and for an injectable command entry returning an exit code rather than calling `os.Exit` below `main`. Make `scripts/check-docs.sh` fail on broken repository-relative links, malformed Markdown, stale phase statements, and missing ADR/specification traceability using pinned documented tooling.
+- this plan is merged;
+- Mathieu explicitly starts the implementation loop and that authorization is recorded in the umbrella issue;
+- the umbrella `MODE: EXECUTION` issue, `implementation/v1` branch, draft PR, and `v1-status.md` exist;
+- the branch starts from current `origin/main`.
 
-**GREEN:** establish module `git.2027a.net/2027a/auroscope`, a minimal command entry, `-trimpath` build flags, version/commit injection variables, and a CI job using Arch with CGO enabled. Pin Go/tool images or package snapshots explicitly.
+**Implement:**
 
-**REFACTOR:** keep `main` wiring-only; no CLI framework or domain packages created pre-emptively.
+- first update the current-phase statements in `AGENTS.md`, `README.md`, and `docs/design-phase.md` to record the authorized implementation phase without rewriting accepted design history;
+- minimal `go.mod` and wiring-only `cmd/auroscope/main.go`;
+- a small `scripts/check-docs.sh` that validates repository-relative links and stale phase statements without introducing a documentation framework;
+- raw argv classification sufficient for pass-through, one explicit intercepted `-S` case, `--noconfirm` rejection when a new AUR decision is possible, and the ADR-0014 v1 rejection boundary (`-B`, targetless `-U`, local/path-like targets, `file:`, and `pkgbuilds` mode);
+- minimal argv-only process runner preserving terminal descriptors and child exit/signal evidence;
+- version/capability checks for the exact supported Paru/Pacman/makepkg floor;
+- disposable-Arch contract harness;
+- in-memory planning/approval placeholders only where needed to exercise the sequence;
+- private Paru config and fixed guard probe sufficient to observe the real execution path.
 
-**Verification:** cumulative baseline; `scripts/check-docs.sh`; `CGO_ENABLED=1 go build -trimpath ./cmd/auroscope`; inspect embedded module/VCS metadata with `go version -m` in the Arch CI image. Do not claim AURoscope's own `--version`: the accepted classifier preserves Paru's transparent `--version` behavior.
+**Do not implement:** SQLite, full configuration, scanner catalogue, LLM, status commands, retention, packaging, or reusable artifacts.
 
-**Exit criteria:** signed Arch-targeted binary builds; CI proves CGO toolchain availability; no runtime or package-management behavior is claimed yet. Covers ADR-0001 and prepares ADR-0007.
+**Verification:**
 
-### 01 — Raw argv classifier and fail-closed v1 boundary
+- documentation checks pass after the phase transition;
+- byte-for-byte pass-through fixtures;
+- fail-closed local/path input fixtures;
+- real process-group cancellation smoke;
+- disposable-Arch proof of plan → second resolution → execution closure → hook → `--skipreview`;
+- changed or unexpected package-base abort before recipe code;
+- host-package-state safety guard.
 
-**Prerequisites:** slice 00.
+**Definition of Done:**
 
-**Files:**
+- the supported Paru execution closure and hook boundary are executable facts;
+- unsupported grammar fails closed;
+- if proof fails, a decision issue contains exact commands/output and later milestones remain blocked;
+- if proof succeeds, its fixtures become the single supported-version contract harness used later.
 
-- create `internal/cli/classify.go`, `internal/cli/classify_test.go`, `internal/cli/classify_fuzz_test.go`;
-- create `internal/cli/command.go`, `internal/cli/command_test.go`;
-- create `testdata/paru/argv-cases.json`;
-- modify `cmd/auroscope/main.go` only to call the classifier/dispatcher.
+### Milestone 1 — First deterministic guarded vertical slice
 
-**RED:** table and fuzz tests for every class in the design argument table: byte-for-byte pass-through, intercepted searches/installs/upgrades, explicit `-U` archive pass-through, `--noconfirm` rejection when a new AUR decision is possible, unknown/ambiguous fail-closed behavior, and pre-launch rejection of `-B`, targetless `-U`, path-like targets, `file:`, and modes containing `pkgbuilds`/`p`.
+**Objective:** make one explicit AUR target complete the real product path in disposable Arch with LLM disabled.
 
-**GREEN:** parse only AURoscope-owned subcommands and the minimum Pacman/Paru operation grammar; retain the original `[]string` unchanged for transparent flows; produce typed classification/rejection reasons and final trusted mode-reset intent without starting a child.
+**Definition of Ready:** Milestone 0 is complete and the execution contract needs no design amendment.
 
-**REFACTOR:** separate syntactic classification from execution policy; do not normalize unknown options or build a general Paru parser.
+**Implement:**
 
-**Verification:** `go test ./internal/cli -run .`; `go test ./internal/cli -fuzz=FuzzClassify -fuzztime=30s`; cumulative baseline.
+- only the XDG paths, private permissions, viewer fallback, and configuration fields consumed by this milestone;
+- pinned `go-sqlite3` with the supported SQLite library version, build-tag policy, and `PRAGMA compile_options` baseline recorded and tested;
+- minimal forward migrations and SQLite rows for recipe identity, inspection, explicit decision, transaction, approval, process session, build, package-artifact, and installation outcome evidence required by ADR-0009; artifact rows are populated only from bounded exact evidence and never feed reuse;
+- a bounded standard-library AUR RPC client for authoritative source/namespace/pkgbase and maintainer/source metadata, tested against a fake server for redirects, malformed/oversized/contradictory records, and RPC/repository mismatch;
+- exact AUR Git acquisition, RPC/repository identity cross-check, and canonical tracked recipe manifest without sourcing or executing package content; committed `.SRCINFO` remains hostile metadata and is never regenerated;
+- first-install diff/context;
+- one representative deterministic rule plus technical status and advisory signal plumbing;
+- private text report and terminal `approve | inspect | defer | reject | cancel` decision;
+- one-shot approval, complete guard identity verification, private execution handoff, and forced rebuild;
+- one cross-component integration harness reused by later milestones.
 
-**Exit criteria:** no rejected or ambiguous local-recipe input can launch Paru; every transparent fixture returns the exact original argv. Covers ADR-0006 and ADR-0014.
+Treat Git object IDs as validated opaque identities for the supported AUR contract. Do not build a speculative multi-format Git framework.
 
-### 02 — XDG paths, strict configuration, and private runtime roots
+**Verification:**
 
-**Prerequisites:** slice 00; classifier types from slice 01.
+- supported SQLite version and compile-option checks;
+- empty and reopen migration tests;
+- marker recipe proving collection/review executes no package content;
+- exact identity mutation rejection;
+- explicit decision required even for a clear signal;
+- cancellation leaves no reusable approval;
+- disposable-Arch explicit install succeeds only after visible evidence and approval;
+- reports remain non-authoritative SQLite snapshots.
 
-**Files:**
+**Definition of Done:** one explicit AUR package can be planned, reviewed, explicitly approved, guarded, rebuilt, and installed in disposable Arch without LLM or host package-state access.
 
-- create `internal/config/config.go`, `internal/config/config_test.go`;
-- create `internal/config/paths.go`, `internal/config/paths_linux_test.go`;
-- create `internal/config/editor.go`, `internal/config/editor_test.go`;
-- create `internal/config/testdata/*.toml`;
-- modify `go.mod`, `go.sum` to pin reviewed `github.com/pelletier/go-toml/v2` and `github.com/mattn/go-shellwords v1.0.14`.
+### Milestone 2 — Complete the inspection and approval trust core
 
-**RED:** tests for optional config/defaults; unknown TOML keys; explicit backend modes; secret environment-variable references; exact XDG fallbacks; absolute/owned/non-symlink/private roots; `0077` umask effects; `0600`/`0700` modes; safe `XDG_RUNTIME_DIR` and unpredictable `MkdirTemp` fallback; configured viewer argv; `$VISUAL` → `$EDITOR` → pager precedence; disabled environment/backtick expansion; report path appended as a distinct argv element.
+**Objective:** broaden the first vertical slice until its inspection and one-shot approval contracts satisfy the accepted v1 security/correctness boundary.
 
-**GREEN:** implement typed config sections `[policy]`, `[paths]`, `[scanner]`, `[llm]`, `[review]`, `[retention]`, `[compatibility]`, strict decoding, path validation, and private directory/file creation. Do not create persistence tables or execute viewers yet.
+**Definition of Ready:** Milestone 1's vertical path is green and remains the integration harness.
 
-**REFACTOR:** centralize ownership/mode checks and keep package-derived strings out of path authority.
+**Implement:**
 
-**Verification:** `go test ./internal/config`; dependency license/module inventory; cumulative baseline.
+- complete canonical manifest handling required by ADR-0010, including tracked file types, modes, paths, hashes, workspace binding, and visible malformed/oversized cases;
+- differential identity and recipe diff;
+- the advertised deterministic rule catalogue with bounded context and versioned stable finding IDs;
+- benign, suspicious, and false-positive corpus entries for every advertised indicator;
+- explicit `complete | partial | failed` status and `clear | informational | caution | high | unknown` signal behavior;
+- full append-only human decision and approval lifecycle;
+- atomic `armed → claimed → consumed` transitions, expiry, duplicate claim rejection, process/workspace binding, terminal invalidation, and startup orphan handling required by ADR-0010;
+- readable evidence/provenance and terminal escaping.
 
-**Exit criteria:** all configured roots match ADR-0012; secrets are never accepted as TOML values; command parsing never invokes a shell. Covers ADR-0008, ADR-0011, and ADR-0012.
+**Verification:**
 
-### 03 — Linux process runner, terminal preservation, and cancellation
+- corpus coverage check;
+- fuzz-seed regression for classifier, manifests, scanner context, and terminal escaping;
+- no-execution marker across collection, scanning, context construction, and presentation;
+- mutation matrix for every approval-bound component;
+- targeted store/approval concurrency and crash checkpoints;
+- full race baseline.
 
-**Prerequisites:** slices 00–02.
+**Definition of Done:** all four ADR-0013 proof areas except the final release E2E have concrete reusable fixtures, and no signal or failure can masquerade as a decision.
 
-**Files:**
+### Milestone 3 — Complete the Paru-facing daily workflow
 
-- create `internal/process/runner.go`, `internal/process/runner_test.go`;
-- create `internal/process/result.go`, `internal/process/result_test.go`;
-- create `internal/process/group_linux.go`, `internal/process/group_linux_test.go`;
-- create `test/integration/process_helper_test.go`.
+**Objective:** expand the guarded vertical path into the supported daily Paru replacement surface.
 
-**RED:** real-process tests proving argv-only execution, inherited stdin/stdout/stderr, optional stdout capture with inherited stderr, separate child exit code and terminating signal, child process-group creation, SIGINT/SIGTERM/SIGHUP forwarding, child wait before cleanup callback, and no implicit shell.
+**Definition of Ready:** Milestone 2's identity, evidence, decision, and approval boundaries are stable.
 
-**GREEN:** implement a small runner around `os/exec` and Linux process groups with typed results. Make cancellation ordering explicit and injectable only where tests need it.
+**Implement:**
 
-**REFACTOR:** isolate Linux-specific syscalls; avoid PTY and generic job-control abstractions.
+- transparent pass-through with original argv and child status;
+- Paru-native search/numbered selection using the accepted versioned adapter;
+- explicit repo, AUR, and mixed-target handling;
+- authoritative origin, package-base, split-package, dependency/provider, and version records;
+- fresh-plan drift comparison and held/dependant closure;
+- bare invocation and `-Syu` as complete official repository phase first, followed only on success by AUR planning/review/execution;
+- `status`, `status --verbose`, `status --json`, `status --markdown`, `held`, and `explain <package>` from SQLite;
+- concise diagnostics and stable AURoscope-owned exit categories while preserving child exit/signal evidence.
 
-**Verification:** `CGO_ENABLED=1 go test -race ./internal/process ./test/integration -run Process`; cumulative baseline.
+**Verification:**
 
-**Exit criteria:** transparent execution can preserve child terminal/status semantics; cancellation always waits and retains exit/signal evidence. Covers ADR-0006. A PTY proposal is forbidden unless a later supported-version test fails because inherited descriptors are insufficient.
+- supported-version selection, cancellation, order grammar, and mode-reset contracts;
+- pass-through, explicit install, search, mixed dependency, bare upgrade, AUR-only upgrade, defer/reject, drift, failure, and signal scenarios in the shared integration harness;
+- official-phase failure/cancellation prevents AUR review;
+- status views explain held consequences and required action;
+- full race baseline.
 
-### 04 — Paru/Pacman/makepkg capability and grammar adapters
+**Definition of Done:** the specification's supported Paru-facing workflows operate through one guarded architecture, and every acceptance criterion has a named test or a documented release-gate dependency.
 
-**Prerequisites:** slices 01 and 03.
+### Milestone 4 — Add optional LLM assessment
 
-**Files:**
+**Objective:** add useful model explanation without coupling it to decisions or destabilizing the deterministic path.
 
-- create `internal/paru/version.go`, `internal/paru/version_test.go`;
-- create `internal/paru/capability.go`, `internal/paru/capability_test.go`;
-- create `internal/paru/selection.go`, `internal/paru/selection_test.go`;
-- create `internal/paru/order.go`, `internal/paru/order_test.go`, `internal/paru/order_fuzz_test.go`;
-- create `internal/paru/commands.go`, `internal/paru/commands_test.go`;
-- create fixtures under `testdata/paru/2.1.0/` and `testdata/paru/post-d1dfbc4/`;
-- create `test/contract/paru_contract_test.go`, `test/contract/pacman_contract_test.go`, `test/contract/run-arch.sh`.
+**Definition of Ready:** Milestone 3 works with LLM mode `disabled`.
 
-**RED:** tests for startup version parsing; behavioral stream capability; clean post-fix selection; bounded transitional 2.1.0 selection grammar; exit `1` success only with valid selected names; exit `1` empty cancellation; signal failure; line/count/control-character bounds; `INSTALL` versus `REPO` order records; AUR records; `MISSING`, unknown, conflicting, and `PKGBUILD` record rejection; final trusted mode-reset argv placement; Pacman repository confirmation; documented command exit behavior.
+**Implement:**
 
-**GREEN:** implement versioned adapters and command builders only for exact supported contracts. Capability detection must use observed behavior, not version strings alone. Keep human-output parsing isolated to the temporary 2.1.0 adapter. The durable production floor remains the first stable Paru release containing `d1dfbc4`; the pinned post-fix commit is contract-test input, not a production minimum.
+- only the `[llm]` configuration fields now consumed;
+- migration for LLM assessments;
+- one shared typed response validator with unknown-field, enum, size, path, and line-reference checks;
+- standard-library OpenAI-compatible HTTP adapter;
+- Codex CLI adapter running outside the recipe repository with bounded redacted input;
+- accepted explicit and automatic backend selection, exact default model, timeout/failure behavior, privacy mode, and bounded retention metadata;
+- report integration that keeps deterministic evidence immutable and visibly separate.
 
-**REFACTOR:** share typed plan records without merging incompatible grammars; include a removal condition for the transitional adapter in code comments/tests.
+**Verification:**
 
-**Verification:** unit/fuzz commands plus `test/contract/run-arch.sh` in ephemeral Arch against Paru `2.1.0-2`, the pinned post-fix reference, Pacman/makepkg `7.1.x`; cumulative baseline.
+- mock HTTP and fake-Codex tests;
+- pinned opt-in Codex contract in isolated CI;
+- prompt-injection fixtures remain inert data;
+- secret/host-path canaries are absent from requests and logs;
+- disabled, invalid, timeout, refusal, and unauthenticated states remain visible `unknown` and preserve explicit human authority;
+- deterministic end-to-end workflow remains green with LLM disabled.
 
-**Exit criteria:** adapter rejects every unproven grammar; native selection behavior and cancellation are executable facts; no contract test touches the host package database. Covers ADR-0002, ADR-0003, ADR-0004, and ADR-0014.
+**Definition of Done:** both supported LLM transports are strictly advisory and locally validated, while the product remains fully operable without them.
 
-### 05 — SQLite bootstrap, migrations, and instrumental schema core
+### Milestone 5 — Personal-software reliability and bounded maintenance
 
-**Prerequisites:** slices 00 and 02.
+**Objective:** make normal long-term use boring: private state, finite growth, clear recovery, and no silent temporary-work accumulation.
 
-**Files:**
+**Definition of Ready:** real lifecycle rows and configuration consumers exist from milestones 1–4.
 
-- modify `go.mod`, `go.sum` to pin `github.com/mattn/go-sqlite3 v1.14.50`;
-- create `internal/store/open.go`, `internal/store/open_test.go`;
-- create `internal/store/migrate.go`, `internal/store/migrate_test.go`;
-- create `internal/store/migrations/0001_identity_inspection.sql`;
-- create `internal/store/lock.go`, `internal/store/lock_test.go`;
-- create `internal/store/types.go`, `internal/store/store_test.go`;
-- create `internal/store/backup.go`, `internal/store/backup_test.go`;
-- create `test/integration/store_concurrency_test.go`.
+**Implement:**
 
-**RED:** runtime failure/smoke for unusable non-CGO driver; exact supported SQLite library version and `PRAGMA compile_options` baseline; `foreign_keys=ON`; WAL, private `-wal`/`-shm`, busy timeout, and required synchronous behavior; ordered embedded migration checksums; empty/migrated/reopened DB; pre-migration backup/restore; `quick_check` failure; concurrent open/write behavior; one mutating application lock with concurrent read-only status access; reversible byte round trips; identity/inspection foreign-key constraints. Missing, added, or changed compile options fail compatibility until deliberately reviewed.
+- remaining accepted retention configuration and defaults;
+- pre-migration backup/restore when a real prior schema exists;
+- startup `quick_check`, stale approval/session recovery, and concise diagnostics;
+- descriptor-relative cleanup required by ADR-0012 for AURoscope-owned direct children;
+- `auroscope cleanup`, bounded report/model/backups/history retention, and recipe-cache age/quota pruning;
+- read-only status while one mutating wrapper is active;
+- maintenance-only `VACUUM` if retained as useful.
 
-**GREEN:** add only `schema_migrations`, `package_bases`, `recipe_identities`, `recipe_files`, `inspections`, and `deterministic_findings`, because these are the first concrete identity/inspection workflows. Record the exact `go-sqlite3` build-tag policy and compile-option baseline for the supported Arch build; start with no optional feature tags unless a tested requirement justifies one. Exact columns require a concrete query or invariant. Add human decisions, transactions, approvals, process sessions, builds, artifacts, outcomes, and LLM assessments only in the later migration that delivers each corresponding feature.
+Do not add a generic scheduler, daemon, event log, or local-host hardening suite. Cleanup and recovery protect ordinary correctness under the accepted trusted-local-account model.
 
-**REFACTOR:** keep SQL forward-only and embedded; keep transactions short; no generic event/EAV/provenance/plugin schema.
+**Verification:**
 
-**Verification:** `CGO_ENABLED=1 go test -race ./internal/store ./test/integration -run Store`; inspect SQLite compile options in Arch CI; backup/restore smoke; cumulative baseline.
+- fake-clock retention tests;
+- success/error/cancel/signal cleanup;
+- active session preservation and stale 24-hour recovery;
+- symlink/path mutation cases originating from hostile recipe content;
+- migration backup/restore from each schema that actually shipped on the branch;
+- idempotent restart recovery;
+- full race baseline.
 
-**Exit criteria:** core invariants are enforced at SQL or short store-transaction boundaries; migration from empty and prior schema is deterministic; authoritative state refuses unsupported locking/filesystem behavior. Covers ADR-0007 and ADR-0009.
+**Definition of Done:** default state growth is finite, recoverable, visible, and safe for personal daily use without background services.
 
-### 06 — Non-executing Git acquisition and canonical recipe identity
+### Milestone 6 — Packaging and release-candidate proof
 
-**Prerequisites:** slices 02, 03, and 05.
+**Objective:** produce an installable self-hosted Arch package and the bounded evidence Mathieu needs to approve v1.
 
-**Files:**
+**Definition of Ready:** milestones 0–5 are complete with no unresolved design blocker.
 
-- create `internal/recipe/acquire.go`, `internal/recipe/acquire_test.go`;
-- create `internal/recipe/manifest.go`, `internal/recipe/manifest_test.go`, `internal/recipe/manifest_fuzz_test.go`;
-- create `internal/recipe/diff.go`, `internal/recipe/diff_test.go`;
-- create `internal/recipe/metadata.go`, `internal/recipe/metadata_test.go`;
-- create `internal/recipe/aur_rpc.go`, `internal/recipe/aur_rpc_test.go`;
-- create fixtures under `testdata/recipes/identity/` and `testdata/recipes/noexec/`;
-- create `test/integration/recipe_noexec_test.go`.
+**Implement:**
 
-**RED:** fixtures and a fake bounded AUR RPC server for authoritative source/namespace/pkgbase, maintainer/source metadata, committed `.SRCINFO` as hostile data, redirects, malformed/oversized/contradictory RPC records, and RPC/repository identity mismatch; SHA-1/SHA-256 Git object formats; commit/tree/blob identity; raw path-byte preservation; file type/mode/size/hash/blob OID; symlinks, special files, hostile filenames, control/bidi/invalid UTF-8, relevant untracked files, changed modes, workspace device/inode, tree/manifest drift; first-install empty baseline and later diff; marker PKGBUILDs/sources proving no command, makepkg, sourcing, or package content executes.
+- self-hosted AUR-style `packaging/arch/PKGBUILD` for Arch `linux/amd64`;
+- `-trimpath` build with source version/commit visible through `status --verbose` and Go build metadata;
+- Go and C toolchain as build dependencies, not runtime dependencies;
+- checksums and standard Go module/license inventory; use ordinary tooling rather than a bespoke SBOM framework;
+- exact compatibility and security-boundary documentation;
+- minimal release CI and checklist;
+- final disposable-Arch E2E using synthetic repository/AUR fixtures.
 
-**GREEN:** query the exact supported AUR RPC contract with a bounded standard-library HTTP client, acquire the authoritative AUR Git candidate with argv-only Git commands, cross-check RPC and repository identity, enumerate immutable tree objects, open workspaces without following sensitive symlink components, compute canonical bounded manifests and diffs, and persist identity/evidence. `.SRCINFO` and AUR RPC data are metadata only; never regenerate `.SRCINFO`.
+Do not publish to `aur.archlinux.org`, tag a release, or merge the PR autonomously.
 
-**REFACTOR:** separate byte identity from escaped display text; make manifest serialization versioned and deterministic.
+**Verification:**
 
-**Verification:** focused unit/fuzz/integration marker tests; run under `strace` or equivalent in disposable CI to prove forbidden executables are not invoked during collection; cumulative baseline.
+- clean package build and install/uninstall in disposable Arch;
+- packaged SQLite runtime matches the pinned library version and compile-option baseline;
+- full unit, vet, formatting, race, contract, integration, corpus, and marker suites;
+- final E2E proves planning → non-executing inspection → attributable evidence → explicit decision → exact guard → rebuild/install;
+- critical abort cases cover defer/reject, plan drift, guard identity drift, and official-phase failure;
+- generated language says “reviewed”, not “safe”;
+- `git diff --check` and clean/synchronized implementation branch.
 
-**Exit criteria:** identical inputs produce identical identity; mutation of every bound component changes or invalidates it; collection executes no package content. Covers ADR-0005, ADR-0010, ADR-0012, and security gate 2 of ADR-0013.
+**Definition of Done:** the draft PR is a release candidate with all specification acceptance criteria mapped to passing evidence, remaining compatibility limits documented, and no unresolved critical/high blocker. The loop stops for Mathieu's review and separate merge/tag authorization.
 
-### 07 — Deterministic scanner and bounded context construction
+## 8. Checkpoints and requirement traceability
 
-**Prerequisites:** slice 06 and store core from slice 05.
+| Boundary | Primary milestone(s) |
+|---|---|
+| ADR-0001 — Go and self-hosted Arch packaging | 0, 6 |
+| ADR-0002 — native Paru selection | 0, 3 |
+| ADR-0003 — multi-stage orchestration | 0, 1, 3 |
+| ADR-0004 — official upgrade first | 3, 6 |
+| ADR-0005 — final recipe guard | 0–2, 6 |
+| ADR-0006 — process architecture | 0, 1, 3 |
+| ADR-0007 — CGO SQLite | 1, 5, 6 |
+| ADR-0008 — minimal dependencies | 1, 4, 6 |
+| ADR-0009 — instrumental state | 1–5 |
+| ADR-0010 — one-shot approval | 1, 2, 6 |
+| ADR-0011 — scanner and advisory LLM | 1, 2, 4 |
+| ADR-0012 — XDG, cleanup, retention | 1, 5 |
+| ADR-0013 — bounded four-part proof | 1, 2, 6 |
+| ADR-0014 — reject local PKGBUILD inputs | 0, 3 |
+| Bare `auroscope` replacement | 3, 6 |
+| Exact inspected recipe before build | 1, 2, 6 |
+| Deterministic/LLM evidence separation | 2, 4, 6 |
+| Human owns every decision | 1–4, 6 |
+| `status`, `held`, `explain` | 3, 5 |
+| Cancellation leaves no approval | 1–3, 6 |
+| Workstation package state untouched | 0, 1, 3, 6 |
 
-**Files:**
+Review checkpoints are informational by default and do not pause the autonomous loop:
 
-- create `internal/scanner/finding.go`, `internal/scanner/finding_test.go`;
-- create `internal/scanner/rules.go`, `internal/scanner/rules_test.go`;
-- create `internal/scanner/context.go`, `internal/scanner/context_test.go`, `internal/scanner/context_fuzz_test.go`;
-- create `internal/scanner/benchmark_test.go`;
-- populate `testdata/recipes/corpus/benign/` and `testdata/recipes/corpus/suspicious/`;
-- create `testdata/recipes/corpus/manifest.json` mapping every advertised indicator to positive and false-positive fixtures.
+- **Feasibility checkpoint:** Milestone 0.
+- **First useful product checkpoint:** Milestone 1.
+- **Trust-core checkpoint:** Milestone 2.
+- **Daily-use checkpoint:** Milestone 3.
+- **Release-candidate checkpoint:** Milestone 6, which always pauses for Mathieu.
 
-**RED:** stable finding IDs independent of prose; immutable evidence/severity; line/byte references; aggregate signal separated from findings; positive, benign, false-positive, malformed, obfuscated, prompt-injection, oversized, binary, symlink, control/bidi, and truncation cases for every accepted rule family; exact initial ceilings of 256 KiB/file, 2 MiB aggregate, 512 KiB diff, 200 files; relevant omission yielding `partial` and `unknown|caution`, never `clear`.
+Mathieu may ask the loop to pause at any checkpoint.
 
-**GREEN:** implement bounded lexical/non-executing rules and deterministic context selection. Do not add a shell parser unless a failing rule requirement justifies a separate dependency/ADR review.
+## 9. Definition of v1 complete
 
-**REFACTOR:** version rule and context contracts; keep observations factual and intent-neutral.
+V1 implementation is complete only when:
 
-**Verification:** `go test ./internal/scanner`; fuzz seed regression; corpus coverage script verifies no advertised indicator lacks positive and benign controls; benchmark the accepted context ceilings against the full corpus and retain results as a release artifact; rerun no-execution marker suite; cumulative baseline.
+- Milestone 0 proved the exact supported Paru execution contract before dependent architecture was built;
+- bare upgrade, native selection, explicit install, and transparent pass-through satisfy the specification;
+- official packages receive no AUR-specific review friction;
+- all AUR recipes and required dependencies are inspected before recipe-supplied code;
+- deterministic and LLM evidence remain distinct and no automatic decision exists;
+- explicit approval binds the exact complete recipe identity and is one-shot;
+- drift, cancellation, failure, signal, expiry, or replay leaves no reusable approval;
+- v1 always rebuilds AUR packages and never treats recipe approval as cached-artifact approval;
+- status, held consequences, decisions, and outcomes are readable from SQLite;
+- temporary work and retained state are finite by default and recover correctly;
+- the four ADR-0013 gates and specification acceptance criteria pass in disposable environments;
+- the self-hosted Arch package installs without a Go runtime;
+- the implementation branch and draft PR contain verifiable milestone reports and no unresolved release blocker;
+- Mathieu separately approves merge and release/tagging.
 
-**Exit criteria:** corpus covers every advertised v1 indicator; scanner output is reproducible and attributable; truncation/failure is visible. Covers ADR-0011 and security gates 1–2 of ADR-0013.
+## 10. Explicitly deferred
 
-### 08 — Advisory LLM contracts and backend adapters
-
-**Prerequisites:** slices 02, 03, 05, and 07.
-
-**Files:**
-
-- create `internal/store/migrations/0002_llm_assessments.sql` and migration tests;
-- create `internal/llm/types.go`, `internal/llm/types_test.go`, `internal/llm/validate_fuzz_test.go`;
-- create `internal/llm/select.go`, `internal/llm/select_test.go`;
-- create `internal/llm/http.go`, `internal/llm/http_test.go`;
-- create `internal/llm/codex.go`, `internal/llm/codex_test.go`;
-- create `internal/llm/request.go`, `internal/llm/request_test.go`;
-- create fixtures under `testdata/llm/`;
-- create `test/contract/codex_contract_test.go` for an explicitly pinned supported CLI version.
-
-**RED:** no decision/action fields; unknown fields/enums/path/line references rejected; UTF-8/string/count/response bounds; package prompt injection remains data; deterministic evidence cannot be replaced; host paths/environment/secrets omitted; explicit backend precedence; automatic complete-API-before-Codex; disabled mode; Codex model default exactly `5.6-luna`; explicit incomplete config, unauthenticated Codex, timeout, refusal, invalid output, and transport failure produce visible `unknown` with no silent backend/model fallback; raw retention and privacy mode behavior.
-
-**GREEN:** implement typed JSON with `DisallowUnknownFields` and semantic validation, standard-library HTTP transport, and argv-only Codex invocation from a private non-recipe directory containing bounded redacted input. Add persistence only with this feature.
-
-**REFACTOR:** share response validation between HTTP and Codex while keeping transport diagnostics distinct; never add an LLM SDK.
-
-**Verification:** `go test ./internal/llm ./internal/store`; mock HTTP tests; fake-Codex tests; opt-in pinned live Codex contract in isolated CI with no package repository cwd; secret-leak canary scan of requests/logs; cumulative baseline.
-
-**Exit criteria:** model output is optional, advisory, locally validated, and incapable of authorizing work; failure remains human-visible. Covers ADR-0008, ADR-0011, and security gate 3 of ADR-0013.
-
-### 09 — Reports, terminal review, and append-only human decisions
-
-**Prerequisites:** slices 02, 05, 07, and 08.
-
-**Files:**
-
-- create `internal/report/render.go`, `internal/report/render_test.go`;
-- create `internal/report/escape.go`, `internal/report/escape_fuzz_test.go`;
-- create `internal/report/write.go`, `internal/report/write_test.go`;
-- create `internal/review/present.go`, `internal/review/present_test.go`;
-- create `internal/review/decision.go`, `internal/review/decision_test.go`;
-- create `internal/store/migrations/0003_human_decisions.sql` and migration tests;
-- create `internal/store/decision.go`, `internal/store/decision_test.go`;
-- create golden fixtures under `internal/report/testdata/` and transcript fixtures under `internal/review/testdata/`.
-
-**RED:** text/Markdown/JSON separation of technical status, deterministic findings, aggregate signal, LLM assessment, and null/explicit human decision; provenance and partial/failed limitations; escaped hostile terminal content; atomic private write (`fsync`, rename, directory sync where supported); viewer receives a read-only generated report; terminal menu supports inspect/approve/defer/reject/cancel; a `clear` recipe may use concise/batched presentation but still records explicit human approval before any approval is armed; Paru's later native confirmation is not removed; approval after visible partial/failed analysis remains explicit; edited recipe invalidates identity and requires reinspection; no automatic decision field or path.
-
-**GREEN:** render only from typed store state plus immutable blobs; implement generic viewer/pager launch and append-only decision recording. Reports remain snapshots and are never read as state.
-
-**REFACTOR:** keep rendering pure where possible and presentation I/O behind narrow testable boundaries.
-
-**Verification:** golden tests, transcript tests, terminal escape fuzzing, marker/no-execution suite, cumulative baseline.
-
-**Exit criteria:** a user can understand evidence, provenance, uncertainty, and required action without any signal masquerading as a decision. Covers ADR-0009, ADR-0011, ADR-0012, and security gate 3 of ADR-0013.
-
-### 10 — Transaction planning, drift comparison, and held closure
-
-**Prerequisites:** slices 01, 04, 05, 06, and 09.
-
-**Files:**
-
-- create `internal/paru/plan.go`, `internal/paru/plan_test.go`;
-- create `internal/paru/drift.go`, `internal/paru/drift_test.go`;
-- create `internal/paru/closure.go`, `internal/paru/closure_test.go`, `internal/paru/closure_fuzz_test.go`;
-- create `internal/store/migrations/0004_transactions.sql` and migration tests;
-- create `internal/store/transaction.go`, `internal/store/transaction_test.go`;
-- create `test/integration/planning_flow_test.go`.
-
-**RED:** explicit target/search/AUR upgrade plans; authoritative repo/AUR origin records; complete split-package/package-base grouping; deterministic argument recording; dependency/provider/version/origin/recipe identity drift; unknown/MISSING/conflicting/partial split-package records; configured PKGBUILD mode neutralization; held pkgbase plus impossible dependant closure; changed re-resolution always returns to review rather than repair; an executable test exposes the non-atomic interval between the last plan comparison and Paru's fresh resolver run; no SQLite transaction held while waiting on a child or user.
-
-**GREEN:** persist planning evidence, derive review candidates and held closure from proven Paru records, and compare a fresh execution-resolution plan with the approved plan. Paru remains authoritative; AURoscope only validates and compares its typed output. Treat this comparison as pre-execution evidence, not an atomic lock on Paru's later resolver state.
-
-**REFACTOR:** keep planning model independent of human presentation and executable orchestration.
-
-**Verification:** focused unit/fuzz tests; synthetic integration with fake runner and SQLite; supported-version Arch contract fixtures; cumulative baseline.
-
-**Exit criteria:** every executable AUR package base is planned and reviewable; any material observed drift fails closed with an explainable difference. Before slice 12, the supported dependency contract must prove how the actual execution run is bounded by the approved closure; if it cannot, open a `MODE: DECISION` amendment and stop rather than overstate the guarantee. Covers ADR-0003, ADR-0004, ADR-0009, and ADR-0014.
-
-### 11 — One-shot approval lifecycle and guard
-
-**Prerequisites:** slices 03, 05, 06, 09, and 10.
-
-**Files:**
-
-- create `internal/approval/identity.go`, `internal/approval/identity_test.go`;
-- create `internal/approval/lifecycle.go`, `internal/approval/lifecycle_test.go`;
-- create `internal/approval/process_linux.go`, `internal/approval/process_linux_test.go`;
-- create `internal/approval/guard.go`, `internal/approval/guard_test.go`;
-- create `internal/store/migrations/0005_approvals.sql` and migration tests;
-- create `internal/store/approval.go`, `internal/store/approval_test.go`;
-- modify `internal/cli/command.go` and `cmd/auroscope/main.go` to wire the internal `guard` command;
-- create `test/integration/approval_concurrency_test.go`, `test/integration/guard_identity_test.go`.
-
-**RED:** arm only from same-inspection explicit human approve; 30-minute default and 2-hour maximum; lowercase-hex transaction ID; exact source/namespace/pkgbase, commit/tree/manifest/per-file/scanner/human/workspace/UID/process binding; parent PID/start ticks/executable; pre-claim no-follow identity; `BEGIN IMMEDIATE` atomic single `armed → claimed`; concurrent duplicate claim; expiry; unexpected pkgbase; every identity component mutation; post-claim recomputation; monotonic `claimed → consumed`; terminal invalidation; startup orphan recovery; process evidence unavailable/contradictory; approval after recorded partial/failed analysis.
-
-**GREEN:** implement the store transitions and narrow `guard --transaction <id>` path. The hook string is fixed `exec /usr/bin/auroscope guard --transaction <id>` with no package-derived text. Guard success means final identity verification before any recipe code, not safety or per-build adjacency.
-
-**REFACTOR:** keep process identity Linux-specific and keep manifest implementation shared with slice 06.
-
-**Verification:** race/concurrency integration; crash-injection around claim/verification; mutation matrix; cumulative baseline.
-
-**Exit criteria:** no approval is floating or reusable; missing, duplicate, expired, drifted, substituted, or replayed state fails before recipe-supplied code executes. Covers ADR-0005, ADR-0009, and ADR-0010.
-
-### 12 — Private Paru execution handoff and artifact reuse
-
-**Prerequisites:** slices 02–06 and 10–11.
-
-**Files:**
-
-- create `internal/paru/config.go`, `internal/paru/config_test.go`;
-- create `internal/paru/execute.go`, `internal/paru/execute_test.go`;
-- create `internal/store/migrations/0006_build_outcomes.sql` and migration tests;
-- create `internal/store/build.go`, `internal/store/build_test.go`;
-- create `internal/approval/artifact.go`, `internal/approval/artifact_test.go`;
-- create `test/contract/paru_config_contract_test.go`;
-- create `test/integration/execution_flow_test.go`.
-
-**RED:** original config resolution (`PARU_CONF`, XDG, `/etc/paru.conf`); absolute trusted include; nested includes, missing files, repeated `[bin]`, whitespace paths, and later guard override; private `0600` transaction config; fixed hook; `PARU_CONF` handoff; mandatory `--skipreview`; exact final trusted modes; no added `--noconfirm`; fresh plan comparison before execution; process-session recording before guard; success/child failure/signal/cancel invalidation; force rebuild by default; exact post-build evidence for every split-package artifact before recording a reusable SHA-256; substituted cache file, same name/version from another build, partial outputs, interrupted build, and stale records; unexpected guard call abort before repo build dependencies.
-
-**GREEN:** generate private Paru config, start the execution process group, bind the session, consume/invalidate approvals, and record only outcomes proven by supported process/dependency evidence. Never invoke `makepkg --packagelist`, `--printsrcinfo`, or `--verifysource` to discover artifacts. If no exact bounded post-build surface exists for a case, record the limited outcome and keep artifact reuse disabled; no arbitrary package artifact inherits recipe approval.
-
-**REFACTOR:** separate command construction, config rendering, lifecycle transitions, and child observation.
-
-**Verification:** fake runner integration; exact Paru config parser contract in disposable Arch; artifact mutation/reuse matrix; signal suite; cumulative baseline.
-
-**Exit criteria:** execution uses the reviewed plan and guard, cannot reopen Paru review after the guard, and never reuses an unproven package artifact. Actual execution-closure observation satisfies slice 10's gate or implementation remains blocked for a design amendment. Covers ADR-0003, ADR-0005, ADR-0006, ADR-0010, and ADR-0012.
-
-### 13 — Complete official-upgrade-first orchestration
-
-**Prerequisites:** slices 03–04 and 10–12.
-
-**Files:**
-
-- create `internal/paru/upgrade.go`, `internal/paru/upgrade_test.go`;
-- create `internal/paru/orchestrate.go`, `internal/paru/orchestrate_test.go`;
-- modify `internal/cli/command.go` and `cmd/auroscope/main.go` for intercepted user flows;
-- create `test/integration/upgrade_flow_test.go`.
-
-**RED:** bare invocation and `-Syu`; complete official `paru -Syu --repo` (or proven equivalent) first with inherited terminal and exact status; no AUR review around official packages; failure/cancellation prevents AUR phase; post-upgrade AUR query/plan/review only; explicit install/search flows skip unrelated sysupgrade; deferred/rejected AUR closure passed as exact ignores; changed closure or plan returns to review; transparent flows preserve argv/status.
-
-**GREEN:** implement the top-level state machine using existing classifier, process, adapter, store, review, approval, and execution packages. Keep phase results separate and visible.
-
-**REFACTOR:** model states and terminal outcomes explicitly; do not hide phases in a broad “install” function.
-
-**Verification:** deterministic fake-runner scenarios; supported-version disposable Arch integration with synthetic repositories/private Pacman state; cancellation and child-status matrix; cumulative baseline.
-
-**Exit criteria:** official upgrade is never fragmented for AUR policy; no AUR recipe code runs before post-upgrade review/approval; explicit and search installs use the same exact-review boundary. Covers ADR-0002, ADR-0003, and ADR-0004.
-
-### 14 — Status, held, explain, and snapshot exports
-
-**Prerequisites:** slices 05, 09–13.
-
-**Files:**
-
-- create `internal/store/status.go`, `internal/store/status_test.go`;
-- create `internal/report/status.go`, `internal/report/status_test.go`;
-- extend `internal/cli/command.go`, `internal/cli/command_test.go`;
-- create command tests under `cmd/auroscope/main_test.go`.
-
-**RED:** `status`, `status --verbose`, `status --json`, `status --markdown`, `held`, and `explain <package>`; verbose status includes AURoscope build version/commit while transparent `--version` remains Paru's; known/clear/awaiting/deferred/rejected counts; concise reasons and signal sources; dependency consequences; required human action; identity/decision/build/install history; byte-safe display; stable JSON exit/error envelope; reports generated from SQLite and never read back.
-
-**GREEN:** add read-only store queries and renderers, then wire owned CLI subcommands without interfering with Paru passthrough.
-
-**REFACTOR:** share typed view models, not rendered strings, across output formats.
-
-**Verification:** golden text/Markdown/JSON tests; corrupted/missing DB diagnostics; read-only concurrency with active transaction; cumulative baseline.
-
-**Exit criteria:** all persisted product state required by the specification is explainable without consulting mutable report files. Covers ADR-0009, ADR-0011, and ADR-0012.
-
-### 15 — Cleanup, retention, recovery, and maintenance
-
-**Prerequisites:** slices 02, 05, 11–14.
-
-**Files:**
-
-- create `internal/config/retention.go`, `internal/config/retention_test.go`;
-- create `internal/store/recover.go`, `internal/store/recover_test.go`;
-- create `internal/store/purge.go`, `internal/store/purge_test.go`;
-- create `internal/recipe/cleanup_linux.go`, `internal/recipe/cleanup_linux_test.go`;
-- extend `internal/cli/command.go` for `cleanup` and explicit maintenance operations;
-- create `test/integration/recovery_cleanup_test.go`.
-
-**RED:** success/error/cancel/signal cleanup; descriptor-relative no-follow deletion; only direct children; recorded marker not authority; UID/device/inode/PID/start-time cross-check; active session never removed; 24-hour runtime grace; unrecorded crash residue; defaults of 365/30/7/14 days, 512 MiB LRU, and 3 days; no unlimited/disabled default; live/referenced identity preservation; serialized age+quota cache prune; explicit backup restore and maintenance-only `VACUUM`; idempotent restart recovery.
-
-**GREEN:** implement startup recovery, explicit cleanup/purge, and bounded retention around recorded state. Never call recursive deletion on a path derived solely from package or marker text.
-
-**REFACTOR:** centralize lifecycle terminal cleanup and make purge decisions independently testable from deletion mechanics.
-
-**Verification:** fake-clock tests; symlink/path mutation integration; crash checkpoints; repeated idempotent recovery; cumulative baseline.
-
-**Exit criteria:** temporary work does not accumulate silently; retained evidence stays bounded without deleting live or referenced records. Covers ADR-0009, ADR-0010, and ADR-0012.
-
-### 16 — Full functional integration matrix
-
-**Prerequisites:** slices 00–15.
-
-**Files:**
-
-- create scenario fixtures under `test/integration/scenarios/`;
-- create `test/integration/transparent_flow_test.go`, `selection_flow_test.go`, `explicit_install_flow_test.go`, `aur_upgrade_flow_test.go`, `failure_flow_test.go`;
-- extend `scripts/check.sh` with deterministic integration targets.
-
-**RED:** add one failing scenario at a time for repo-only pass-through, package archive `-U`, search selection/cancel, explicit repo target, explicit AUR target, mixed repo/AUR dependencies, bare upgrade, AUR-only upgrade, first install, differential update, partial/failed scan, disabled/HTTP/Codex LLM, approve/defer/reject/cancel, plan drift, guard drift, artifact reuse/rebuild, child failure/signal, crash recovery, and status/explain results.
-
-**GREEN:** fix only the integration defect exposed by the current scenario, then run the focused scenario before advancing to the next one.
-
-**REFACTOR:** remove duplicate scenario wiring while preserving typed boundaries; do not replace live contract gates with mocks.
-
-**Verification:** cumulative baseline plus `CGO_ENABLED=1 go test -race ./test/integration/...`; coverage report used to find untested branches, not as a substitute acceptance metric.
-
-**Exit criteria:** every product acceptance criterion has at least one deterministic integration scenario and a traceable test name.
-
-### 17 — Arch packaging, dependency inventory, and release CI
-
-**Prerequisites:** slices 00–16.
-
-**Files:**
-
-- create `packaging/arch/PKGBUILD` and packaging test fixtures;
-- create `scripts/build-arch.sh`, `scripts/check-package.sh`, `scripts/generate-sbom.sh`;
-- extend `.gitea/workflows/verify.yml` and create `.gitea/workflows/release.yml`;
-- update `README.md` with verified installation/support boundaries;
-- create `docs/compatibility.md` and `docs/security-model.md` distilled from accepted contracts.
-
-**RED:** packaging smoke fails before required metadata/dependencies/install layout exist; package inspection checks Go/C toolchain are make dependencies, not runtime dependencies; embedded version/commit is visible through `status --verbose` and artifact metadata without stealing Paru's transparent `--version`; release SQLite runtime matches the pinned library version and `PRAGMA compile_options` baseline; no unsupported static/pure-Go claim; checksums/module list/SBOM produced; package installs in disposable root; unsupported Paru/Pacman/makepkg diagnostics are explicit; clean rebuild comparison records reproducibility or documented variance.
-
-**GREEN:** implement self-hosted AUR-style package build for Arch `linux/amd64`, release artifacts, checksums, SBOM/module inventory, and exact compatibility documentation. Do not publish to `aur.archlinux.org`.
-
-**REFACTOR:** keep packaging logic in PKGBUILD/scripts rather than application runtime.
-
-**Verification:** clean Arch builds twice; package install/uninstall smoke in disposable environment; `namcap` where useful; module/license inventory; full baseline and contract matrix.
-
-**Exit criteria:** a user can install the self-hosted package without a Go runtime; release artifacts identify source and dependencies; reproducibility result is honest. Covers ADR-0001, ADR-0007, and ADR-0008.
-
-### 18 — Mandatory disposable-Arch security proof and release candidate gate
-
-**Prerequisites:** slices 00–17 and all required supported-version artifacts.
-
-**Files:**
-
-- create `test/e2e/run-arch.sh`, `test/e2e/guard-host.sh`;
-- create `test/e2e/fixtures/` for synthetic Pacman repository, AUR Git repositories, malicious markers, and scripted user input;
-- create `test/e2e/e2e_test.go` with machine-verifiable assertions;
-- create `docs/release-checklist.md`;
-- extend release CI to archive logs, reports, DB snapshot, and package hashes from the disposable environment.
-
-**RED:** the harness must first prove its safety guard rejects real `/`, host `/var/lib/pacman`, host cache, absent private database/root, privileged host mounts, and non-disposable execution. Then add failing end-to-end assertions before wiring each scenario.
-
-**GREEN:** in a disposable Arch container or VM, create a synthetic signed/private repository and synthetic AUR remotes, then exercise selection/planning → non-executing collection → deterministic/optional LLM evidence → visible human decision → exact guard → build/install. Include suspicious/benign recipes, marker proof, defer/reject, drift abort, and a successful explicit approval. Never target the workstation.
-
-**REFACTOR:** keep the security proof narrow: hostile package input, no execution during inspection, faithful evidence, human authority, and order-before-install. Ordinary compatibility scenarios may share infrastructure but remain labelled functional tests.
-
-**Verification:** full baseline; supported-version contracts; corpus coverage; package build; complete disposable E2E; manual review of generated report wording to ensure it says “reviewed” rather than “safe”.
-
-**Exit criteria:** all four ADR-0013 gates pass; all specification acceptance criteria pass; no unresolved critical/high release blocker; Mathieu reviews the release checklist before any v1 tag.
-
-## 6. Dependency graph and merge checkpoints
-
-```text
-00
-├─ 01
-├─ 02
-│  ├─ 05
-│  └─ 03
-│     └─ 04
-├─ 05 ─┬─ 06 ── 07 ── 08 ── 09
-│      └──────────────────────┘
-├─ 04 + 05 + 06 + 09 ── 10
-├─ 03 + 05 + 06 + 09 + 10 ── 11
-├─ 02..06 + 10 + 11 ── 12
-├─ 03 + 04 + 10..12 ── 13
-├─ 05 + 09..13 ── 14
-├─ 02 + 05 + 11..14 ── 15
-└─ 00..15 ── 16 ── 17 ── 18
-```
-
-Review checkpoints:
-
-- **Foundation checkpoint after 05:** module, CLI boundary, private config/runtime, process behavior, dependency adapters, and store mechanics are individually proven.
-- **Inspection checkpoint after 09:** exact identity, no-execution collection, scanner, LLM, reports, and human authority work without package installation.
-- **Execution checkpoint after 13:** planning drift, one-shot guard, artifact binding, and official-first orchestration work in disposable integration.
-- **Operations checkpoint after 16:** status, recovery, cleanup, retention, and the complete deterministic functional matrix pass.
-- **Release checkpoint after 18:** packaging, exact supported dependency contracts, and mandatory disposable-Arch proof pass.
-
-Later slices may be specified while an earlier PR is under review, but their implementation branches must start from a base containing every prerequisite.
-
-## 7. Requirement traceability
-
-| Accepted decision / product criterion | Primary slices |
-| --- | --- |
-| ADR-0001 — Go and self-hosted Arch packaging | 00, 17 |
-| ADR-0002 — Paru native selection | 04, 13, 16, 18 |
-| ADR-0003 — multi-stage Paru orchestration | 04, 10, 12, 13 |
-| ADR-0004 — official upgrade before AUR review | 10, 13, 16, 18 |
-| ADR-0005 — final recipe identity guard | 06, 11, 12, 18 |
-| ADR-0006 — Go/process architecture | 01, 03, 04, 12 |
-| ADR-0007 — `mattn/go-sqlite3` with CGO | 00, 05, 17 |
-| ADR-0008 — minimal direct dependencies | 02, 05, 08, 17 |
-| ADR-0009 — instrumental SQLite state | 05, 10, 11, 14, 15 |
-| ADR-0010 — one-shot approvals | 06, 11, 12, 15, 18 |
-| ADR-0011 — deterministic scanner/advisory LLM | 02, 07, 08, 09, 14 |
-| ADR-0012 — XDG/private cleanup/retention | 02, 05, 06, 09, 12, 15 |
-| ADR-0013 — bounded AUR threat model and four v1 gates | 06, 07, 09, 18 |
-| ADR-0014 — reject local PKGBUILD inputs | 01, 04, 10, 16 |
-| Bare `auroscope` replacement | 13, 16, 18 |
-| Native numbered selection | 04, 13, 18 |
-| Official packages without AUR review friction | 01, 03, 13, 18 |
-| AUR recipes/dependencies inspected before build | 06–13, 18 |
-| Deterministic and LLM evidence remain separate | 07–09, 14, 18 |
-| User owns every consequential decision | 09, 11, 13, 18 |
-| `status`, `held`, `explain` expose held consequences | 10, 14, 16 |
-| Approval binds exact commit and complete manifest | 06, 11, 18 |
-| Changed recipe stops before recipe code | 11, 12, 18 |
-| Cancellation leaves no reusable approval | 03, 11–13, 16 |
-| Disposable E2E never alters workstation | 04, 13, 17, 18 |
-
-## 8. Definition of v1 implementation complete
-
-Implementation is complete only when:
-
-- every slice is merged through its own authorized execution issue/PR and all prerequisites are traceable;
-- cumulative unit, race, vet, formatting, fuzz-seed, integration, supported-version contract, packaging, and disposable E2E gates pass;
-- the recipe corpus covers every advertised deterministic indicator with suspicious and benign/false-positive controls;
-- marker tests prove collection, scanning, context preparation, and presentation execute no package content;
-- generated reports visibly separate deterministic evidence, LLM advice, technical completeness, and human decision;
-- exact plan/recipe/process/workspace approval binding and artifact reuse rules survive concurrency, drift, cancellation, signal, and recovery tests;
-- bare upgrade runs a complete official phase first and never starts AUR review after official failure/cancellation;
-- local PKGBUILD inputs fail before Paru starts;
-- status and cleanup behavior are observable and finite by default;
-- the self-hosted Arch package installs in a disposable environment, identifies its source version, and does not require Go at runtime;
-- the release checklist documents remaining compatibility limits and residual risks without calling reviewed packages safe;
-- Mathieu reviews the release-candidate evidence and separately authorizes tagging/release.
-
-## 9. Explicitly deferred beyond v1
-
-Do not let implementation slices absorb these items:
+Do not absorb these into the autonomous loop:
 
 - publication to `aur.archlinux.org`;
-- a replacement TUI or editor plugin;
-- a Paru/libalpm resolver implementation;
+- cached package-artifact reuse;
+- replacement TUI or editor plugins;
+- Paru/libalpm resolver implementation;
 - local PKGBUILD or configured PKGBUILD-repository support;
 - exhaustive upstream-source or compiled-binary analysis;
 - custom build sandbox/chroot guarantees or hostile-local-account protection;
-- generic plugin/rule frameworks, event sourcing, provenance/EAV schemas, or distributed orchestration;
-- autonomous non-interactive approve/reject policy;
-- cross-platform or pure-Go SQLite release targets;
-- PTY support without a failing executable contract test against a required supported dependency.
+- generic plugin/rule frameworks, event sourcing, EAV/provenance systems, daemons, or distributed orchestration;
+- autonomous non-interactive package approval or rejection;
+- cross-platform or pure-Go SQLite targets;
+- PTY support without a failing supported-version contract test;
+- bespoke SBOM/reproducibility infrastructure beyond ordinary module inventory, checksums, and honest build metadata.
+
+## 11. Fresh-session bootstrap prompt
+
+After PR #18 is merged, Mathieu can start a new Hephaistos session with this compact prompt:
+
+```text
+/goal
+Repo: /home/mathieu/.hermes/profiles/hephaistos/projects/auroscope
+Target: implement AURoscope v1 through the autonomous loop in docs/implementation/initial-plan.md.
+Policy: one MODE: EXECUTION umbrella issue, branch implementation/v1, one draft Forgejo PR; never merge or tag autonomously.
+
+Load first: hermes-agent, kanban-agent-workflows, goal-series-development-loop, software-development-practices, forgejo.
+Read AGENTS.md, README.md, docs/specification.md, docs/design-phase.md, every accepted ADR, and the definitive plan.
+
+This prompt authorizes creation of the durable Kanban chain and implementation work described by the plan after verifying PR #18 is merged into current origin/main. Execute milestones serially until the release-candidate gate or a documented stop condition. Prefer direct implementation workers over planning-only output. Persist every restart point in docs/implementation/v1-status.md and Forgejo; do not rely on chat history. Verify, sign, commit, push, and update the draft PR at every milestone. If a design boundary fails, stop with evidence and open the required focused decision issue.
+
+Final response only when blocked or at release candidate: report milestone, checks, commits, PR, status-file state, blocker/decision URL if any, and exact next action for Mathieu.
+```
