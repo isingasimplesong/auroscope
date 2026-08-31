@@ -29,14 +29,15 @@ Any implementation finding that contradicts an accepted ADR stops the affected s
 
 This planning PR contains documentation only. After Mathieu accepts it:
 
-1. Create one Forgejo issue per numbered slice. Its first non-empty line must be `MODE: EXECUTION` and its body must link this plan, list the exact slice, prerequisites, and acceptance gates.
-2. Create `execution/issue-<number>-<slug>` from current `origin/main` only after prerequisites are merged.
-3. Keep one coherent slice per branch and PR. Do not stack later slices on an unmerged feature branch unless Mathieu explicitly authorizes it.
-4. Use strict RED → GREEN → REFACTOR commits or preserve that trace in the PR description when a coherent commit cannot remain red.
-5. Push signed commits with the Hephaistos identity. Open a Forgejo PR against `main`; agents do not merge their own PRs.
-6. Rebase or merge current `origin/main` before final verification according to repository policy; never force-push by default.
-7. A PR is reviewable only when the slice-specific commands and the cumulative baseline pass. A green unit suite never substitutes for a required live contract or disposable-Arch gate.
-8. Update this plan only when dependencies, scope, or acceptance criteria materially change. Record the reason and affected later slices.
+1. Before Slice 00, require a `MODE: EXECUTION` issue in which Mathieu explicitly advances the repository from design to implementation; the marker alone is not a phase transition. That first implementation PR updates the phase statements in `AGENTS.md`, `README.md`, and `docs/design-phase.md` without rewriting accepted design history.
+2. Create one Forgejo issue per numbered slice. Its first non-empty line must be `MODE: EXECUTION` and its body must link this plan, list the exact slice, prerequisites, and acceptance gates.
+3. Create `execution/issue-<number>-<slug>` from current `origin/main` only after prerequisites are merged.
+4. Keep one coherent slice per branch and PR. Do not stack later slices on an unmerged feature branch unless Mathieu explicitly authorizes it.
+5. Use strict RED → GREEN → REFACTOR commits or preserve that trace in the PR description when a coherent commit cannot remain red.
+6. Push signed commits with the Hephaistos identity. Open a Forgejo PR against `main`; agents do not merge their own PRs.
+7. Rebase or merge current `origin/main` before final verification according to repository policy; never force-push by default.
+8. A PR is reviewable only when the slice-specific commands and the cumulative baseline pass. A green unit suite never substitutes for a required live contract or disposable-Arch gate.
+9. Update this plan only when dependencies, scope, or acceptance criteria materially change. Record the reason and affected later slices.
 
 Recommended PR size is one numbered slice. Slices 00 and 01 may be combined only if their combined diff remains bootstrap-sized; the security proof, guard protocol, upgrade workflow, and release gate must remain separate review units.
 
@@ -48,6 +49,8 @@ Every slice follows the same loop:
 2. **GREEN:** implement only enough production behavior to pass that test without broad speculative abstractions.
 3. **REFACTOR:** remove duplication, tighten names and boundaries, then rerun the focused test and cumulative baseline.
 4. **VERIFY:** execute the slice commands on the required environment and preserve relevant logs as CI artifacts when a live dependency is involved.
+
+The numbered slices are mergeable delivery envelopes, not permission to implement every RED clause in one batch. Within a slice, treat each separately stated behavior as an ordered micro-slice: write one focused failing test, observe the intended failure, make only that test pass, refactor while green, and commit before advancing. Split any clause that cannot remain a small reviewable change into named subtests/subcommits inside the same execution issue.
 
 Cumulative local baseline after Go bootstrap:
 
@@ -103,7 +106,7 @@ Test files live beside their package unless they require a real dependency or pr
 
 ### 00 — Reproducible Go and CI bootstrap
 
-**Prerequisites:** accepted plan; clean `main`; Arch `linux/amd64` target.
+**Prerequisites:** accepted plan; a dedicated execution issue containing Mathieu's explicit phase advance; clean `main`; Arch `linux/amd64` target.
 
 **Files:**
 
@@ -111,16 +114,17 @@ Test files live beside their package unless they require a real dependency or pr
 - create `cmd/auroscope/main.go`, `cmd/auroscope/main_test.go`;
 - create `internal/testutil/testutil.go`;
 - create `scripts/check.sh`;
+- create `scripts/check-docs.sh`;
 - create `.gitea/workflows/verify.yml`;
-- update `README.md` only with verified developer commands.
+- update `AGENTS.md`, `README.md`, and `docs/design-phase.md` to record the authorized implementation phase; add only verified developer commands.
 
-**RED:** add tests for deterministic build metadata formatting and for an injectable command entry returning an exit code rather than calling `os.Exit` below `main`.
+**RED:** add tests for deterministic build metadata formatting and for an injectable command entry returning an exit code rather than calling `os.Exit` below `main`. Make `scripts/check-docs.sh` fail on broken repository-relative links, malformed Markdown, stale phase statements, and missing ADR/specification traceability using pinned documented tooling.
 
 **GREEN:** establish module `git.2027a.net/2027a/auroscope`, a minimal command entry, `-trimpath` build flags, version/commit injection variables, and a CI job using Arch with CGO enabled. Pin Go/tool images or package snapshots explicitly.
 
 **REFACTOR:** keep `main` wiring-only; no CLI framework or domain packages created pre-emptively.
 
-**Verification:** cumulative baseline; `CGO_ENABLED=1 go build -trimpath ./cmd/auroscope`; inspect embedded module/VCS metadata with `go version -m` in the Arch CI image. Do not claim AURoscope's own `--version`: the accepted classifier preserves Paru's transparent `--version` behavior.
+**Verification:** cumulative baseline; `scripts/check-docs.sh`; `CGO_ENABLED=1 go build -trimpath ./cmd/auroscope`; inspect embedded module/VCS metadata with `go version -m` in the Arch CI image. Do not claim AURoscope's own `--version`: the accepted classifier preserves Paru's transparent `--version` behavior.
 
 **Exit criteria:** signed Arch-targeted binary builds; CI proves CGO toolchain availability; no runtime or package-management behavior is claimed yet. Covers ADR-0001 and prepares ADR-0007.
 
@@ -227,9 +231,9 @@ Test files live beside their package unless they require a real dependency or pr
 - create `internal/store/backup.go`, `internal/store/backup_test.go`;
 - create `test/integration/store_concurrency_test.go`.
 
-**RED:** runtime failure/smoke for unusable non-CGO driver; `foreign_keys=ON`; WAL, private `-wal`/`-shm`, busy timeout, and required synchronous behavior; ordered embedded migration checksums; empty/migrated/reopened DB; pre-migration backup/restore; `quick_check` failure; concurrent open/write behavior; one mutating application lock with concurrent read-only status access; reversible byte round trips; identity/inspection foreign-key constraints.
+**RED:** runtime failure/smoke for unusable non-CGO driver; exact supported SQLite library version and `PRAGMA compile_options` baseline; `foreign_keys=ON`; WAL, private `-wal`/`-shm`, busy timeout, and required synchronous behavior; ordered embedded migration checksums; empty/migrated/reopened DB; pre-migration backup/restore; `quick_check` failure; concurrent open/write behavior; one mutating application lock with concurrent read-only status access; reversible byte round trips; identity/inspection foreign-key constraints. Missing, added, or changed compile options fail compatibility until deliberately reviewed.
 
-**GREEN:** add only `schema_migrations`, `package_bases`, `recipe_identities`, `recipe_files`, `inspections`, and `deterministic_findings`, because these are the first concrete identity/inspection workflows. Exact columns require a concrete query or invariant. Add human decisions, transactions, approvals, process sessions, builds, artifacts, outcomes, and LLM assessments only in the later migration that delivers each corresponding feature.
+**GREEN:** add only `schema_migrations`, `package_bases`, `recipe_identities`, `recipe_files`, `inspections`, and `deterministic_findings`, because these are the first concrete identity/inspection workflows. Record the exact `go-sqlite3` build-tag policy and compile-option baseline for the supported Arch build; start with no optional feature tags unless a tested requirement justifies one. Exact columns require a concrete query or invariant. Add human decisions, transactions, approvals, process sessions, builds, artifacts, outcomes, and LLM assessments only in the later migration that delivers each corresponding feature.
 
 **REFACTOR:** keep SQL forward-only and embedded; keep transactions short; no generic event/EAV/provenance/plugin schema.
 
@@ -247,12 +251,13 @@ Test files live beside their package unless they require a real dependency or pr
 - create `internal/recipe/manifest.go`, `internal/recipe/manifest_test.go`, `internal/recipe/manifest_fuzz_test.go`;
 - create `internal/recipe/diff.go`, `internal/recipe/diff_test.go`;
 - create `internal/recipe/metadata.go`, `internal/recipe/metadata_test.go`;
+- create `internal/recipe/aur_rpc.go`, `internal/recipe/aur_rpc_test.go`;
 - create fixtures under `testdata/recipes/identity/` and `testdata/recipes/noexec/`;
 - create `test/integration/recipe_noexec_test.go`.
 
-**RED:** fixtures for SHA-1/SHA-256 Git object formats; commit/tree/blob identity; raw path-byte preservation; file type/mode/size/hash/blob OID; symlinks, special files, hostile filenames, control/bidi/invalid UTF-8, relevant untracked files, changed modes, workspace device/inode, tree/manifest drift; first-install empty baseline and later diff; marker PKGBUILDs/sources proving no command, makepkg, sourcing, or package content executes.
+**RED:** fixtures and a fake bounded AUR RPC server for authoritative source/namespace/pkgbase, maintainer/source metadata, committed `.SRCINFO` as hostile data, redirects, malformed/oversized/contradictory RPC records, and RPC/repository identity mismatch; SHA-1/SHA-256 Git object formats; commit/tree/blob identity; raw path-byte preservation; file type/mode/size/hash/blob OID; symlinks, special files, hostile filenames, control/bidi/invalid UTF-8, relevant untracked files, changed modes, workspace device/inode, tree/manifest drift; first-install empty baseline and later diff; marker PKGBUILDs/sources proving no command, makepkg, sourcing, or package content executes.
 
-**GREEN:** acquire exact AUR Git candidates with argv-only Git commands, enumerate immutable tree objects, open workspaces without following sensitive symlink components, compute canonical bounded manifests and diffs, and persist identity/evidence. `.SRCINFO` and AUR RPC data are metadata only; never regenerate `.SRCINFO`.
+**GREEN:** query the exact supported AUR RPC contract with a bounded standard-library HTTP client, acquire the authoritative AUR Git candidate with argv-only Git commands, cross-check RPC and repository identity, enumerate immutable tree objects, open workspaces without following sensitive symlink components, compute canonical bounded manifests and diffs, and persist identity/evidence. `.SRCINFO` and AUR RPC data are metadata only; never regenerate `.SRCINFO`.
 
 **REFACTOR:** separate byte identity from escaped display text; make manifest serialization versioned and deterministic.
 
@@ -502,7 +507,7 @@ Test files live beside their package unless they require a real dependency or pr
 - update `README.md` with verified installation/support boundaries;
 - create `docs/compatibility.md` and `docs/security-model.md` distilled from accepted contracts.
 
-**RED:** packaging smoke fails before required metadata/dependencies/install layout exist; package inspection checks Go/C toolchain are make dependencies, not runtime dependencies; embedded version/commit is visible through `status --verbose` and artifact metadata without stealing Paru's transparent `--version`; no unsupported static/pure-Go claim; checksums/module list/SBOM produced; package installs in disposable root; unsupported Paru/Pacman/makepkg diagnostics are explicit; clean rebuild comparison records reproducibility or documented variance.
+**RED:** packaging smoke fails before required metadata/dependencies/install layout exist; package inspection checks Go/C toolchain are make dependencies, not runtime dependencies; embedded version/commit is visible through `status --verbose` and artifact metadata without stealing Paru's transparent `--version`; release SQLite runtime matches the pinned library version and `PRAGMA compile_options` baseline; no unsupported static/pure-Go claim; checksums/module list/SBOM produced; package installs in disposable root; unsupported Paru/Pacman/makepkg diagnostics are explicit; clean rebuild comparison records reproducibility or documented variance.
 
 **GREEN:** implement self-hosted AUR-style package build for Arch `linux/amd64`, release artifacts, checksums, SBOM/module inventory, and exact compatibility documentation. Do not publish to `aur.archlinux.org`.
 
@@ -567,7 +572,7 @@ Later slices may be specified while an earlier PR is under review, but their imp
 ## 7. Requirement traceability
 
 | Accepted decision / product criterion | Primary slices |
-|---|---|
+| --- | --- |
 | ADR-0001 — Go and self-hosted Arch packaging | 00, 17 |
 | ADR-0002 — Paru native selection | 04, 13, 16, 18 |
 | ADR-0003 — multi-stage Paru orchestration | 04, 10, 12, 13 |
