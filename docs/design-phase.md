@@ -1,110 +1,44 @@
-# AURoscope design-phase mandate
+# AURoscope design status
 
-## Purpose
+## Current phase
 
-The next project phase is design, not production implementation. Its job is to turn the accepted product specification into grounded technical proposals, submit consequential choices to Mathieu, record accepted decisions, and only then produce an implementation plan.
+The minimal LLM-first architecture was accepted by Mathieu in [decision issue #19](https://git.2027a.net/2027a/auroscope/issues/19) with an exact standalone [`GO DECISION`](https://git.2027a.net/2027a/auroscope/issues/19#issuecomment-1314) on 2026-08-30.
 
-## Fixed constraints
+Production implementation remains unauthorized. The next permitted work is:
 
-- Implementation language: Go.
-- Deliverable: a small `auroscope` executable, initially targeting Arch Linux on `linux/amd64`.
-- Dependencies: prefer the Go standard library; add only ordinary, maintained dependencies that avoid materially worse reinvention. Every direct dependency requires a concrete justification.
-- Distribution: a self-hosted AUR-style PKGBUILD repository first; publication on `aur.archlinux.org` is deferred.
-- Go should be a build dependency, not a runtime dependency, where feasible.
-- SQLite is the authoritative durable state store.
-- Human-readable status is rendered from SQLite; exported Markdown/JSON is not read back as state.
-- Temporary recipe clones and audit inputs must not accumulate. Use private directories under `$TMPDIR` and/or bounded reconstructible cache, clean on success/error/interruption, and provide stale-work cleanup for crash residue.
-- Interactive decisions always belong to the user. Deterministic findings and LLM assessments remain separate advisory evidence.
-- Do not execute or source untrusted PKGBUILDs during collection or review.
+1. a narrow disposable-Arch spike proving the Paru worktree/audit/edit/final-build path;
+2. a new short implementation plan grounded in that evidence;
+3. separate explicit authorization before production implementation.
 
-## Standard storage roots
+## Accepted product frame
 
-```text
-${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/
-${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/
-${XDG_CACHE_HOME:-$HOME/.cache}/auroscope/
-${TMPDIR:-/tmp}/auroscope-*/
-```
+AURoscope has one purpose: audit exact AUR recipe changes with Codex CLI before Paru builds them, present the result, and collect the user's per-package decision.
 
-The design must assign each concrete artifact to the correct root. `/tmp` is not assumed to be RAM; the hard requirement is privacy, bounded lifetime, and no silent accumulation.
+- Official packages remain native Paru/Pacman operations and are never audited.
+- Search, selection, resolution, build, and installation remain Paru responsibilities.
+- Codex CLI is the only v1 LLM backend and is not optional in an AUR audit.
+- AURoscope keeps only minimal audit/baseline state and a final recipe-identity guard.
+- The local machine and account are trusted.
 
-## Required investigations and proposals
+See [`architecture/minimal-v1.md`](architecture/minimal-v1.md), [`specification.md`](specification.md), and [`ADR-0015`](decisions/0015-minimal-llm-first-wrapper.md).
 
-### 1. Exact Paru/Pacman contract
+## Required spike
 
-Inspect the exact supported Paru/Pacman versions, local/versioned manuals, source, and tests. Propose:
+The new plan must not guess the central Paru integration. In disposable Arch, prove:
 
-- the argument classification table: transparent pass-through versus intercepted flows;
-- capture of Paru-native interactive selections without recreating its TUI;
-- authoritative origin and dependency resolution;
-- complete official-repository upgrades while deferring selected AUR work;
-- handling of explicit installs, upgrades, removals, queries, caches, already-built packages, PKGBUILD repositories, cancellation, signals, and exit codes;
-- minimum supported versions and compatibility boundaries.
+1. native search/selection and AUR origin identification;
+2. the exact AUR worktree is available before package-supplied code;
+3. an edited recipe can be re-audited and the same worktree reaches final build, or `edit` is explicitly deferred;
+4. `PreBuildCommand` sees the exact worktree before build;
+5. skipped AUR targets can be excluded and Paru performs the final fresh resolution;
+6. official repository operations remain transparent and audit-free.
 
-### 2. Go architecture and dependencies
+## Decision protocol
 
-Propose modules and process boundaries, CLI parsing, configuration loading, subprocess/PTY handling, cancellation, structured errors, and build/release strategy. Compare SQLite driver options, especially pure-Go versus CGO consequences. Do not add a framework merely to create an architecture diagram.
+Consequential design issues begin with `MODE: DECISION`. Ordinary comments continue discussion only. Mathieu accepts the latest proposal by posting a standalone comment exactly equal to `GO DECISION`.
 
-### 3. SQLite state model
+Finalization may update ADRs and design/specification documents, but does not authorize an implementation plan or production code. Executable follow-up uses a separate issue whose first non-empty line is `MODE: EXECUTION`.
 
-Propose tables, keys, constraints, migrations, transactions, concurrency/locking, crash recovery, lifecycle transitions, retention, and purge. Distinguish recipe identity, inspection, findings, assessment, human decision, approval, build, and installation.
+## Historical material
 
-### 4. Approval and TOCTOU protocol
-
-Define the exact commit/hash identity, approval scope and expiry, wrapper-to-`PreBuildCommand` handoff, anti-replay behavior, invalidation, cache handling, modified recipes, and cleanup after every terminal state.
-
-### 5. Deterministic scanner and LLM contracts
-
-The accepted boundary is recorded in [`ADR-0011`](decisions/0011-deterministic-scanner-and-llm-contracts.md). Use immutable versioned deterministic findings, explicit context/truncation state, and optional advisory LLM output that has no decision or action field and cannot rewrite scanner evidence. Support explicit Codex/API/disabled modes and deterministic automatic API-then-Codex selection, with a configurable Codex model defaulting to `5.6-luna`, best-effort exposure reduction, strict local output validation, and visible failure without implicit fallback.
-
-### 6. Configuration and XDG layout
-
-Propose the config format, defaults, exact paths, permissions, report generation, editor/pager behavior, bounded cache policy, and temporary-work cleanup.
-
-### 7. Threat model
-
-The accepted boundary is recorded in [`ADR-0013`](decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md). Cover hostile AUR recipes, repository files, source/upstream material and metadata, non-executing inspection, prompt injection, evidence provenance, analysis failure, and honest residual-risk language. The local machine, account, other local processes, configuration/editors, and general sudo hardening are outside the security guarantee; test their behavior only where ordinary application correctness requires it.
-
-### 8. Test strategy
-
-Keep ordinary unit, contract, PTY, SQLite/migration, scanner, LLM, identity-guard, and failure tests proportional to their functional contracts. The mandatory v1 security gates are narrower: a benign/suspicious recipe corpus, proof that inspection executes no package content, faithful evidence/error presentation with no automatic decision, and one disposable-Arch review-to-install end-to-end test. Never run that proof against the real workstation.
-
-## Process and deliverables
-
-1. Read `README.md`, `docs/specification.md`, this document, and `AGENTS.md`.
-2. Revalidate third-party behavior from exact source/docs/tests; do not rely on model memory.
-3. Consult `2027a/paru-llm-audit` only for targeted lessons, fixtures, and pitfalls—not as architecture to port.
-4. Run narrow disposable spikes where documentation cannot establish behavior.
-5. Write proposals with options, trade-offs, recommendation, unresolved risks, and proof obtained.
-6. Submit consequential choices to Mathieu before declaring them accepted.
-7. Record accepted choices as ADRs under `docs/decisions/`.
-8. Produce the detailed implementation plan only after the design decisions are accepted.
-9. Do not start production implementation during this phase unless Mathieu explicitly advances the phase.
-
-## Decision issue protocol
-
-Consequential design choices are discussed in Forgejo issues whose first non-empty line is `MODE: DECISION`.
-
-- Ordinary comments continue a bounded issue discussion; they do not authorize repository changes, ADR acceptance, implementation, or closure.
-- Mathieu accepts the latest concrete proposal by posting a standalone comment exactly equal to `GO DECISION`.
-- The watcher validates Mathieu's pinned Forgejo identity and requires the GO to be the latest external comment, then transfers the issue from `Agent/Human` to `Agent/Hermes` for ADR/docs finalization.
-- Finalization records and verifies the decision, but cannot write production code or the implementation plan.
-- Executable follow-up work uses a separate issue whose first non-empty line is `MODE: EXECUTION`.
-- Missing or contradictory routing fails closed under `Agent/Needs Review`.
-
-Expected design artifacts may include:
-
-```text
-docs/development-frame.md
-docs/architecture/paru-contract.md
-docs/architecture/go-and-dependencies.md
-docs/architecture/sqlite-state-model.md
-docs/architecture/approval-protocol.md
-docs/architecture/scanner-llm-contracts.md
-docs/architecture/threat-model.md
-docs/architecture/test-strategy.md
-docs/decisions/NNNN-*.md
-docs/implementation/initial-plan.md   # only after design approval
-```
-
-The list is guidance, not permission to create empty document-shaped bureaucracy. Combine documents when that improves clarity.
+The previous architecture made the LLM optional and introduced a deterministic scanner, broad state model, durable approval protocol, closure comparison, and extensive recovery machinery. It is superseded and archived under [`archive/pre-llm-first/`](archive/pre-llm-first/). Historical documents are evidence only, not instructions.
