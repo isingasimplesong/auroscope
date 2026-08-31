@@ -165,6 +165,7 @@ func insertBeforeTargets(args []string, option string) []string {
 }
 
 func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *bufio.Reader) (reviewedPackage, error) {
+	fmt.Fprintf(o.config.stdout, "AURoscope: acquiring AUR recipe %s with Paru...\n", escapeTerminal(pkgbase))
 	if err := o.paru.acquire(pkgbase, o.config.cloneDir); err != nil {
 		return reviewedPackage{}, err
 	}
@@ -181,7 +182,8 @@ func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *b
 		if err != nil {
 			return reviewedPackage{}, err
 		}
-		report, err := (codexClient{path: o.config.codexPath}).audit(bundle)
+		fmt.Fprintf(o.config.stdout, "AURoscope: auditing %s with Codex (timeout %s)...\n", escapeTerminal(pkgbase), o.config.codexTimeout)
+		report, err := (codexClient{path: o.config.codexPath}).audit(bundle, o.config)
 		if err != nil {
 			fmt.Fprintf(o.config.stderr, "auroscope: audit failed for %s: %v\n", pkgbase, err)
 			switch askDecision(reader, o.config, []string{"retry", "skip", "cancel"}) {
@@ -196,6 +198,7 @@ func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *b
 				return reviewedPackage{Identity: bundle.Identity, Decision: decisionCancel}, nil
 			}
 		}
+		fmt.Fprintf(o.config.stdout, "AURoscope: Codex audit completed for %s.\n", escapeTerminal(pkgbase))
 		printReview(o.config, pkgbase, bundle, report)
 		switch askDecision(reader, o.config, []string{"approve", "inspect", "edit", "skip", "cancel"}) {
 		case "approve":

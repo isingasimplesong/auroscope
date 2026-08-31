@@ -62,6 +62,6 @@ The test builds and installs the package inside disposable Arch, validates its d
 
 ## Upstream snapshot
 
-This recipe pins immutable AURoscope commit `0c89a6dc07320242508980c55b46f2811dfd9cc6`. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the package.
+This recipe pins immutable AURoscope commit `ff9a82a0097781423ba6c655a5d5f1e3abe095b7`, including the bounded Codex audit progress and cancellation fix for issue #29. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the package.
 
 Upstream has not yet declared a software license. `LicenseRef-Unspecified` records that fact; it must be replaced when upstream adopts a license.

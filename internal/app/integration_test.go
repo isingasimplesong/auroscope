@@ -10,8 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func TestApprovedAURPackageEndToEndWithFirstAudit(t *testing.T) {
@@ -40,7 +43,10 @@ func TestApprovedAURPackageEndToEndWithFirstAudit(t *testing.T) {
 	if !strings.Contains(callsText, "-P --order hello") || !strings.Contains(callsText, "-G hello") || !strings.Contains(callsText, "-S --skipreview -- hello") {
 		t.Fatalf("calls = %s", callsText)
 	}
-	if !strings.Contains(stdout.String(), "AUR audit: hello") {
+	if !strings.Contains(stdout.String(), "AURoscope: acquiring AUR recipe hello with Paru...") ||
+		!strings.Contains(stdout.String(), "AURoscope: auditing hello with Codex (timeout 5m0s)...") ||
+		!strings.Contains(stdout.String(), "AURoscope: Codex audit completed for hello.") ||
+		!strings.Contains(stdout.String(), "AUR audit: hello") {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 	assertBaseline(t, filepath.Join(dir, "state.sqlite3"), "hello")
@@ -626,7 +632,7 @@ printf '{"summary":"from final file","risk":"low","findings":[],"uncertainty":""
 		Files:    []recipeFile{{Path: "PKGBUILD", Mode: trackedRegularMode, Type: trackedRegularType, SHA256: strings.Repeat("c", 64), Size: 14, Text: "pkgname=hello\n"}},
 	}
 
-	report, err := (codexClient{path: codexPath}).audit(bundle)
+	report, err := (codexClient{path: codexPath}).audit(bundle, runConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +640,7 @@ printf '{"summary":"from final file","risk":"low","findings":[],"uncertainty":""
 		t.Fatalf("report = %#v", report)
 	}
 	args := readString(t, argsFile)
-	for _, want := range []string{"exec --json --ephemeral --sandbox read-only --skip-git-repo-check --output-last-message "} {
+	for _, want := range []string{"exec --json --ephemeral --sandbox read-only --skip-git-repo-check --output-schema ", " --output-last-message "} {
 		if !strings.Contains(args, want) {
 			t.Fatalf("args = %q", args)
 		}
@@ -654,7 +660,7 @@ func TestCodexAcceptsSupportedVersions(t *testing.T) {
 		t.Run(version, func(t *testing.T) {
 			dir := t.TempDir()
 			codexPath := writeExecutable(t, dir, "codex", "#!/bin/sh\nprintf '"+version+"\\n'\n")
-			if err := (codexClient{path: codexPath}).verifyVersion(); err != nil {
+			if err := (codexClient{path: codexPath}).verifyVersion(runConfig{}.withDefaults()); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -666,7 +672,7 @@ func TestCodexRejectsUnsupportedVersionAndInvalidManifestReferences(t *testing.T
 	codexPath := writeExecutable(t, dir, "codex", `#!/bin/sh
 printf 'codex-cli 9.9.9\n'
 `)
-	_, err := (codexClient{path: codexPath}).audit(auditBundle{})
+	_, err := (codexClient{path: codexPath}).audit(auditBundle{}, runConfig{})
 	if err == nil || !strings.Contains(err.Error(), "unsupported Codex CLI version") {
 		t.Fatalf("error = %v", err)
 	}
@@ -772,6 +778,123 @@ exit 0
 	t.Setenv("RECIPE_REPO", repo)
 	t.Setenv("ORDER_OUTPUT", orderOutput)
 	return path
+}
+
+func TestCodexAuditHasNoInteractiveStdin(t *testing.T) {
+	dir := t.TempDir()
+	codexPath := writeExecutable(t, dir, "codex", `#!/bin/sh
+if test "$1" = "--version"; then
+  printf 'codex-cli 0.150.1\n'
+  exit 0
+fi
+if IFS= read -r unexpected; then
+  printf 'unexpected stdin: %s\n' "$unexpected" >&2
+  exit 90
+fi
+out=''
+while test "$#" -gt 0; do
+  if test "$1" = "--output-last-message"; then shift; out="$1"; fi
+  shift || true
+done
+printf '%s' '{"summary":"stdin isolated","risk":"low","findings":[],"uncertainty":"","inspect":[]}' > "$out"
+`)
+	report, err := (codexClient{path: codexPath}).audit(auditBundle{}, runConfig{stdin: strings.NewReader("approve\n")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary != "stdin isolated" {
+		t.Fatalf("report = %#v", report)
+	}
+}
+
+func TestCodexInterruptKillsProcessGroupAndRetryStartsFreshAttempt(t *testing.T) {
+	dir := t.TempDir()
+	attemptFile := filepath.Join(dir, "attempt")
+	childPIDFile := filepath.Join(dir, "child-pid")
+	codexPath := writeExecutable(t, dir, "codex", `#!/bin/sh
+if test "$1" = "--version"; then
+  printf 'codex-cli 0.150.1\n'
+  exit 0
+fi
+attempt=1
+if test -f "$ATTEMPT_FILE"; then attempt=2; fi
+printf '%s' "$attempt" > "$ATTEMPT_FILE"
+if test "$attempt" = 1; then
+  sleep 60 &
+  printf '%s' "$!" > "$CHILD_PID_FILE"
+  wait
+  exit 91
+fi
+out=''
+while test "$#" -gt 0; do
+  if test "$1" = "--output-last-message"; then shift; out="$1"; fi
+  shift || true
+done
+printf '%s' '{"summary":"fresh retry","risk":"low","findings":[],"uncertainty":"","inspect":[]}' > "$out"
+`)
+	t.Setenv("ATTEMPT_FILE", attemptFile)
+	t.Setenv("CHILD_PID_FILE", childPIDFile)
+	signals := make(chan os.Signal, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := (codexClient{path: codexPath}).audit(auditBundle{}, runConfig{signals: signals, codexTimeout: 5 * time.Second})
+		errCh <- err
+	}()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, err := os.Stat(childPIDFile); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("Codex child did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	signals <- os.Interrupt
+	if err := <-errCh; err == nil || !strings.Contains(err.Error(), "interrupted by interrupt") {
+		t.Fatalf("interrupt error = %v", err)
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(readString(t, childPIDFile)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.Now().Add(2 * time.Second)
+	for {
+		err = syscall.Kill(pid, 0)
+		if errors.Is(err, syscall.ESRCH) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Codex descendant %d still exists: %v", pid, err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	report, err := (codexClient{path: codexPath}).audit(auditBundle{}, runConfig{signals: signals, codexTimeout: 5 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary != "fresh retry" || strings.TrimSpace(readString(t, attemptFile)) != "2" {
+		t.Fatalf("report = %#v; attempt = %q", report, readString(t, attemptFile))
+	}
+}
+
+func TestCodexAuditTimeoutIsBounded(t *testing.T) {
+	dir := t.TempDir()
+	codexPath := writeExecutable(t, dir, "codex", `#!/bin/sh
+if test "$1" = "--version"; then
+  printf 'codex-cli 0.150.1\n'
+  exit 0
+fi
+sleep 60
+`)
+	started := time.Now()
+	_, err := (codexClient{path: codexPath}).audit(auditBundle{}, runConfig{codexTimeout: 100 * time.Millisecond})
+	if err == nil || !strings.Contains(err.Error(), "timed out after 100ms") {
+		t.Fatalf("timeout error = %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > 3*time.Second {
+		t.Fatalf("timeout took %s", elapsed)
+	}
 }
 
 func fakeCodex(t *testing.T, dir, bundleCopy, output string) string {
