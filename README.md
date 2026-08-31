@@ -35,7 +35,22 @@ The accepted architecture is in [`docs/architecture/minimal-v1.md`](docs/archite
 
 ## Current implementation
 
-The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` and `internal/app`.
+The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` and `internal/app`. Exact Codex CLI versions `0.150.1` and `0.151.0` are supported.
+
+## Install on Arch Linux
+
+The self-hosted AUR-style recipe lives in [`2027a/auroscope-aur`](https://git.2027a.net/2027a/auroscope-aur). Publication on `aur.archlinux.org` remains deferred.
+
+```console
+git clone https://git.2027a.net/2027a/auroscope-aur.git
+cd auroscope-aur
+paru -S --needed openai-codex-bin
+makepkg -si
+```
+
+Codex must be authenticated for the user who runs AURoscope. During the first desktop trial, invoke `auroscope` explicitly rather than replacing `paru` with an alias.
+
+## Development verification
 
 ```console
 CGO_ENABLED=1 go test ./...
