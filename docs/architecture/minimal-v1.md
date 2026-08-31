@@ -36,11 +36,11 @@ There is no separate resolver, rule engine, backend abstraction, approval servic
 
 For each exact AUR worktree in Paru's resolved build set, including AUR dependencies, compare against the last successfully approved/built commit. First use sends the complete recipe. Build a bounded bundle of the diff, needed files, untrusted `.SRCINFO`, minimal metadata, commit, and manifest digest. Official dependencies are never audited.
 
-Codex CLI is the single v1 backend. It runs outside the recipe worktree and returns validated structured JSON. If Codex fails, the user can retry, skip, or cancel; there is no silent bypass.
+Codex CLI is the single v1 backend. It runs outside the recipe worktree and returns validated structured JSON. Its prompt scopes risk to packaging behavior and provenance; upstream software or binary opacity is not assessed when the expected official source is unchanged. If Codex fails, the user can retry, skip, or cancel; there is no silent bypass.
 
 ## Decision and edit
 
-The menu is `approve | inspect | edit+reaudit | skip | cancel`. Edit support is accepted only if the Paru spike proves the edited audited worktree is exactly the worktree Paru builds. Otherwise `edit` is deferred rather than spawning a second build system.
+The default review shows only package base, concise assessment, and packaging-risk level. `inspect` reveals the full report and diff without rerunning Codex. The menu is `approve | inspect | edit+reaudit | skip | cancel` and accepts a number, initial, or full word. Edit support is accepted only if the Paru spike proves the edited audited worktree is exactly the worktree Paru builds. Otherwise `edit` is deferred rather than spawning a second build system.
 
 ## Final guard
 

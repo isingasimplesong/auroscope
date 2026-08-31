@@ -173,6 +173,7 @@ func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *b
 	if err != nil {
 		return reviewedPackage{}, err
 	}
+auditLoop:
 	for {
 		baseline, err := store.baseline(pkgbase)
 		if err != nil {
@@ -198,32 +199,38 @@ func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *b
 				return reviewedPackage{Identity: bundle.Identity, Decision: decisionCancel}, nil
 			}
 		}
-		fmt.Fprintf(o.config.stdout, "AURoscope: Codex audit completed for %s.\n", escapeTerminal(pkgbase))
-		printReview(o.config, pkgbase, bundle, report)
-		switch askDecision(reader, o.config, []string{"approve", "inspect", "edit", "skip", "cancel"}) {
-		case "approve":
-			if err := store.recordAudit(pkgbase, bundle.Identity, bundle.PreviousCommit, report, string(decisionApprove)); err != nil {
-				return reviewedPackage{}, err
+		printReviewSummary(o.config, pkgbase, report)
+		for {
+			switch askDecision(reader, o.config, []string{"approve", "inspect", "edit", "skip", "cancel"}) {
+			case "approve":
+				if err := store.recordAudit(pkgbase, bundle.Identity, bundle.PreviousCommit, report, string(decisionApprove)); err != nil {
+					return reviewedPackage{}, err
+				}
+				return reviewedPackage{Identity: bundle.Identity, Decision: decisionApprove}, nil
+			case "inspect":
+				printReview(o.config, pkgbase, bundle, report)
+			case "edit":
+				if err := editAndSnapshot(o.config, dir); err != nil {
+					return reviewedPackage{}, err
+				}
+				continue auditLoop
+			case "skip":
+				if err := store.recordAudit(pkgbase, bundle.Identity, bundle.PreviousCommit, report, string(decisionSkip)); err != nil {
+					return reviewedPackage{}, err
+				}
+				return reviewedPackage{Identity: bundle.Identity, Decision: decisionSkip}, nil
+			case "cancel":
+				if err := store.recordAudit(pkgbase, bundle.Identity, bundle.PreviousCommit, report, string(decisionCancel)); err != nil {
+					return reviewedPackage{}, err
+				}
+				return reviewedPackage{Identity: bundle.Identity, Decision: decisionCancel}, nil
 			}
-			return reviewedPackage{Identity: bundle.Identity, Decision: decisionApprove}, nil
-		case "inspect":
-			printReview(o.config, pkgbase, bundle, report)
-		case "edit":
-			if err := editAndSnapshot(o.config, dir); err != nil {
-				return reviewedPackage{}, err
-			}
-		case "skip":
-			if err := store.recordAudit(pkgbase, bundle.Identity, bundle.PreviousCommit, report, string(decisionSkip)); err != nil {
-				return reviewedPackage{}, err
-			}
-			return reviewedPackage{Identity: bundle.Identity, Decision: decisionSkip}, nil
-		case "cancel":
-			if err := store.recordAudit(pkgbase, bundle.Identity, bundle.PreviousCommit, report, string(decisionCancel)); err != nil {
-				return reviewedPackage{}, err
-			}
-			return reviewedPackage{Identity: bundle.Identity, Decision: decisionCancel}, nil
 		}
 	}
+}
+
+func printReviewSummary(config runConfig, pkgbase string, report auditReport) {
+	fmt.Fprintf(config.stdout, "\nAUR audit: %s\nAssessment: %s\nRisk: %s\n", escapeTerminal(pkgbase), escapeTerminal(report.Summary), escapeTerminal(report.Risk))
 }
 
 func printReview(config runConfig, pkgbase string, bundle auditBundle, report auditReport) {
@@ -269,11 +276,23 @@ func escapeTerminal(s string) string {
 
 func askDecision(reader *bufio.Reader, config runConfig, allowed []string) string {
 	allowedSet := map[string]bool{}
-	for _, value := range allowed {
+	aliases := map[string]string{}
+	for index, value := range allowed {
 		allowedSet[value] = true
+		aliases[fmt.Sprint(index+1)] = value
+		initial := value[:1]
+		if previous, exists := aliases[initial]; !exists || previous == value {
+			aliases[initial] = value
+		} else {
+			delete(aliases, initial)
+		}
 	}
 	for {
-		fmt.Fprintf(config.stdout, "Decision [%s]: ", strings.Join(allowed, "/"))
+		items := make([]string, 0, len(allowed))
+		for index, value := range allowed {
+			items = append(items, fmt.Sprintf("[%d/%s] %s", index+1, value[:1], decisionLabel(value)))
+		}
+		fmt.Fprintf(config.stdout, "Decision %s: ", strings.Join(items, " | "))
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "cancel"
@@ -282,7 +301,21 @@ func askDecision(reader *bufio.Reader, config runConfig, allowed []string) strin
 		if allowedSet[choice] {
 			return choice
 		}
+		if value, ok := aliases[choice]; ok {
+			return value
+		}
 		fmt.Fprintf(config.stderr, "auroscope: unsupported decision %q\n", choice)
+	}
+}
+
+func decisionLabel(value string) string {
+	switch value {
+	case "inspect":
+		return "inspect full report"
+	case "edit":
+		return "edit and re-audit"
+	default:
+		return value
 	}
 }
 
