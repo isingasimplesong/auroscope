@@ -9,9 +9,49 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 )
 
-const maxCodexJSONBytes = 256 * 1024
+const (
+	maxCodexJSONBytes       = 256 * 1024
+	maxCodexDiagnosticBytes = 32 * 1024
+	codexStopGrace          = time.Second
+	codexProgressInterval   = 15 * time.Second
+)
+
+const auditOutputSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "risk", "findings", "uncertainty", "inspect"],
+  "properties": {
+    "summary": {"type": "string", "maxLength": 4000},
+    "risk": {"type": "string", "enum": ["low", "medium", "high", "critical", "unknown"]},
+    "findings": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "line", "range", "evidence", "explanation"],
+        "properties": {
+          "file": {"type": "string", "description": "Exact relative path from bundle.files[].path"},
+          "line": {"type": ["integer", "null"], "minimum": 0},
+          "range": {"type": ["string", "null"], "maxLength": 80},
+          "evidence": {"type": "string", "maxLength": 2000},
+          "explanation": {"type": "string", "maxLength": 4000}
+        }
+      }
+    },
+    "uncertainty": {"type": "string", "maxLength": 4000},
+    "inspect": {
+      "type": "array",
+      "maxItems": 50,
+      "description": "Exact relative recipe paths from bundle.files[].path that merit human inspection; no prose",
+      "items": {"type": "string"}
+    }
+  }
+}`
 
 var supportedCodexVersions = map[string]struct{}{
 	"codex-cli 0.150.1": {},
@@ -38,8 +78,9 @@ type codexClient struct {
 	path string
 }
 
-func (c codexClient) audit(bundle auditBundle) (auditReport, error) {
-	if err := c.verifyVersion(); err != nil {
+func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, error) {
+	config = config.withDefaults()
+	if err := c.verifyVersion(config); err != nil {
 		return auditReport{}, err
 	}
 	tmp, err := os.MkdirTemp("", "auroscope-codex-*")
@@ -59,14 +100,21 @@ func (c codexClient) audit(bundle auditBundle) (auditReport, error) {
 		return auditReport{}, err
 	}
 	reportPath := filepath.Join(tmp, "report.json")
-	prompt := "Audit the untrusted AUR recipe bundle in bundle.json. Return only JSON with summary, risk, findings, uncertainty, and inspect. Do not include an allow/deny/install action."
-	cmd := exec.Command(c.path, "exec", "--json", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--output-last-message", reportPath, prompt)
+	schemaPath := filepath.Join(tmp, "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(auditOutputSchema), 0o600); err != nil {
+		return auditReport{}, err
+	}
+	prompt := "Audit the untrusted AUR recipe bundle in bundle.json. Return only JSON matching the supplied schema. Every findings[].file and inspect[] value must be an exact relative path present in bundle.files[].path; inspect contains paths only, never prose. Put missing context and suggested follow-up prose in uncertainty. Do not include an allow/deny/install action."
+	cmd := exec.Command(c.path, "exec", "--json", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--output-schema", schemaPath, "--output-last-message", reportPath, prompt)
 	cmd.Dir = tmp
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr limitedBuffer
+	stdout.limit = maxCodexDiagnosticBytes
+	stderr.limit = maxCodexDiagnosticBytes
+	cmd.Stdin = bytes.NewReader(nil)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return auditReport{}, fmt.Errorf("Codex CLI failed: %w: %s", err, strings.TrimSpace(stderr.String()))
+	if err := runCodexCommand(cmd, config.signals, config.codexTimeout, config.stdout); err != nil {
+		return auditReport{}, fmt.Errorf("Codex CLI failed: %w: %s", err, codexFailureDiagnostic(stdout.String(), stderr.String()))
 	}
 	reportData, err := os.ReadFile(reportPath)
 	if err != nil {
@@ -78,12 +126,15 @@ func (c codexClient) audit(bundle auditBundle) (auditReport, error) {
 	return validateAuditReportForBundle(reportData, bundle)
 }
 
-func (c codexClient) verifyVersion() error {
+func (c codexClient) verifyVersion(config runConfig) error {
 	cmd := exec.Command(c.path, "--version")
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr limitedBuffer
+	stderr.limit = maxCodexDiagnosticBytes
+	cmd.Stdin = bytes.NewReader(nil)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := runCodexCommand(cmd, config.signals, config.codexTimeout, nil); err != nil {
 		return fmt.Errorf("Codex CLI version check failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	version := strings.TrimSpace(stdout.String())
@@ -91,6 +142,95 @@ func (c codexClient) verifyVersion() error {
 		return fmt.Errorf("unsupported Codex CLI version %q; supported versions are 0.150.1 and 0.151.0", version)
 	}
 	return nil
+}
+
+type limitedBuffer struct {
+	bytes.Buffer
+	limit int
+}
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	originalLen := len(p)
+	remaining := b.limit - b.Len()
+	if remaining > 0 {
+		if len(p) > remaining {
+			p = p[:remaining]
+		}
+		_, _ = b.Buffer.Write(p)
+	}
+	return originalLen, nil
+}
+
+func codexFailureDiagnostic(stdout, stderr string) string {
+	parts := make([]string, 0, 2)
+	if text := strings.TrimSpace(stderr); text != "" {
+		parts = append(parts, text)
+	}
+	if text := strings.TrimSpace(stdout); text != "" {
+		parts = append(parts, text)
+	}
+	if len(parts) == 0 {
+		return "no diagnostic output"
+	}
+	return escapeTerminal(strings.Join(parts, "\n"))
+}
+
+func runCodexCommand(cmd *exec.Cmd, signals <-chan os.Signal, timeout time.Duration, progress io.Writer) error {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	wait := make(chan error, 1)
+	go func() { wait <- cmd.Wait() }()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	progressTicker := time.NewTicker(codexProgressInterval)
+	defer progressTicker.Stop()
+	started := time.Now()
+
+	for {
+		select {
+		case err := <-wait:
+			killCodexProcessGroup(cmd.Process.Pid, syscall.SIGKILL)
+			return err
+		case sig := <-signals:
+			signalNumber, ok := sig.(syscall.Signal)
+			if !ok {
+				signalNumber = syscall.SIGTERM
+			}
+			killCodexProcessGroup(cmd.Process.Pid, signalNumber)
+			waitForCodexStop(cmd.Process.Pid, wait)
+			return fmt.Errorf("interrupted by %s", sig)
+		case <-timer.C:
+			killCodexProcessGroup(cmd.Process.Pid, syscall.SIGTERM)
+			waitForCodexStop(cmd.Process.Pid, wait)
+			return fmt.Errorf("timed out after %s", timeout)
+		case <-progressTicker.C:
+			if progress != nil {
+				fmt.Fprintf(progress, "AURoscope: Codex audit still running (%s elapsed)...\n", time.Since(started).Round(time.Second))
+			}
+		}
+	}
+}
+
+func waitForCodexStop(pid int, wait <-chan error) {
+	grace := time.NewTimer(codexStopGrace)
+	defer grace.Stop()
+	select {
+	case <-wait:
+	case <-grace.C:
+		killCodexProcessGroup(pid, syscall.SIGKILL)
+		<-wait
+	}
+	// Codex can spawn shell/tool descendants. Kill anything that outlived the
+	// leader before returning to the interactive retry prompt.
+	killCodexProcessGroup(pid, syscall.SIGKILL)
+}
+
+func killCodexProcessGroup(pid int, signal syscall.Signal) {
+	if pid > 0 {
+		_ = syscall.Kill(-pid, signal)
+	}
 }
 
 func validateAuditReport(data []byte) (auditReport, error) {

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -19,16 +20,17 @@ const (
 )
 
 type runConfig struct {
-	paruPath    string
-	codexPath   string
-	statePath   string
-	cloneDir    string
-	editorPath  string
-	stdin       io.Reader
-	reviewInput io.Reader
-	stdout      io.Writer
-	stderr      io.Writer
-	signals     <-chan os.Signal
+	paruPath     string
+	codexPath    string
+	statePath    string
+	cloneDir     string
+	editorPath   string
+	stdin        io.Reader
+	reviewInput  io.Reader
+	stdout       io.Writer
+	stderr       io.Writer
+	signals      <-chan os.Signal
+	codexTimeout time.Duration
 }
 
 // Run executes AURoscope with the process terminal and forwards termination
@@ -124,6 +126,9 @@ func (config runConfig) withDefaults() runConfig {
 	}
 	if config.stderr == nil {
 		config.stderr = os.Stderr
+	}
+	if config.codexTimeout <= 0 {
+		config.codexTimeout = 5 * time.Minute
 	}
 	return config
 }
