@@ -45,15 +45,54 @@ func TestApprovedAURPackageEndToEndWithFirstAudit(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "AURoscope: acquiring AUR recipe hello with Paru...") ||
 		!strings.Contains(stdout.String(), "AURoscope: auditing hello with Codex (timeout 5m0s)...") ||
-		!strings.Contains(stdout.String(), "AURoscope: Codex audit completed for hello.") ||
-		!strings.Contains(stdout.String(), "AUR audit: hello") {
+		!strings.Contains(stdout.String(), "AUR audit: hello") ||
+		!strings.Contains(stdout.String(), "Assessment: looks bounded") ||
+		!strings.Contains(stdout.String(), "Risk: low") {
 		t.Fatalf("stdout = %q", stdout.String())
+	}
+	for _, unwanted := range []string{"commit:", "manifest:", "Inspect:", "Diff:"} {
+		if strings.Contains(stdout.String(), unwanted) {
+			t.Fatalf("default review unexpectedly contains %q: %s", unwanted, stdout.String())
+		}
 	}
 	assertBaseline(t, filepath.Join(dir, "state.sqlite3"), "hello")
 	var bundle auditBundle
 	readJSON(t, filepath.Join(dir, "bundle.json"), &bundle)
 	if bundle.Mode != "full" || bundle.Identity.Pkgbase != "hello" || len(bundle.Files) == 0 {
 		t.Fatalf("bundle = %#v", bundle)
+	}
+}
+
+func TestInspectShowsFullReportWithoutRerunningCodex(t *testing.T) {
+	dir := t.TempDir()
+	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\npkgver=1\n")
+	calls := filepath.Join(dir, "calls")
+	codexCalls := filepath.Join(dir, "codex-calls")
+	t.Setenv("CODEX_CALLS", codexCalls)
+	paruPath := fakeParu(t, dir, calls, repo, "AUR TARGET hello hello\n")
+	codexPath := fakeCodex(t, dir, filepath.Join(dir, "bundle.json"), `{"summary":"packaging looks conventional","risk":"low","findings":[{"file":"PKGBUILD","line":1,"range":"1-1","evidence":"pkgname=hello","explanation":"ordinary metadata"}],"uncertainty":"none","inspect":["PKGBUILD"]}`)
+
+	var stdout, stderr bytes.Buffer
+	status := run([]string{"-S", "hello"}, runConfig{
+		paruPath:    paruPath,
+		codexPath:   codexPath,
+		statePath:   filepath.Join(dir, "state.sqlite3"),
+		cloneDir:    filepath.Join(dir, "clones"),
+		stdin:       strings.NewReader(""),
+		reviewInput: strings.NewReader("2\n1\n"),
+		stdout:      &stdout,
+		stderr:      &stderr,
+	})
+	if status != 0 {
+		t.Fatalf("status = %d; stdout = %s; stderr = %s", status, stdout.String(), stderr.String())
+	}
+	if got := strings.Count(readString(t, codexCalls), "audit\n"); got != 1 {
+		t.Fatalf("Codex audit count = %d, want 1", got)
+	}
+	for _, want := range []string{"commit:", "manifest:", "evidence: pkgname=hello", "Uncertainty:", "Inspect:"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("full report missing %q:\n%s", want, stdout.String())
+		}
 	}
 }
 
@@ -903,6 +942,9 @@ func fakeCodex(t *testing.T, dir, bundleCopy, output string) string {
 if test "$1" = "--version"; then
   printf 'codex-cli 0.150.1\n'
   exit 0
+fi
+if test -n "${CODEX_CALLS:-}"; then
+  printf 'audit\n' >> "$CODEX_CALLS"
 fi
 cp bundle.json "$BUNDLE_COPY"
 out=''
