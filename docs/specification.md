@@ -74,6 +74,8 @@ Codex CLI is the only v1 LLM backend. The model is configurable, but there is no
 
 Codex runs outside the recipe repository in a private temporary directory containing only the audit bundle. Package content is labelled as untrusted data.
 
+The audit assesses AUR packaging security and its evolution: `PKGBUILD`, auxiliary files, install scripts, URL provenance and changes, checksums and signatures, build/package commands, permissions, persistence, and other package effects. It does not raise risk merely because an upstream binary cannot be inspected. When an unchanged URL points to the expected official source, the intrinsic security of that upstream software is outside the packaging audit; provenance anomalies and URL changes remain reportable.
+
 A valid response is bounded JSON with:
 
 - concise change summary;
@@ -88,13 +90,15 @@ If Codex fails or returns invalid output, the audit has not occurred. The user m
 
 ## 7. Human decision
 
-For each AUR `pkgbase`, AURoscope presents the Codex summary, findings, uncertainty, and recipe diff. The user chooses:
+For each AUR `pkgbase`, AURoscope initially presents only the package name, Codex summary, risk level, and a concise decision menu. `inspect` displays the complete findings, uncertainty, suggested paths, recipe diff, and technical identity, then returns to the decision menu. The user chooses:
 
 - `approve`: allow this exact recipe identity into the final Paru run;
 - `inspect`: open the report/diff and ask again;
 - `edit`: edit the recipe, recompute its identity, rerun Codex, and ask again;
 - `skip`: exclude this AUR package base from the final run;
 - `cancel`: cancel the AUR phase.
+
+Every menu accepts the displayed number, the action's initial, or the full action word. Audit errors use the same compact form with `retry`, `skip`, and `cancel`.
 
 AURoscope never decides for the user. Paru retains its normal final transaction confirmation.
 

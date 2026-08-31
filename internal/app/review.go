@@ -199,7 +199,7 @@ func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *b
 			}
 		}
 		fmt.Fprintf(o.config.stdout, "AURoscope: Codex audit completed for %s.\n", escapeTerminal(pkgbase))
-		printReview(o.config, pkgbase, bundle, report)
+		printReviewSummary(o.config, pkgbase, report)
 		switch askDecision(reader, o.config, []string{"approve", "inspect", "edit", "skip", "cancel"}) {
 		case "approve":
 			if err := store.recordAudit(pkgbase, bundle.Identity, bundle.PreviousCommit, report, string(decisionApprove)); err != nil {
@@ -207,7 +207,7 @@ func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *b
 			}
 			return reviewedPackage{Identity: bundle.Identity, Decision: decisionApprove}, nil
 		case "inspect":
-			printReview(o.config, pkgbase, bundle, report)
+			printFullReview(o.config, pkgbase, bundle, report)
 		case "edit":
 			if err := editAndSnapshot(o.config, dir); err != nil {
 				return reviewedPackage{}, err
@@ -226,8 +226,12 @@ func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *b
 	}
 }
 
-func printReview(config runConfig, pkgbase string, bundle auditBundle, report auditReport) {
-	fmt.Fprintf(config.stdout, "\nAUR audit: %s\ncommit: %s\nmanifest: %s\nrisk: %s\n%s\n", escapeTerminal(pkgbase), bundle.Identity.Commit, bundle.Identity.ManifestDigest, escapeTerminal(report.Risk), escapeTerminal(report.Summary))
+func printReviewSummary(config runConfig, pkgbase string, report auditReport) {
+	fmt.Fprintf(config.stdout, "\nPackage: %s\nSummary: %s\nRisk: %s\n", escapeTerminal(pkgbase), escapeTerminal(report.Summary), escapeTerminal(report.Risk))
+}
+
+func printFullReview(config runConfig, pkgbase string, bundle auditBundle, report auditReport) {
+	fmt.Fprintf(config.stdout, "\nFull audit report: %s\ncommit: %s\nmanifest: %s\nrisk: %s\nsummary: %s\n", escapeTerminal(pkgbase), bundle.Identity.Commit, bundle.Identity.ManifestDigest, escapeTerminal(report.Risk), escapeTerminal(report.Summary))
 	for _, finding := range report.Findings {
 		location := escapeTerminal(finding.File)
 		if finding.Line > 0 {
@@ -247,8 +251,11 @@ func printReview(config runConfig, pkgbase string, bundle auditBundle, report au
 			fmt.Fprintf(config.stdout, "- %s\n", escapeTerminal(path))
 		}
 	}
-	if bundle.Diff != "" {
-		fmt.Fprintf(config.stdout, "\nDiff:\n%s\n", escapeTerminal(bundle.Diff))
+	fmt.Fprintln(config.stdout, "\nDiff:")
+	if bundle.Diff == "" {
+		fmt.Fprintln(config.stdout, "(none; full recipe audit)")
+	} else {
+		fmt.Fprintln(config.stdout, escapeTerminal(bundle.Diff))
 	}
 }
 
@@ -268,19 +275,33 @@ func escapeTerminal(s string) string {
 }
 
 func askDecision(reader *bufio.Reader, config runConfig, allowed []string) string {
-	allowedSet := map[string]bool{}
+	aliases := map[string]string{}
+	initialCounts := map[string]int{}
 	for _, value := range allowed {
-		allowedSet[value] = true
+		initialCounts[value[:1]]++
+	}
+	menu := make([]string, 0, len(allowed))
+	for index, value := range allowed {
+		number := fmt.Sprint(index + 1)
+		aliases[number] = value
+		aliases[value] = value
+		initial := value[:1]
+		label := number
+		if initialCounts[initial] == 1 {
+			aliases[initial] = value
+			label += "/" + initial
+		}
+		menu = append(menu, label+" "+value)
 	}
 	for {
-		fmt.Fprintf(config.stdout, "Decision [%s]: ", strings.Join(allowed, "/"))
+		fmt.Fprintf(config.stdout, "Decision: %s\nChoice: ", strings.Join(menu, " | "))
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "cancel"
 		}
 		choice := strings.ToLower(strings.TrimSpace(line))
-		if allowedSet[choice] {
-			return choice
+		if decision, ok := aliases[choice]; ok {
+			return decision
 		}
 		fmt.Fprintf(config.stderr, "auroscope: unsupported decision %q\n", choice)
 	}
