@@ -2,9 +2,9 @@
 
 ## Status and decision protocol
 
-**Status:** Proposed for Mathieu's review except where an accepted ADR is linked explicitly. A recommendation alone is never acceptance.
+**Status:** Design decisions accepted. All consequential choices in the decision set are recorded in accepted ADRs; production implementation and the detailed implementation plan remain unauthorized until a separate `MODE: EXECUTION` issue advances the phase.
 
-This document intentionally contains no implementation plan and no production code. As Mathieu accepts, rejects, or amends the numbered decisions in [Decision set](#decision-set-for-mathieu), accepted choices are split into ADRs. Only after the consequential ADRs are accepted may `docs/implementation/initial-plan.md` be written.
+This document intentionally contains no implementation plan and no production code. Accepted choices are split into ADRs. The design gate is complete, so `docs/implementation/initial-plan.md` may be written only after a separate `MODE: EXECUTION` issue explicitly authorizes that planning work.
 
 ## 1. Grounded baseline and proof
 
@@ -550,7 +550,7 @@ Each decision is tracked in a dedicated Forgejo issue containing its context, ev
 | D6 — SQLite driver | [#7](https://git.2027a.net/2027a/auroscope/issues/7) | **Accepted:** [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md) |
 | D7 — remaining Go dependencies | [#8](https://git.2027a.net/2027a/auroscope/issues/8) | **Accepted:** [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md) |
 | D8 — SQLite state model | [#9](https://git.2027a.net/2027a/auroscope/issues/9) | **Accepted:** [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md) |
-| D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) | Proposed |
+| D9 — approval protocol | [#10](https://git.2027a.net/2027a/auroscope/issues/10) | **Accepted:** [ADR-0010](../decisions/0010-one-shot-approval-protocol.md) |
 | D10 — scanner/LLM contracts | [#11](https://git.2027a.net/2027a/auroscope/issues/11) | **Accepted:** [ADR-0011](../decisions/0011-deterministic-scanner-and-llm-contracts.md) |
 | D11 — XDG/cleanup/retention | [#12](https://git.2027a.net/2027a/auroscope/issues/12) | **Accepted:** [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md) |
 | D12 — threat model/tests | [#13](https://git.2027a.net/2027a/auroscope/issues/13) | **Accepted:** [ADR-0013](../decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md) |
@@ -566,7 +566,7 @@ Workflow for every decision issue:
 
 Issues without an exact mode marker fall back to a single existing routing label; missing or conflicting routing is classified `Agent/Needs Review` and executes nothing. Until step 3 is complete and the resulting ADR is committed for a given decision, that item remains **Proposed**. Accepted items below link to their ADR. The PR itself is evidence and discussion material, not approval.
 
-Please accept, amend, reject, or defer each unresolved item. Recommendations without an accepted ADR are not decisions.
+All decisions below are accepted and recorded in ADRs. Any later change requires an explicit amendment or superseding ADR.
 
 1. **D1 — Paru compatibility — Accepted in [ADR-0002](../decisions/0002-paru-native-selection-compatibility.md):** retain the first stable Paru release containing `d1dfbc4` as the durable floor; meanwhile permit an isolated, temporary, fail-closed adapter for verified 2.1.0 output. Detect capability behaviorally and remove the adapter after a fixed stable release passes the contract matrix. A pinned post-fix commit remains design/test-only.
 2. **D2 — orchestration — Accepted in [ADR-0003](../decisions/0003-multi-stage-paru-orchestration.md):** adopt two-stage Paru planning/review/execution; do not parse Paru's human UI beyond ADR-0002's temporary 2.1.0 exception, and never replace its resolver.
@@ -576,7 +576,7 @@ Please accept, amend, reject, or defer each unresolved item. Recommendations wit
 6. **D6 — SQLite driver — Accepted:** use `mattn/go-sqlite3 v1.14.50` with CGO for Arch `linux/amd64` v1; revisit pure Go only with real cross-target need. Record: [ADR-0007](../decisions/0007-mattn-go-sqlite3-cgo.md).
 7. **D7 — remaining dependencies — Accepted:** TOML via `pelletier/go-toml/v2`, `$VISUAL` parsing via `mattn/go-shellwords v1.0.14` with environment and backtick expansion disabled, embedded SQL migrations, typed local LLM validation, and no LLM SDK/framework or PTY dependency without demonstrated need. See [ADR-0008](../decisions/0008-minimal-direct-go-dependencies.md).
 8. **D8 — state model — Accepted in [ADR-0009](../decisions/0009-minimal-sqlite-state-model.md):** normalized immutable evidence/decisions plus only the mutable lifecycle rows required for identity, inspection, human authority, status, and recovery; no generic event-sourcing, provenance, EAV, plugin, or speculative schema.
-9. **D9 — approval protocol:** transaction/process/workspace-bound one-shot approvals, 30-minute default expiry, atomic claim, all terminal states invalidate leftovers, explicit same-UID residual risk, and human approval remains representable after visibly recorded partial/failed analysis. **Recommended: accept.**
+9. **D9 — approval protocol — Accepted in [ADR-0010](../decisions/0010-one-shot-approval-protocol.md):** transaction/process/workspace-bound one-shot approvals, 30-minute default expiry, atomic claim, all terminal states invalidate leftovers, explicit same-UID residual risk, and human approval remains representable after visibly recorded partial/failed analysis.
 10. **D10 — scanner/LLM — Accepted in [ADR-0011](../decisions/0011-deterministic-scanner-and-llm-contracts.md):** immutable versioned deterministic findings; optional advisory LLM with no decision/action field; explicit `codex`, supported API, and `disabled` modes plus automatic “complete API, otherwise Codex” selection; configurable Codex model defaulting to `5.6-luna`; bounded best-effort Codex exposure; strict local output validation; visible failure and human pause without implicit fallback or autonomous veto.
 11. **D11 — XDG/cleanup — Accepted in [ADR-0012](../decisions/0012-xdg-layout-permissions-retention.md):** use the exact XDG layout and private ownership/symlink controls above, 24-hour stale-work recovery, and finite configurable retention defaults: 365-day identity/decision/outcome history, 30-day reports/model JSON, 7-day state backups, 14-day or 512-MiB reconstructible recipe cache, and 3-day failed-work metadata.
 12. **D12 — threat/tests — Accepted in [ADR-0013](../decisions/0013-aur-supply-chain-threat-model-and-v1-test-gates.md):** limit the adversary model to hostile AUR supply-chain input. Before v1, require a benign/suspicious recipe corpus, proof that inspection executes no package content, faithful evidence/error presentation with human authority, and one disposable-Arch review-to-install E2E. The local machine and account are outside the security guarantee.
