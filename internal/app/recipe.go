@@ -142,6 +142,13 @@ func readRecipeFiles(dir string) ([]recipeFile, error) {
 		if !info.Mode().IsRegular() {
 			return nil, fmt.Errorf("recipe path %s is not a regular file", name)
 		}
+		actualMode := trackedRegularMode
+		if info.Mode().Perm()&0o111 != 0 {
+			actualMode = trackedExecutableMode
+		}
+		if actualMode != mode {
+			return nil, fmt.Errorf("recipe path %s worktree mode %s differs from tracked mode %s", name, actualMode, mode)
+		}
 		if info.Size() > maxRecipeFileBytes {
 			return nil, fmt.Errorf("recipe file %s exceeds %d bytes", name, maxRecipeFileBytes)
 		}
@@ -219,21 +226,50 @@ func boundAuditBundle(bundle auditBundle) error {
 	return nil
 }
 
-func snapshotEditedWorktree(dir string) error {
-	if _, err := gitOutput(dir, "add", "-A"); err != nil {
+func snapshotEditedWorktree(dir string, preExistingUntracked map[string]bool) error {
+	if _, err := gitOutput(dir, "add", "-u"); err != nil {
 		return fmt.Errorf("stage edited recipe: %w", err)
 	}
-	status, err := gitOutput(dir, "status", "--porcelain")
+	untracked, err := untrackedRecipePaths(dir)
 	if err != nil {
-		return fmt.Errorf("inspect edited recipe: %w", err)
+		return err
 	}
-	if strings.TrimSpace(status) == "" {
+	for path := range untracked {
+		if preExistingUntracked[path] {
+			continue
+		}
+		if err := validateRelativeRecipePath(path); err != nil {
+			return err
+		}
+		if _, err := gitOutput(dir, "add", "--", path); err != nil {
+			return fmt.Errorf("stage new edited recipe file %s: %w", path, err)
+		}
+	}
+	staged, err := gitOutput(dir, "diff", "--cached", "--name-only", "-z")
+	if err != nil {
+		return fmt.Errorf("inspect staged recipe edit: %w", err)
+	}
+	if staged == "" {
 		return nil
 	}
 	if _, err := gitOutput(dir, "-c", "user.name=AURoscope", "-c", "user.email=auroscope@localhost", "commit", "-m", "AURoscope reviewed edit"); err != nil {
 		return fmt.Errorf("commit edited recipe: %w", err)
 	}
 	return nil
+}
+
+func untrackedRecipePaths(dir string) (map[string]bool, error) {
+	output, err := gitOutput(dir, "ls-files", "--others", "--exclude-standard", "-z")
+	if err != nil {
+		return nil, fmt.Errorf("list untracked recipe files: %w", err)
+	}
+	paths := map[string]bool{}
+	for _, path := range strings.Split(output, "\x00") {
+		if path != "" {
+			paths[path] = true
+		}
+	}
+	return paths, nil
 }
 
 func gitOutput(dir string, args ...string) (string, error) {

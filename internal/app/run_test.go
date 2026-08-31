@@ -153,6 +153,10 @@ func TestPTYRunHelper(t *testing.T) {
 		stdout:   os.Stdout,
 		stderr:   os.Stderr,
 	})
+	foreground, err := foregroundProcessGroup(os.Stdin.Fd())
+	if err != nil || foreground != syscall.Getpgrp() {
+		os.Exit(92)
+	}
 	os.Exit(status)
 }
 
@@ -439,7 +443,7 @@ func TestParuPlanRejectsSRCINFORecordsBeforeExecution(t *testing.T) {
 }
 
 func TestParuPlanSupportsVariableLengthAURSplitRecords(t *testing.T) {
-	result := orderResult{Records: []orderRecord{{Kind: "AUR", Fields: []string{"TARGET", "split-member", "split-base", "extra", "metadata"}}}}
+	result := orderResult{Records: []orderRecord{{Kind: "AUR", Fields: []string{"TARGET", "split-base", "split-member", "split-helper"}}}}
 	plan, err := result.plan()
 	if err != nil {
 		t.Fatal(err)
@@ -447,7 +451,7 @@ func TestParuPlanSupportsVariableLengthAURSplitRecords(t *testing.T) {
 	if !reflect.DeepEqual(plan.AURPkgbases, []string{"split-base"}) {
 		t.Fatalf("pkgbases = %#v", plan.AURPkgbases)
 	}
-	if !reflect.DeepEqual(plan.AURTargetsByPkgbase["split-base"], []string{"split-member"}) {
+	if !reflect.DeepEqual(plan.AURTargetsByPkgbase["split-base"], []string{"split-member", "split-helper"}) {
 		t.Fatalf("targets = %#v", plan.AURTargetsByPkgbase)
 	}
 	if err := result.ensureTargetsClassified([]string{"split-member"}); err != nil {
@@ -522,6 +526,33 @@ exit 0
 	}
 	if stdout.String() != "acquiring\n" {
 		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestAuditedInstallArgsPreserveNativeOptionsAndReplaceTargets(t *testing.T) {
+	args := auditedInstallArgs(
+		[]string{"-S", "--needed", "--noconfirm", "tree", "hello"},
+		[]string{"tree", "hello"},
+		[]string{"tree"},
+	)
+	args = insertBeforeTargets(args, "--skipreview")
+	want := []string{"-S", "--needed", "--noconfirm", "--skipreview", "--", "tree"}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("args = %#v, want %#v", args, want)
+	}
+}
+
+func TestInitialTargetsRejectLocalRecipeInputsBeforeParu(t *testing.T) {
+	for _, args := range [][]string{
+		{"-B", "."},
+		{"--build", "/tmp/recipe"},
+		{"-S", "./PKGBUILD"},
+		{"-S", "../recipe"},
+		{"-S", "file:/tmp/recipe"},
+	} {
+		if _, err := initialTargets(args, paruClient{}); err == nil {
+			t.Fatalf("initialTargets(%#v) accepted local recipe input", args)
+		}
 	}
 }
 

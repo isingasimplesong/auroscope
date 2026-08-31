@@ -178,13 +178,12 @@ func (result orderResult) plan() (resolvedPlan, error) {
 		switch record.Kind {
 		case "REPO":
 			name := record.Fields[2]
-			if !seenRepo[name] {
+			if record.Fields[0] == "TARGET" && !seenRepo[name] {
 				seenRepo[name] = true
 				plan.RepoTargets = append(plan.RepoTargets, name)
 			}
 		case "AUR":
-			name := record.Fields[1]
-			pkgbase := record.Fields[2]
+			pkgbase := record.Fields[1]
 			if !seenAUR[pkgbase] {
 				seenAUR[pkgbase] = true
 				plan.AURPkgbases = append(plan.AURPkgbases, pkgbase)
@@ -193,9 +192,11 @@ func (result orderResult) plan() (resolvedPlan, error) {
 				if seenAURTarget[pkgbase] == nil {
 					seenAURTarget[pkgbase] = map[string]bool{}
 				}
-				if !seenAURTarget[pkgbase][name] {
-					seenAURTarget[pkgbase][name] = true
-					plan.AURTargetsByPkgbase[pkgbase] = append(plan.AURTargetsByPkgbase[pkgbase], name)
+				for _, name := range record.Fields[2:] {
+					if !seenAURTarget[pkgbase][name] {
+						seenAURTarget[pkgbase][name] = true
+						plan.AURTargetsByPkgbase[pkgbase] = append(plan.AURTargetsByPkgbase[pkgbase], name)
+					}
 				}
 			}
 		case "MISSING", "CONFLICT":
@@ -211,18 +212,28 @@ func (result orderResult) ensureTargetsClassified(targets []string) error {
 	recordsByTarget := map[string]bool{}
 	for _, record := range result.Records {
 		if (record.Kind == "REPO" || record.Kind == "AUR") && record.Fields[0] == "TARGET" {
-			recordsByTarget[record.Fields[1]] = true
 			if record.Kind == "REPO" {
 				recordsByTarget[record.Fields[2]] = true
+			} else {
+				for _, name := range record.Fields[2:] {
+					recordsByTarget[name] = true
+				}
 			}
 		}
 	}
 	for _, target := range targets {
-		if !recordsByTarget[target] {
+		if !recordsByTarget[unqualifiedTarget(target)] {
 			return incompatibleParu("requested target %q was not classified", target)
 		}
 	}
 	return nil
+}
+
+func unqualifiedTarget(target string) string {
+	if slash := strings.IndexByte(target, '/'); slash >= 0 {
+		return target[slash+1:]
+	}
+	return target
 }
 
 func validateOrderRecord(fields []string) error {

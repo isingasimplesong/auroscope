@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"unsafe"
 )
 
 const (
@@ -128,7 +129,15 @@ func (config runConfig) withDefaults() runConfig {
 }
 
 func initialTargets(args []string, paru paruClient) ([]string, error) {
+	for _, arg := range args {
+		if arg == "--build" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.ContainsRune(strings.TrimPrefix(arg, "-"), 'B') {
+			return nil, fmt.Errorf("local PKGBUILD builds are outside AURoscope v1")
+		}
+	}
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		if err := rejectLocalRecipeTargets(args); err != nil {
+			return nil, err
+		}
 		return paru.selectPackages(args)
 	}
 	var targets []string
@@ -148,7 +157,19 @@ func initialTargets(args []string, paru paruClient) ([]string, error) {
 		}
 		targets = append(targets, arg)
 	}
+	if err := rejectLocalRecipeTargets(targets); err != nil {
+		return nil, err
+	}
 	return targets, nil
+}
+
+func rejectLocalRecipeTargets(targets []string) error {
+	for _, target := range targets {
+		if target == "." || target == ".." || strings.HasPrefix(target, "./") || strings.HasPrefix(target, "../") || filepath.IsAbs(target) || strings.HasPrefix(target, "file:") {
+			return fmt.Errorf("local/path recipe target %q is outside AURoscope v1", target)
+		}
+	}
+	return nil
 }
 
 func isSystemUpgrade(args []string) bool {
@@ -194,6 +215,9 @@ func commandMayBuildAUR(args []string) bool {
 	nonBuildingSyncAction := false
 	hasOperation := false
 	for _, arg := range args {
+		if arg == "--build" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.ContainsRune(strings.TrimPrefix(arg, "-"), 'B') {
+			return true
+		}
 		switch arg {
 		case "--sync":
 			sync, hasOperation = true, true
@@ -292,10 +316,14 @@ type commandResult struct {
 
 func execute(config runConfig, cmd *exec.Cmd) commandResult {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	var terminalFD uintptr
+	parentPgrp := -1
 	if stdin, ok := cmd.Stdin.(*os.File); ok {
 		if info, err := stdin.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
 			cmd.SysProcAttr.Foreground = true
 			cmd.SysProcAttr.Ctty = int(stdin.Fd())
+			terminalFD = stdin.Fd()
+			parentPgrp = syscall.Getpgrp()
 		}
 	}
 	if err := cmd.Start(); err != nil {
@@ -324,8 +352,34 @@ func execute(config runConfig, cmd *exec.Cmd) commandResult {
 	}
 
 	err := cmd.Wait()
+	if parentPgrp >= 0 {
+		signal.Ignore(syscall.SIGTTOU)
+		restoreErr := setForegroundProcessGroup(terminalFD, parentPgrp)
+		signal.Reset(syscall.SIGTTOU)
+		if restoreErr != nil && err == nil {
+			close(done)
+			return commandResult{status: -1, err: fmt.Errorf("restore terminal foreground process group: %w", restoreErr)}
+		}
+	}
 	close(done)
 	return commandResult{status: commandStatus(err), err: err}
+}
+
+func setForegroundProcessGroup(fd uintptr, pgid int) error {
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(syscall.TIOCSPGRP), uintptr(unsafe.Pointer(&pgid)))
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
+
+func foregroundProcessGroup(fd uintptr) (int, error) {
+	var pgid int
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(syscall.TIOCGPGRP), uintptr(unsafe.Pointer(&pgid)))
+	if errno != 0 {
+		return 0, errno
+	}
+	return pgid, nil
 }
 
 func commandStatus(err error) int {

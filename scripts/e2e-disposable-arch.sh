@@ -133,8 +133,8 @@ printf 'approve\n' | env \
   2>/tmp/auroscope-e2e-stderr \
   || { cat /tmp/auroscope-e2e-stderr >&2; exit 1; }
 
-grep -q -- '-S --skipreview hello' /tmp/auroscope-e2e-paru-calls
+grep -q -- '-S --skipreview -- hello' /tmp/auroscope-e2e-paru-calls
 grep -q 'AUR audit: hello' /tmp/auroscope-e2e-stdout
 
-echo 'disposable Arch fake-Paru integration smoke passed; real supported-version Paru E2E remains unresolved'
+echo 'disposable Arch fake-Paru integration smoke passed'
 BASH

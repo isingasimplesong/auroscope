@@ -93,7 +93,7 @@ func (o orchestrator) run(originalArgs, targets []string) error {
 		return nil
 	}
 	if len(approved) == 0 {
-		result := o.paru.finalInstall(append([]string{"-S"}, plan.RepoTargets...), nil)
+		result := o.paru.finalInstall(auditedInstallArgs(originalArgs, targets, plan.RepoTargets), nil)
 		if result.status != 0 {
 			return childExit{status: result.status}
 		}
@@ -104,8 +104,8 @@ func (o orchestrator) run(originalArgs, targets []string) error {
 		return err
 	}
 	defer os.RemoveAll(txDir)
-	args := []string{"-S", "--skipreview"}
-	args = append(args, finalTargets...)
+	args := auditedInstallArgs(originalArgs, targets, finalTargets)
+	args = insertBeforeTargets(args, "--skipreview")
 	result := o.paru.finalInstall(args, []string{"PARU_CONF=" + confPath})
 	if result.status != 0 {
 		return childExit{status: result.status}
@@ -126,6 +126,42 @@ func finishNative(paru paruClient, originalArgs, repoTargets []string) error {
 		return childExit{status: result.status}
 	}
 	return nil
+}
+
+func auditedInstallArgs(originalArgs, selectedTargets, finalTargets []string) []string {
+	if len(originalArgs) == 0 || isSystemUpgrade(originalArgs) || !strings.HasPrefix(originalArgs[0], "-") {
+		args := []string{"-S", "--"}
+		return append(args, finalTargets...)
+	}
+	selected := map[string]bool{}
+	for _, target := range selectedTargets {
+		selected[target] = true
+		selected[unqualifiedTarget(target)] = true
+	}
+	args := make([]string, 0, len(originalArgs)+len(finalTargets)+1)
+	for _, arg := range originalArgs {
+		if arg == "--" {
+			continue
+		}
+		if !strings.HasPrefix(arg, "-") && (selected[arg] || selected[unqualifiedTarget(arg)]) {
+			continue
+		}
+		args = append(args, arg)
+	}
+	args = append(args, "--")
+	return append(args, finalTargets...)
+}
+
+func insertBeforeTargets(args []string, option string) []string {
+	for i, arg := range args {
+		if arg == "--" {
+			out := make([]string, 0, len(args)+1)
+			out = append(out, args[:i]...)
+			out = append(out, option)
+			return append(out, args[i:]...)
+		}
+	}
+	return append(args, option)
 }
 
 func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *bufio.Reader) (reviewedPackage, error) {
@@ -251,6 +287,10 @@ func editAndSnapshot(config runConfig, dir string) error {
 	if config.editorPath == "" {
 		return errors.New("EDITOR is required for edit")
 	}
+	preExistingUntracked, err := untrackedRecipePaths(dir)
+	if err != nil {
+		return err
+	}
 	cmd := exec.Command(config.editorPath, dir)
 	cmd.Dir = dir
 	cmd.Stdin = config.stdin
@@ -259,7 +299,7 @@ func editAndSnapshot(config runConfig, dir string) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("editor failed: %w", err)
 	}
-	return snapshotEditedWorktree(dir)
+	return snapshotEditedWorktree(dir, preExistingUntracked)
 }
 
 func writeTransactionFiles(approved []recipeIdentity, cloneDir string) (string, string, error) {
@@ -293,16 +333,47 @@ func writeTransactionFiles(approved []recipeIdentity, cloneDir string) (string, 
 	if err != nil {
 		return "", "", err
 	}
-	conf := fmt.Sprintf("[options]\nCloneDir = %s\n", cloneDir)
-	if original := os.Getenv("PARU_CONF"); original != "" {
-		conf += fmt.Sprintf("Include = %s\n", original)
+	for label, value := range map[string]string{"clone directory": cloneDir, "executable": exe, "transaction path": txPath} {
+		if strings.ContainsAny(value, "\r\n") {
+			return "", "", fmt.Errorf("%s contains a newline", label)
+		}
 	}
-	conf += fmt.Sprintf("\n[bin]\nPreBuildCommand = %s __guard %s\n", posixShellQuote(exe), posixShellQuote(txPath))
-	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
+	var conf strings.Builder
+	if original := effectiveParuConfig(); original != "" {
+		if strings.ContainsAny(original, "\r\n") {
+			return "", "", fmt.Errorf("Paru config path contains a newline")
+		}
+		fmt.Fprintf(&conf, "[options]\nInclude = %s\n", original)
+	}
+	fmt.Fprintf(&conf, "\n[options]\nCloneDir = %s\n", cloneDir)
+	fmt.Fprintf(&conf, "\n[bin]\nPreBuildCommand = %s __guard %s\n", posixShellQuote(exe), posixShellQuote(txPath))
+	if err := os.WriteFile(confPath, []byte(conf.String()), 0o600); err != nil {
 		return "", "", err
 	}
 	complete = true
 	return dir, confPath, nil
+}
+
+func effectiveParuConfig() string {
+	if path := os.Getenv("PARU_CONF"); path != "" {
+		return path
+	}
+	if root := os.Getenv("XDG_CONFIG_HOME"); root != "" {
+		path := filepath.Join(root, "paru", "paru.conf")
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		path := filepath.Join(home, ".config", "paru", "paru.conf")
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	if _, err := os.Stat("/etc/paru.conf"); err == nil {
+		return "/etc/paru.conf"
+	}
+	return ""
 }
 
 func posixShellQuote(s string) string {

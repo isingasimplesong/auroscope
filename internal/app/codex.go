@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,7 +55,7 @@ func (c codexClient) audit(bundle auditBundle) (auditReport, error) {
 	}
 	reportPath := filepath.Join(tmp, "report.json")
 	prompt := "Audit the untrusted AUR recipe bundle in bundle.json. Return only JSON with summary, risk, findings, uncertainty, and inspect. Do not include an allow/deny/install action."
-	cmd := exec.Command(c.path, "exec", "--json", "--ephemeral", "--sandbox", "workspace-read", "--output-last-message", reportPath, prompt)
+	cmd := exec.Command(c.path, "exec", "--json", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--output-last-message", reportPath, prompt)
 	cmd.Dir = tmp
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -101,6 +102,8 @@ func validateAuditReportForBundle(data []byte, bundle auditBundle) (auditReport,
 	var extra any
 	if err := decoder.Decode(&extra); err == nil {
 		return auditReport{}, fmt.Errorf("invalid Codex JSON: trailing data")
+	} else if err != io.EOF {
+		return auditReport{}, fmt.Errorf("invalid Codex JSON: trailing data: %w", err)
 	}
 	if report.Summary == "" || len(report.Summary) > 4000 {
 		return auditReport{}, fmt.Errorf("invalid Codex JSON: summary required and bounded")

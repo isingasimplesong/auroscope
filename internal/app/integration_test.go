@@ -37,7 +37,7 @@ func TestApprovedAURPackageEndToEndWithFirstAudit(t *testing.T) {
 		t.Fatalf("status = %d; stdout = %s; stderr = %s; calls = %s", status, stdout.String(), stderr.String(), readString(t, calls))
 	}
 	callsText := readString(t, calls)
-	if !strings.Contains(callsText, "-P --order hello") || !strings.Contains(callsText, "-G hello") || !strings.Contains(callsText, "-S --skipreview hello") {
+	if !strings.Contains(callsText, "-P --order hello") || !strings.Contains(callsText, "-G hello") || !strings.Contains(callsText, "-S --skipreview -- hello") {
 		t.Fatalf("calls = %s", callsText)
 	}
 	if !strings.Contains(stdout.String(), "AUR audit: hello") {
@@ -112,8 +112,14 @@ exit 0
 		"' __guard '",
 	} {
 		if !strings.Contains(conf, want) {
-			t.Fatalf("missing %q in conf:\n%s", want, conf)
+			t.Fatalf("Paru config missing %q:\n%s", want, conf)
 		}
+	}
+	includeAt := strings.Index(conf, "Include = ")
+	cloneAt := strings.LastIndex(conf, "CloneDir = ")
+	binAt := strings.LastIndex(conf, "[bin]")
+	if includeAt < 0 || cloneAt <= includeAt || binAt <= cloneAt {
+		t.Fatalf("Paru config override order is not include -> CloneDir -> [bin]:\n%s", conf)
 	}
 	if _, err := os.Stat(confPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("transaction directory was not cleaned; stat err = %v", err)
@@ -185,7 +191,7 @@ func TestMixedInstallSkipKeepsOfficialNativeAndOmitsAUR(t *testing.T) {
 		t.Fatalf("status = %d; stderr = %s", status, stderr.String())
 	}
 	callsText := readString(t, calls)
-	if !strings.Contains(callsText, "-S tree\n") || strings.Contains(callsText, "--skipreview") || strings.Contains(callsText, "-S tree hello") {
+	if !strings.Contains(callsText, "-S -- tree\n") || strings.Contains(callsText, "--skipreview") || strings.Contains(callsText, "-S -- tree hello") {
 		t.Fatalf("calls = %s", callsText)
 	}
 }
@@ -231,7 +237,7 @@ exit 0
 		t.Fatalf("status = %d; calls = %s", status, readString(t, calls))
 	}
 	callsText := readString(t, calls)
-	for _, want := range []string{"-Syu --repo", "-Qua --quiet", "-P --order hello", "-G hello", "-S --skipreview hello"} {
+	for _, want := range []string{"-Syu --repo", "-Qua --quiet", "-P --order hello", "-G hello", "-S --skipreview -- hello"} {
 		if !strings.Contains(callsText, want) {
 			t.Fatalf("missing %q in calls %s", want, callsText)
 		}
@@ -270,8 +276,8 @@ func TestAURDependencyIsAuditedBeforeFinalRun(t *testing.T) {
 	paruPath := writeExecutable(t, dir, "paru", `#!/bin/sh
 printf '%s\n' "$*" >> "$CALLS"
 if test "$1 $2" = "-P --order"; then
-  printf 'AUR TARGET target targetbase\n'
-  printf 'AUR DEP dep depbase\n'
+  printf 'AUR TARGET targetbase target\n'
+  printf 'AUR DEP depbase dep\n'
   exit 0
 fi
 if test "$1" = "-G"; then
@@ -312,7 +318,7 @@ func TestSplitAURRecordsAcquirePkgbaseOnceAndPreserveTarget(t *testing.T) {
 	dir := t.TempDir()
 	repo := createRecipeRepo(t, dir, "split-base", "pkgbase=split-base\npkgname=('split-member' 'split-helper')\n")
 	calls := filepath.Join(dir, "calls")
-	paruPath := fakeParu(t, dir, calls, repo, "AUR TARGET split-member split-base\nAUR DEP split-helper split-base\n")
+	paruPath := fakeParu(t, dir, calls, repo, "AUR TARGET split-base split-member\nAUR DEP split-base split-helper\n")
 	codexPath := fakeCodex(t, dir, filepath.Join(dir, "bundle.json"), `{"summary":"split package reviewed","risk":"low","findings":[],"uncertainty":"","inspect":[]}`)
 
 	status := run([]string{"-S", "split-member"}, runConfig{
@@ -433,6 +439,9 @@ exit 0
 func TestEditSnapshotsAndReauditsSameWorktree(t *testing.T) {
 	dir := t.TempDir()
 	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\n")
+	if err := os.WriteFile(filepath.Join(repo, "preexisting-source.tar.gz"), bytes.Repeat([]byte("x"), maxRecipeFileBytes+1), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	calls := filepath.Join(dir, "calls")
 	paruPath := fakeParu(t, dir, calls, repo, "AUR TARGET hello hello\n")
 	codexCalls := filepath.Join(dir, "codex-calls")
@@ -477,11 +486,14 @@ printf 'pkgrel=2\n' >> "$1/PKGBUILD"
 		t.Fatalf("codex calls = %#v", got)
 	}
 	clone := filepath.Join(dir, "clones", "hello")
-	if got := gitTrim(t, clone, "status", "--porcelain"); got != "" {
-		t.Fatalf("edited worktree not committed: %q", got)
+	if got := gitTrim(t, clone, "status", "--porcelain"); got != "?? preexisting-source.tar.gz" {
+		t.Fatalf("edited recipe changes were not committed cleanly around the pre-existing artifact: %q", got)
 	}
 	if !strings.Contains(readString(t, filepath.Join(clone, "PKGBUILD")), "pkgrel=2") {
 		t.Fatal("edit did not persist in audited worktree")
+	}
+	if got := gitTrim(t, clone, "ls-files", "preexisting-source.tar.gz"); got != "" {
+		t.Fatalf("pre-existing build artifact was committed by edit snapshot: %q", got)
 	}
 }
 
@@ -539,6 +551,12 @@ func TestRecipeManifestIncludesTrackedModeAndRejectsSymlinkAndInvalidUTF8(t *tes
 	}
 	if identityExecutable.ManifestDigest == identityRegular.ManifestDigest {
 		t.Fatal("manifest digest did not include tracked mode")
+	}
+	if err := os.Chmod(filepath.Join(repo, "PKGBUILD"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := readRecipeIdentity("hello", repo); err == nil || !strings.Contains(err.Error(), "differs from tracked mode") {
+		t.Fatalf("unstaged mode drift error = %v", err)
 	}
 
 	symlinkRepo := createRecipeRepo(t, dir, "linked", "pkgname=linked\n")
@@ -616,7 +634,7 @@ printf '{"summary":"from final file","risk":"low","findings":[],"uncertainty":""
 		t.Fatalf("report = %#v", report)
 	}
 	args := readString(t, argsFile)
-	for _, want := range []string{"exec --json --ephemeral --sandbox workspace-read --output-last-message "} {
+	for _, want := range []string{"exec --json --ephemeral --sandbox read-only --skip-git-repo-check --output-last-message "} {
 		if !strings.Contains(args, want) {
 			t.Fatalf("args = %q", args)
 		}

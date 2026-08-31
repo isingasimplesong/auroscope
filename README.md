@@ -41,9 +41,10 @@ The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` 
 CGO_ENABLED=1 go test ./...
 go vet ./...
 AUROSCOPE_E2E_DISPOSABLE_ARCH=1 scripts/e2e-disposable-arch.sh
+AUROSCOPE_E2E_SUPPORTED_PARU=1 scripts/e2e-supported-paru.sh
 ```
 
-The disposable script requires Docker and refuses to run unless the disposable guard variable is set. It is a fake-Paru/fake-Codex integration smoke inside a disposable Arch container with private `/tmp/auroscope-e2e-*` package-manager paths. The real supported-version Paru E2E gate from the specification remains unresolved until it runs against the pinned Paru surface.
+Both disposable scripts require Docker and explicit guard variables. The first is a fast fake-Paru/fake-Codex integration smoke. The supported-version gate builds pinned Paru commit `9ac3578807a87858651e81a02586ceb947686e7c`, uses real AUR acquisition/resolution/build and Pacman installation only inside the disposable container, proves the real guard and drift rejection, and confirms that official-only work invokes no Codex audit.
 
 ## Previous design
 
