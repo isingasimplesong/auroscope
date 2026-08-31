@@ -22,4 +22,6 @@ Rules:
 - Superseded ADRs and `docs/archive/pre-llm-first/` are historical evidence, not active requirements.
 - Keep the exact Paru worktree/audit/edit/final-build path grounded in the pinned disposable-Arch contract and rerun its release gate when that boundary changes.
 - Use branches and Forgejo PRs. Never merge, tag, or silently settle a consequential product decision for Mathieu.
-- Decision issues start with `MODE: DECISION`; only Mathieu's exact standalone `GO DECISION` accepts the latest proposal. Executable planning or implementation uses a separate `MODE: EXECUTION` issue.
+- Mathieu may file raw bug reports without a `MODE:` header, labels, acceptance criteria, or routing. Repository agents own triage: inspect the report, gather retrievable context, classify it as execution/decision/information-needed, update it accordingly, and ask Mathieu only for an actual product decision or unavailable essential fact.
+- Decision issues start with `MODE: DECISION`; only Mathieu's exact standalone `GO DECISION` accepts the latest proposal. Agent-triaged executable work uses `MODE: EXECUTION`.
+- Keep the self-hosted Arch/AUR recipe under `packaging/aur/` in this canonical repository. Do not create a dedicated package repository unless Mathieu later accepts that repository-boundary change.

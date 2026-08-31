@@ -35,16 +35,35 @@ The accepted architecture is in [`docs/architecture/minimal-v1.md`](docs/archite
 
 ## Current implementation
 
-The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` and `internal/app`.
+The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` and `internal/app`. Exact Codex CLI versions `0.150.1` and `0.151.0` are supported.
+
+## Install on Arch Linux
+
+The self-hosted AUR-style recipe lives in [`packaging/aur`](packaging/aur). Publication on `aur.archlinux.org` remains deferred.
+
+```console
+# Install Codex by any supported method, for example:
+npm install -g @openai/codex
+
+# Then install AURoscope:
+git clone https://git.2027a.net/2027a/auroscope.git
+cd auroscope/packaging/aur
+makepkg -si
+```
+
+Codex is deliberately not a Pacman dependency: AURoscope uses the `codex` executable found on `PATH`, whether it came from npm, an Arch package, or another installation method. `codex --version` must report an exact supported version, and Codex must be authenticated for the user who runs AURoscope. During the first desktop trial, invoke `auroscope` explicitly rather than replacing `paru` with an alias.
+
+## Development verification
 
 ```console
 CGO_ENABLED=1 go test ./...
 go vet ./...
+packaging/aur/scripts/test-package.sh
 AUROSCOPE_E2E_DISPOSABLE_ARCH=1 scripts/e2e-disposable-arch.sh
 AUROSCOPE_E2E_SUPPORTED_PARU=1 scripts/e2e-supported-paru.sh
 ```
 
-Both disposable scripts require Docker and explicit guard variables. The first is a fast fake-Paru/fake-Codex integration smoke. The supported-version gate builds pinned Paru commit `9ac3578807a87858651e81a02586ceb947686e7c`, uses real AUR acquisition/resolution/build and Pacman installation only inside the disposable container, proves the real guard and drift rejection, and confirms that official-only work invokes no Codex audit.
+The package test and both integration scripts require Docker. The package test builds and installs `packaging/aur/PKGBUILD` in disposable Arch. The first integration script is a fast fake-Paru/fake-Codex smoke. The supported-version gate builds pinned Paru commit `9ac3578807a87858651e81a02586ceb947686e7c`, uses real AUR acquisition/resolution/build and Pacman installation only inside the disposable container, proves the real guard and drift rejection, and confirms that official-only work invokes no Codex audit.
 
 ## Previous design
 
