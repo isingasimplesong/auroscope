@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD013 -->
+
 # AURoscope v1 implementation plan
 
 **Status:** Definitive implementation plan, pending acceptance and merge of [PR #18](https://git.2027a.net/2027a/auroscope/pulls/18). This document is executable guidance, not authorization to write production code. Implementation starts only after this plan is merged and Mathieu explicitly starts the execution loop.
@@ -207,11 +209,17 @@ internal/report
 
 These are domain packages, not interface requirements. Interfaces exist only at nondeterministic boundaries tests must replace: clock/randomness, process execution, model transport, and short store transactions.
 
-This plan intentionally names stable package roots and milestone artifacts rather than preallocating dozens of source files. Each worker chooses the smallest concrete files required by the next failing test and records the resulting paths in the milestone report.
+The milestone file lists below are the concrete initial paths authorized by this plan. A worker may split a listed test file when a failing test proves that a smaller neighbouring file is clearer, but it must not invent a new package boundary or omit listed behavior silently. Any such split is recorded in the milestone report.
 
 Tests live beside their package by default. Use shared `test/contract`, `test/integration`, `test/e2e`, and `testdata` only when a real process or dependency boundary justifies them.
 
 ## 6. Common verification commands
+
+This plan disables Markdown rule MD013 at file scope because exact commands, paths, contract values, and reviewable prose are intentionally kept unwrapped. All other enabled `markdownlint-cli2` rules remain mandatory. Validate the actual file, not stdin:
+
+```console
+npx --yes markdownlint-cli2@0.19.0 docs/implementation/initial-plan.md
+```
 
 After bootstrap, the ordinary local baseline is:
 
@@ -245,6 +253,16 @@ Network/live-provider checks remain opt-in unless they are part of the supported
 - the umbrella `MODE: EXECUTION` issue, `implementation/v1` branch, draft PR, and `v1-status.md` exist;
 - the branch starts from current `origin/main`.
 
+**Exact files:**
+
+- create `go.mod`, `go.sum`, `cmd/auroscope/main.go`, and `cmd/auroscope/main_test.go`;
+- create `internal/cli/classify.go`, `internal/cli/classify_test.go`, and `internal/cli/classify_fuzz_test.go`;
+- create `internal/process/runner.go`, `internal/process/runner_test.go`, `internal/process/group_linux.go`, and `internal/process/group_linux_test.go`;
+- create `internal/paru/version.go`, `internal/paru/version_test.go`, `internal/paru/capability.go`, `internal/paru/capability_test.go`, `internal/paru/order.go`, `internal/paru/order_test.go`, `internal/paru/commands.go`, and `internal/paru/commands_test.go`;
+- create `test/contract/paru_contract_test.go`, `test/contract/pacman_contract_test.go`, `test/contract/run-arch.sh`, and fixtures under `testdata/paru/2.1.0/` and `testdata/paru/post-d1dfbc4/`;
+- create `scripts/check-docs.sh`, `.gitea/workflows/verify.yml`, and `docs/implementation/v1-status.md`;
+- modify `AGENTS.md`, `README.md`, and `docs/design-phase.md` only to record the authorized phase transition and verified developer commands.
+
 **Implement:**
 
 - first update the current-phase statements in `AGENTS.md`, `README.md`, and `docs/design-phase.md` to record the authorized implementation phase without rewriting accepted design history;
@@ -258,6 +276,24 @@ Network/live-provider checks remain opt-in unless they are part of the supported
 - private Paru config and fixed guard probe sufficient to observe the real execution path, including original effective config resolution (`PARU_CONF`, XDG, `/etc/paru.conf`), trusted absolute include, nested/missing includes, repeated `[bin]`, whitespace paths, preservation of user options, and proof that the final fixed `PreBuildCommand` override wins.
 
 **Do not implement:** SQLite, full configuration, scanner catalogue, LLM, status commands, retention, packaging, or reusable artifacts.
+
+**RED:** add one failing test at a time for raw pass-through, rejected local/path inputs, child exit/signal preservation, supported-version grammar, and the disposable execution-closure probe. Observe each expected failure before adding behavior.
+
+**GREEN:** implement only the classifier, process runner, versioned Paru command adapters, and disposable harness needed to make the current focused test pass. If the closure probe cannot observe the actual execution set, stop without creating later packages.
+
+**REFACTOR:** keep `main` wiring-only, retain original argv for transparent flows, and consolidate only command-building or fixture code already duplicated by passing tests.
+
+**Exact verification commands:**
+
+```console
+scripts/check-docs.sh
+CGO_ENABLED=1 go test ./internal/cli ./internal/process ./internal/paru ./test/contract
+CGO_ENABLED=1 go test ./internal/cli -fuzz=FuzzClassify -fuzztime=30s
+test/contract/run-arch.sh
+CGO_ENABLED=1 go build -trimpath ./cmd/auroscope
+go vet ./...
+git diff --check
+```
 
 **Verification:**
 
@@ -282,6 +318,18 @@ Network/live-provider checks remain opt-in unless they are part of the supported
 
 **Definition of Ready:** Milestone 0 is complete and the execution contract needs no design amendment.
 
+**Exact files:**
+
+- create `internal/config/config.go`, `internal/config/config_test.go`, `internal/config/paths.go`, `internal/config/paths_linux_test.go`, `internal/config/editor.go`, and `internal/config/editor_test.go`;
+- create `internal/store/open.go`, `internal/store/open_test.go`, `internal/store/migrate.go`, `internal/store/migrate_test.go`, `internal/store/types.go`, `internal/store/store_test.go`, and `internal/store/migrations/0001_vertical_flow.sql`;
+- create `internal/recipe/aur_rpc.go`, `internal/recipe/aur_rpc_test.go`, `internal/recipe/acquire.go`, `internal/recipe/acquire_test.go`, `internal/recipe/manifest.go`, `internal/recipe/manifest_test.go`, `internal/recipe/diff.go`, and `internal/recipe/diff_test.go`;
+- create `internal/scanner/finding.go`, `internal/scanner/finding_test.go`, `internal/scanner/rules.go`, and `internal/scanner/rules_test.go`;
+- create `internal/report/render.go`, `internal/report/render_test.go`, `internal/report/write.go`, and `internal/report/write_test.go`;
+- create `internal/review/present.go`, `internal/review/present_test.go`, `internal/review/decision.go`, and `internal/review/decision_test.go`;
+- create `internal/approval/identity.go`, `internal/approval/identity_test.go`, `internal/approval/guard.go`, `internal/approval/guard_test.go`, `internal/paru/config.go`, `internal/paru/config_test.go`, `internal/paru/execute.go`, and `internal/paru/execute_test.go`;
+- create `test/integration/explicit_aur_flow_test.go` and fixtures under `testdata/recipes/identity/` and `testdata/recipes/noexec/`;
+- modify `go.mod` and `go.sum` only for the accepted pinned direct dependencies.
+
 **Implement:**
 
 - only the XDG paths, private permissions, viewer fallback, and configuration fields consumed by this milestone;
@@ -297,6 +345,24 @@ Network/live-provider checks remain opt-in unless they are part of the supported
 - one cross-component integration harness reused by later milestones.
 
 Treat Git object IDs as validated opaque identities for the supported AUR contract. Do not build a speculative multi-format Git framework.
+
+**RED:** drive the vertical path with focused failures for private paths, SQLite invariants, bounded AUR RPC, non-executing acquisition, canonical identity, visible evidence, explicit decision, one-shot guard, and forced execution. Add an integration assertion only after its lower boundary has a failing focused test.
+
+**GREEN:** implement the minimum data and calls required for one explicit AUR target with LLM disabled. Persist only rows read by this flow or required by an accepted invariant; never reuse an artifact.
+
+**REFACTOR:** remove duplication along the working vertical path, keep rendered reports non-authoritative, and avoid interfaces outside clock/randomness, process, transport, and short store transactions.
+
+**Exact verification commands:**
+
+```console
+CGO_ENABLED=1 go test ./internal/config ./internal/store ./internal/recipe
+CGO_ENABLED=1 go test ./internal/scanner ./internal/report ./internal/review
+CGO_ENABLED=1 go test ./internal/approval ./internal/paru
+CGO_ENABLED=1 go test ./test/integration -run ExplicitAUR
+CGO_ENABLED=1 go test -race ./...
+go vet ./...
+git diff --check
+```
 
 **Verification:**
 
@@ -318,6 +384,17 @@ Treat Git object IDs as validated opaque identities for the supported AUR contra
 
 **Definition of Ready:** Milestone 1's vertical path is green and remains the integration harness.
 
+**Exact files:**
+
+- create `internal/recipe/manifest_fuzz_test.go`, `internal/recipe/metadata.go`, and `internal/recipe/metadata_test.go`;
+- create `internal/scanner/context.go`, `internal/scanner/context_test.go`, `internal/scanner/context_fuzz_test.go`, and `internal/scanner/benchmark_test.go`;
+- extend `internal/scanner/rules.go` and `internal/scanner/rules_test.go`; populate `testdata/recipes/corpus/benign/`, `testdata/recipes/corpus/suspicious/`, and `testdata/recipes/corpus/manifest.json`;
+- create `internal/report/escape.go`, `internal/report/escape_test.go`, and `internal/report/escape_fuzz_test.go`;
+- create `internal/approval/lifecycle.go`, `internal/approval/lifecycle_test.go`, `internal/approval/process_linux.go`, and `internal/approval/process_linux_test.go`;
+- create `internal/store/migrations/0002_trust_core.sql`, `internal/store/approval.go`, and `internal/store/approval_test.go`;
+- create `test/integration/recipe_noexec_test.go`, `test/integration/approval_concurrency_test.go`, and `test/integration/guard_identity_test.go`;
+- create `scripts/check-corpus.sh`.
+
 **Implement:**
 
 - complete canonical manifest handling required by ADR-0010, including tracked file types, modes, paths, hashes, workspace binding, and visible malformed/oversized cases;
@@ -328,6 +405,26 @@ Treat Git object IDs as validated opaque identities for the supported AUR contra
 - full append-only human decision and approval lifecycle;
 - atomic `armed → claimed → consumed` transitions, expiry, duplicate claim rejection, process/workspace binding, terminal invalidation, and startup orphan handling required by ADR-0010;
 - readable evidence/provenance and terminal escaping.
+
+**RED:** add focused failures for every new manifest component, scanner rule family, context ceiling, terminal escape, lifecycle transition, mutation, and concurrent claim. Add each corpus rule's suspicious fixture and benign control before implementing that rule.
+
+**GREEN:** complete only the identity, scanner, presentation, store, and approval behavior required by the current failing case. Keep technical status, advisory signal, immutable findings, and human decision as separate typed and persisted values.
+
+**REFACTOR:** deduplicate canonical identity and lifecycle checks already exercised by passing tests; keep rule wording factual and keep local-host hardening outside the accepted threat boundary.
+
+**Exact verification commands:**
+
+```console
+CGO_ENABLED=1 go test ./internal/recipe ./internal/scanner ./internal/report ./internal/review
+CGO_ENABLED=1 go test -race ./internal/store ./internal/approval ./test/integration
+CGO_ENABLED=1 go test ./internal/recipe -fuzz=FuzzManifest -fuzztime=30s
+CGO_ENABLED=1 go test ./internal/scanner -fuzz=FuzzContext -fuzztime=30s
+CGO_ENABLED=1 go test ./internal/report -fuzz=FuzzEscape -fuzztime=30s
+scripts/check-corpus.sh
+CGO_ENABLED=1 go test ./...
+go vet ./...
+git diff --check
+```
 
 **Verification:**
 
@@ -349,6 +446,16 @@ Treat Git object IDs as validated opaque identities for the supported AUR contra
 
 **Definition of Ready:** Milestone 2's identity, evidence, decision, and approval boundaries are stable.
 
+**Exact files:**
+
+- create `internal/paru/selection.go`, `internal/paru/selection_test.go`, `internal/paru/plan.go`, `internal/paru/plan_test.go`, `internal/paru/drift.go`, `internal/paru/drift_test.go`, `internal/paru/closure.go`, and `internal/paru/closure_test.go`;
+- create `internal/paru/upgrade.go`, `internal/paru/upgrade_test.go`, `internal/paru/orchestrate.go`, and `internal/paru/orchestrate_test.go`;
+- create `internal/store/migrations/0003_daily_workflow.sql`, `internal/store/transaction.go`, `internal/store/transaction_test.go`, `internal/store/status.go`, and `internal/store/status_test.go`;
+- create `internal/report/status.go` and `internal/report/status_test.go`;
+- modify `internal/cli/command.go`, `internal/cli/command_test.go`, `cmd/auroscope/main.go`, and `cmd/auroscope/main_test.go`;
+- create `test/integration/planning_flow_test.go`, `test/integration/upgrade_flow_test.go`, `test/integration/status_flow_test.go`, and scenario fixtures under `test/integration/scenarios/`;
+- extend `test/contract/paru_contract_test.go` and `testdata/paru/` only with exact supported-version evidence.
+
 **Implement:**
 
 - transparent pass-through with original argv and child status;
@@ -359,6 +466,24 @@ Treat Git object IDs as validated opaque identities for the supported AUR contra
 - bare invocation and `-Syu` as complete official repository phase first, followed only on success by AUR planning/review/execution;
 - `status`, `status --verbose`, `status --json`, `status --markdown`, `held`, and `explain <package>` from SQLite;
 - concise diagnostics and stable AURoscope-owned exit categories while preserving child exit/signal evidence.
+
+**RED:** add one failing command or scenario at a time for pass-through, selection/cancellation, explicit and mixed targets, plan drift, held closure, official-first upgrade ordering, status views, and child outcomes. Prove official failure prevents the AUR phase before implementing the success path.
+
+**GREEN:** compose the existing classifier, process, plan, review, store, approval, and execution boundaries into the smallest state machine that passes the current scenario; never infer or repair resolver output.
+
+**REFACTOR:** share typed plan and status view models while keeping selection, planning, execution, and presentation separate. Preserve original argv and separate wrapper categories from child exit/signal evidence.
+
+**Exact verification commands:**
+
+```console
+CGO_ENABLED=1 go test ./internal/paru ./internal/cli ./internal/store ./internal/report
+CGO_ENABLED=1 go test ./test/contract -run 'Paru|Pacman'
+CGO_ENABLED=1 go test ./test/integration -run 'Planning|Upgrade|Status'
+test/contract/run-arch.sh
+CGO_ENABLED=1 go test -race ./...
+go vet ./...
+git diff --check
+```
 
 **Verification:**
 
@@ -376,6 +501,14 @@ Treat Git object IDs as validated opaque identities for the supported AUR contra
 
 **Definition of Ready:** Milestone 3 works with LLM mode `disabled`.
 
+**Exact files:**
+
+- create `internal/store/migrations/0004_llm_assessments.sql`, `internal/store/llm.go`, and `internal/store/llm_test.go`;
+- create `internal/llm/types.go`, `internal/llm/types_test.go`, `internal/llm/validate_fuzz_test.go`, `internal/llm/select.go`, and `internal/llm/select_test.go`;
+- create `internal/llm/request.go`, `internal/llm/request_test.go`, `internal/llm/http.go`, `internal/llm/http_test.go`, `internal/llm/codex.go`, and `internal/llm/codex_test.go`;
+- create fixtures under `testdata/llm/` and `test/contract/codex_contract_test.go`;
+- modify `internal/config/config.go`, `internal/config/config_test.go`, `internal/report/render.go`, and `internal/report/render_test.go` only for consumed LLM configuration and visibly separate assessment output.
+
 **Implement:**
 
 - only the `[llm]` configuration fields now consumed;
@@ -385,6 +518,26 @@ Treat Git object IDs as validated opaque identities for the supported AUR contra
 - Codex CLI adapter running outside the recipe repository with bounded redacted input;
 - accepted explicit and automatic backend selection, exact default model, timeout/failure behavior, privacy mode, and bounded retention metadata;
 - report integration that keeps deterministic evidence immutable and visibly separate.
+
+**RED:** add failing cases for strict response shape and bounds, prompt injection, redaction canaries, backend precedence, exact `5.6-luna` default, disabled mode, authentication/timeout/refusal/invalid output, and absence of implicit fallback or decision fields.
+
+**GREEN:** implement the shared validator first, then the standard-library HTTP and argv-only Codex transports. Run Codex outside recipe workspaces with only bounded redacted input and persist assessment rows only after validation.
+
+**REFACTOR:** share validation and request construction without merging transport-specific diagnostics; keep the deterministic disabled path free of model dependencies.
+
+**Exact verification commands:**
+
+```console
+CGO_ENABLED=1 go test ./internal/llm ./internal/config ./internal/store ./internal/report
+CGO_ENABLED=1 go test ./internal/llm -fuzz=FuzzValidate -fuzztime=30s
+CGO_ENABLED=1 go test ./test/contract -run Codex
+CGO_ENABLED=1 go test ./test/integration -run 'ExplicitAUR|LLMDisabled'
+CGO_ENABLED=1 go test ./...
+go vet ./...
+git diff --check
+```
+
+The `Codex` contract command is opt-in in ordinary CI and mandatory only in the pinned isolated compatibility job; fake-Codex tests remain deterministic.
 
 **Verification:**
 
@@ -404,6 +557,14 @@ Treat Git object IDs as validated opaque identities for the supported AUR contra
 
 **Definition of Ready:** real lifecycle rows and configuration consumers exist from milestones 1–4.
 
+**Exact files:**
+
+- create `internal/config/retention.go` and `internal/config/retention_test.go`;
+- create `internal/store/backup.go`, `internal/store/backup_test.go`, `internal/store/recover.go`, `internal/store/recover_test.go`, `internal/store/purge.go`, and `internal/store/purge_test.go`;
+- create `internal/recipe/cleanup_linux.go` and `internal/recipe/cleanup_linux_test.go`;
+- modify `internal/cli/command.go` and `internal/cli/command_test.go` for `cleanup` and explicit maintenance operations;
+- create `test/integration/recovery_cleanup_test.go` and fixtures under `test/integration/scenarios/recovery/`.
+
 **Implement:**
 
 - remaining accepted retention configuration and defaults;
@@ -415,6 +576,22 @@ Treat Git object IDs as validated opaque identities for the supported AUR contra
 - maintenance-only `VACUUM` if retained as useful.
 
 Do not add a generic scheduler, daemon, event log, or local-host hardening suite. Cleanup and recovery protect ordinary correctness under the accepted trusted-local-account model.
+
+**RED:** add focused failures for each finite retention default, backup/restore, `quick_check`, terminal-state cleanup, active-session preservation, 24-hour stale recovery, descriptor-relative no-follow removal, referenced-state preservation, age/quota pruning, and idempotent restart.
+
+**GREEN:** implement only startup/explicit maintenance needed by those tests, using recorded state plus UID, device/inode, PID/start-time, and direct-child checks. Never derive recursive deletion authority from package or marker text.
+
+**REFACTOR:** centralize terminal cleanup and pure purge decisions while keeping deletion mechanics Linux-specific and keeping reports/cache distinct from authoritative state.
+
+**Exact verification commands:**
+
+```console
+CGO_ENABLED=1 go test ./internal/config ./internal/store ./internal/recipe ./internal/cli
+CGO_ENABLED=1 go test -race ./test/integration -run RecoveryCleanup
+CGO_ENABLED=1 go test -race ./...
+go vet ./...
+git diff --check
+```
 
 **Verification:**
 
@@ -434,6 +611,14 @@ Do not add a generic scheduler, daemon, event log, or local-host hardening suite
 
 **Definition of Ready:** milestones 0–5 are complete with no unresolved design blocker.
 
+**Exact files:**
+
+- create `packaging/arch/PKGBUILD`, `scripts/build-arch.sh`, and `scripts/check-package.sh`;
+- create `test/e2e/run-arch.sh`, `test/e2e/guard-host.sh`, `test/e2e/e2e_test.go`, and synthetic fixtures under `test/e2e/fixtures/`;
+- create `docs/compatibility.md`, `docs/security-model.md`, and `docs/release-checklist.md`;
+- modify `README.md` only with verified installation/support boundaries;
+- extend `.gitea/workflows/verify.yml` and create `.gitea/workflows/release.yml`.
+
 **Implement:**
 
 - self-hosted AUR-style `packaging/arch/PKGBUILD` for Arch `linux/amd64`;
@@ -445,6 +630,28 @@ Do not add a generic scheduler, daemon, event log, or local-host hardening suite
 - final disposable-Arch E2E using synthetic repository/AUR fixtures.
 
 Do not publish to `aur.archlinux.org`, tag a release, or merge the PR autonomously.
+
+**RED:** make packaging checks fail before required metadata, dependency classes, install layout, SQLite runtime evidence, and source identity exist. Make the E2E host guard reject real roots/caches before adding failing assertions for each benign, suspicious, decision, drift, and official-failure scenario.
+
+**GREEN:** produce the minimal self-hosted package, release checks, compatibility documents, and synthetic disposable-Arch path needed to pass each current assertion. Keep Go/C as build dependencies and preserve the wording “reviewed”, never “safe”.
+
+**REFACTOR:** remove duplicate harness setup without weakening explicit private-root checks; keep packaging outside application runtime and avoid bespoke SBOM or release frameworks.
+
+**Exact verification commands:**
+
+```console
+scripts/check-docs.sh
+scripts/build-arch.sh
+scripts/check-package.sh
+test/contract/run-arch.sh
+test/e2e/guard-host.sh
+test/e2e/run-arch.sh
+CGO_ENABLED=1 go test ./...
+CGO_ENABLED=1 go test -race ./...
+go vet ./...
+test -z "$(git ls-files -z '*.go' | xargs -0 -r gofmt -l)"
+git diff --check
+```
 
 **Verification:**
 
@@ -462,7 +669,7 @@ Do not publish to `aur.archlinux.org`, tag a release, or merge the PR autonomous
 ## 8. Checkpoints and requirement traceability
 
 | Boundary | Primary milestone(s) |
-|---|---|
+| --- | --- |
 | ADR-0001 — Go and self-hosted Arch packaging | 0, 6 |
 | ADR-0002 — native Paru selection | 0, 3 |
 | ADR-0003 — multi-stage orchestration | 0, 1, 3 |
