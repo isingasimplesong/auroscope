@@ -42,7 +42,7 @@ EOF
   pacman --noconfirm -U "$root"/*.pkg.tar.zst
 }
 
-install_test_dependency paru 2.1.0 '  install -Dm755 /dev/stdin "$pkgdir/usr/bin/paru" <<"SCRIPT"
+install_test_dependency paru-git 2.1.0.r67.g9ac3578 '  install -Dm755 /dev/stdin "$pkgdir/usr/bin/paru" <<"SCRIPT"
 #!/bin/sh
 if [ "${1:-}" = "--version" ]; then
   echo "paru v2.1.0"
@@ -64,12 +64,15 @@ chmod 0755 /usr/local/bin/codex
 
 cp -a /package-source /work/package
 chown -R builder:builder /work/package
+sudo -u builder -- bash -lc 'cd /work/package && makepkg --printsrcinfo > /tmp/generated.SRCINFO'
+cmp /work/package/.SRCINFO /tmp/generated.SRCINFO
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfirm'
 pacman --noconfirm -U /work/package/auroscope-*.pkg.tar.zst
 
 pacman -Q auroscope
 printf '%s\n' 'checking declared runtime dependencies'
-missing=$(pacman -T git glibc 'paru>=2.1.0' || true)
+pacman -Qi auroscope | grep '^Depends On' | grep -qw 'paru-git'
+missing=$(pacman -T git glibc paru-git || true)
 [ -z "$missing" ] || {
   printf 'unsatisfied package dependencies:\n%s\n' "$missing" >&2
   exit 1

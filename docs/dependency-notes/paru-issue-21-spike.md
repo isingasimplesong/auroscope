@@ -112,3 +112,9 @@ Both commands exited `0`. The complete `PreBuildCommand` log had the same SHA-25
 5. Commit an edited worktree locally, recompute its complete identity, and rerun Codex before approval.
 6. Relaunch Paru with approved targets only, a transaction-private `PreBuildCommand`, and `--skipreview`; the hook rejects unknown or changed worktrees.
 7. Let Paru perform the fresh final resolution, makepkg build, and Pacman installation. Official-only commands bypass all audit machinery.
+
+## Packaging implication verified for issue #34
+
+On 2026-09-03, the exact stable tag `70f66dc9eddb40e264ee6c9197541262b7792c9c` was rebuilt in the pinned disposable Arch image. `printf '1\n' | paru -Ssaq --interactive hello` returned status `1`, wrote the complete localized menu, prompt, and final `hello` target to stdout, and wrote nothing to stderr. This reproduces the silent `auroscope <terms>` report: AURoscope correctly captures stdout as the machine stream, but stable Paru puts the human UI there too.
+
+The self-hosted AURoscope package must therefore depend explicitly on `paru-git`, not `paru>=2.1.0`. The latter both advertises an unsupported stable package and is not satisfied by AUR `paru-git`'s unversioned `provides=('paru')`. Bootstrap instructions must install `paru-git` before running `makepkg -si`, because Pacman cannot resolve an AUR dependency by itself.
