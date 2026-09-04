@@ -5,11 +5,11 @@ Self-hosted AUR-style package recipe for AURoscope. Publication on `aur.archlinu
 ## Prerequisites
 
 - Arch Linux `x86_64`;
-- `paru-git` with Paru's post-2.1 interactive-output fix and machine order records;
+- a package providing `paru` with Paru's post-2.1 interactive-output fix and machine order records (currently `paru-git`);
 - a supported Codex CLI executable available as `codex` on `PATH`;
 - Codex authenticated for the user who runs AURoscope.
 
-AURoscope's currently tested Paru surface is commit `9ac3578807a87858651e81a02586ceb947686e7c`. Stable Paru 2.1.0 is not compatible because it mixes the interactive human menu and selected targets on stdout. The package depends on `paru-git` by name rather than accepting stable `paru` and failing silently during search.
+AURoscope's currently tested Paru surface is commit `9ac3578807a87858651e81a02586ceb947686e7c`. Stable Paru 2.1.0 is not compatible because it mixes the interactive human menu and selected targets on stdout. The package depends on the virtual `paru` capability so an already installed compatible provider such as `paru-git` satisfies `makepkg`. Pacman cannot fetch an absent AUR provider, so install one before bootstrapping AURoscope. AURoscope validates the required selection and order behavior when used and fails closed on incompatible output; neither the provider package name nor `paru --version` alone distinguishes the required post-release surface.
 
 AURoscope currently accepts the exact Codex CLI versions `0.150.1` and `0.151.0`. Codex is deliberately **not** a Pacman dependency: an installation from npm, an Arch package, or another method works equally as long as `codex --version` reports a supported version.
 
@@ -65,6 +65,6 @@ The test builds and installs the package inside disposable Arch, validates its d
 
 ## Upstream snapshot
 
-This recipe pins immutable AURoscope commit `7311508ca25f68755189e9007b976805006af677`, including the complete-context unchanged-recipe audit fix from issue #36. Package release 2 corrects the runtime dependency to `paru-git`; the executable source is unchanged from release 1 of this snapshot. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the executable snapshot.
+This recipe pins immutable AURoscope commit `7311508ca25f68755189e9007b976805006af677`, including the complete-context unchanged-recipe audit fix from issue #36. Package release 3 expresses Paru as the virtual `paru` runtime capability so compatible providers satisfy `makepkg`; the executable source is unchanged from release 1 of this snapshot. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the executable snapshot.
 
 Upstream has not yet declared a software license. `LicenseRef-Unspecified` records that fact; it must be replaced when upstream adopts a license.

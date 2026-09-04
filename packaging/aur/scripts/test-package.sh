@@ -33,6 +33,7 @@ pkgrel=1
 pkgdesc='Disposable AURoscope package-test dependency'
 arch=('any')
 license=('LicenseRef-Test-Only')
+provides=('paru')
 package() {
 $body
 }
@@ -66,13 +67,14 @@ cp -a /package-source /work/package
 chown -R builder:builder /work/package
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --printsrcinfo > /tmp/generated.SRCINFO'
 cmp /work/package/.SRCINFO /tmp/generated.SRCINFO
+grep -Fx $'\tdepends = paru' /tmp/generated.SRCINFO
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfirm'
 pacman --noconfirm -U /work/package/auroscope-*.pkg.tar.zst
 
 pacman -Q auroscope
 printf '%s\n' 'checking declared runtime dependencies'
-pacman -Qi auroscope | grep '^Depends On' | grep -qw 'paru-git'
-missing=$(pacman -T git glibc paru-git || true)
+pacman -Qi auroscope | grep '^Depends On' | grep -qw 'paru'
+missing=$(pacman -T git glibc paru || true)
 [ -z "$missing" ] || {
   printf 'unsatisfied package dependencies:\n%s\n' "$missing" >&2
   exit 1
