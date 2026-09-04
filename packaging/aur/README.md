@@ -5,9 +5,11 @@ Self-hosted AUR-style package recipe for AURoscope. Publication on `aur.archlinu
 ## Prerequisites
 
 - Arch Linux `x86_64`;
-- Paru 2.1.0 or a compatible package providing `paru`;
+- `paru-git` with Paru's post-2.1 interactive-output fix and machine order records;
 - a supported Codex CLI executable available as `codex` on `PATH`;
 - Codex authenticated for the user who runs AURoscope.
+
+AURoscope's currently tested Paru surface is commit `9ac3578807a87858651e81a02586ceb947686e7c`. Stable Paru 2.1.0 is not compatible because it mixes the interactive human menu and selected targets on stdout. The package depends on `paru-git` by name rather than accepting stable `paru` and failing silently during search.
 
 AURoscope currently accepts the exact Codex CLI versions `0.150.1` and `0.151.0`. Codex is deliberately **not** a Pacman dependency: an installation from npm, an Arch package, or another method works equally as long as `codex --version` reports a supported version.
 
@@ -24,6 +26,7 @@ paru -S openai-codex-bin
 Bootstrap the package without asking AURoscope to audit itself:
 
 ```console
+paru -S paru-git
 git clone https://git.2027a.net/2027a/auroscope.git
 cd auroscope/packaging/aur
 makepkg -si
@@ -62,6 +65,6 @@ The test builds and installs the package inside disposable Arch, validates its d
 
 ## Upstream snapshot
 
-This recipe pins immutable AURoscope commit `7311508ca25f68755189e9007b976805006af677`, including the complete-context unchanged-recipe audit fix from issue #36. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the package.
+This recipe pins immutable AURoscope commit `7311508ca25f68755189e9007b976805006af677`, including the complete-context unchanged-recipe audit fix from issue #36. Package release 2 corrects the runtime dependency to `paru-git`; the executable source is unchanged from release 1 of this snapshot. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the executable snapshot.
 
 Upstream has not yet declared a software license. `LicenseRef-Unspecified` records that fact; it must be replaced when upstream adopts a license.

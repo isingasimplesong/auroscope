@@ -2,7 +2,7 @@
 
 pkgname=auroscope
 pkgver=0.1.0.r3.g7311508
-pkgrel=1
+pkgrel=2
 pkgdesc='LLM-first safety review wrapper around Paru and Pacman'
 arch=('x86_64')
 url='https://git.2027a.net/2027a/auroscope'
@@ -10,7 +10,7 @@ license=('LicenseRef-Unspecified')
 depends=(
   'git'
   'glibc'
-  'paru>=2.1.0'
+  'paru-git'
 )
 makedepends=(
   'gcc'

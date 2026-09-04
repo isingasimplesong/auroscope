@@ -46,13 +46,17 @@ The self-hosted AUR-style recipe lives in [`packaging/aur`](packaging/aur). Publ
 # Install Codex by any supported method, for example:
 npm install -g @openai/codex
 
-# Then install AURoscope:
+# Replace stable Paru 2.1.0 with the current paru-git package. AURoscope needs
+# Paru's post-2.1 interactive-output fix and machine order records.
+paru -S paru-git
+
+# Then bootstrap AURoscope without asking it to audit itself:
 git clone https://git.2027a.net/2027a/auroscope.git
 cd auroscope/packaging/aur
 makepkg -si
 ```
 
-Codex is deliberately not a Pacman dependency: AURoscope uses the `codex` executable found on `PATH`, whether it came from npm, an Arch package, or another installation method. `codex --version` must report an exact supported version, and Codex must be authenticated for the user who runs AURoscope. During the first desktop trial, invoke `auroscope` explicitly rather than replacing `paru` with an alias.
+Stable Paru 2.1.0 is not compatible: its interactive search writes the human menu and selected targets to the same stream, so AURoscope cannot recover the selection without parsing localized UI. The package therefore depends explicitly on `paru-git`; the currently tested Paru surface is commit `9ac3578807a87858651e81a02586ceb947686e7c`. Codex is deliberately not a Pacman dependency: AURoscope uses the `codex` executable found on `PATH`, whether it came from npm, an Arch package, or another installation method. `codex --version` must report an exact supported version, and Codex must be authenticated for the user who runs AURoscope. During the first desktop trial, invoke `auroscope` explicitly rather than replacing `paru` with an alias.
 
 ## Development verification
 
