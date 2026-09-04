@@ -76,6 +76,8 @@ func TestAuditPromptScopesRiskToPackaging(t *testing.T) {
 		"official upstream",
 		"first full audit",
 		"do not list inability to inspect upstream binary internals",
+		"mode is unchanged",
+		"low rather than unknown",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("audit prompt missing %q:\n%s", want, prompt)
