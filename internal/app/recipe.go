@@ -65,20 +65,24 @@ func buildAuditBundle(pkgbase, dir string, previous *packageBaseline) (auditBund
 	}
 	if previous != nil && previous.Commit != "" {
 		bundle.PreviousCommit = previous.Commit
-		bundle.Mode = "diff"
-		diff, err := gitOutput(dir, "diff", "--no-ext-diff", previous.Commit+"..HEAD")
-		if err != nil {
-			return auditBundle{}, fmt.Errorf("build recipe diff: %w", err)
+		if previous.Commit == identity.Commit && previous.ManifestDigest == identity.ManifestDigest {
+			bundle.Mode = "unchanged"
+		} else {
+			bundle.Mode = "diff"
+			diff, err := gitOutput(dir, "diff", "--no-ext-diff", previous.Commit, "--")
+			if err != nil {
+				return auditBundle{}, fmt.Errorf("build recipe diff: %w", err)
+			}
+			if len(diff) > maxRecipeDiffBytes {
+				return auditBundle{}, fmt.Errorf("recipe diff exceeds %d bytes", maxRecipeDiffBytes)
+			}
+			bundle.Diff = diff
+			files, err = changedRecipeFiles(dir, previous.Commit, manifestFiles)
+			if err != nil {
+				return auditBundle{}, err
+			}
+			bundle.Files = files
 		}
-		if len(diff) > maxRecipeDiffBytes {
-			return auditBundle{}, fmt.Errorf("recipe diff exceeds %d bytes", maxRecipeDiffBytes)
-		}
-		bundle.Diff = diff
-		files, err = changedRecipeFiles(dir, previous.Commit, manifestFiles)
-		if err != nil {
-			return auditBundle{}, err
-		}
-		bundle.Files = files
 	}
 	for _, file := range manifestFiles {
 		if file.Path == ".SRCINFO" {
@@ -193,7 +197,7 @@ func parseTrackedFileEntry(entry string) (string, string, error) {
 }
 
 func changedRecipeFiles(dir, previousCommit string, manifestFiles []recipeFile) ([]recipeFile, error) {
-	output, err := gitOutput(dir, "diff", "--name-only", "-z", previousCommit+"..HEAD")
+	output, err := gitOutput(dir, "diff", "--name-only", "-z", previousCommit, "--")
 	if err != nil {
 		return nil, fmt.Errorf("list changed recipe files: %w", err)
 	}

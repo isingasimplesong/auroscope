@@ -65,6 +65,6 @@ The test builds and installs the package inside disposable Arch, validates its d
 
 ## Upstream snapshot
 
-This recipe pins immutable AURoscope commit `6e02c6ddf27ae398ebea3025758b894e526b2eff`, including the compact interactive review and packaging-focused Codex audit contract from issue #31. Package release 2 corrects the runtime dependency to `paru-git`; the executable source is unchanged. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the executable snapshot.
+This recipe pins immutable AURoscope commit `7311508ca25f68755189e9007b976805006af677`, including the complete-context unchanged-recipe audit fix from issue #36. Package release 2 corrects the runtime dependency to `paru-git`; the executable source is unchanged from release 1 of this snapshot. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the executable snapshot.
 
 Upstream has not yet declared a software license. `LicenseRef-Unspecified` records that fact; it must be replaced when upstream adopts a license.

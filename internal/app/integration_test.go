@@ -44,10 +44,10 @@ func TestApprovedAURPackageEndToEndWithFirstAudit(t *testing.T) {
 		t.Fatalf("calls = %s", callsText)
 	}
 	if !strings.Contains(stdout.String(), "AURoscope: acquiring AUR recipe hello with Paru...") ||
-		!strings.Contains(stdout.String(), "AURoscope: auditing hello with Codex (timeout 5m0s)...") ||
-		!strings.Contains(stdout.String(), "AUR audit: hello") ||
-		!strings.Contains(stdout.String(), "Assessment: looks bounded") ||
-		!strings.Contains(stdout.String(), "Risk: low") {
+		!strings.Contains(stdout.String(), "\nAURoscope: auditing hello with Codex (timeout 5m0s)...\n\n") ||
+		!strings.Contains(stdout.String(), "AUR audit: hello\n\n") ||
+		!strings.Contains(stdout.String(), "Assessment: looks bounded\n\n") ||
+		!strings.Contains(stdout.String(), "Risk: low\n\n") {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 	for _, unwanted := range []string{"commit:", "manifest:", "Inspect:", "Diff:"} {
@@ -211,6 +211,61 @@ func TestDifferentialAuditUsesSuccessfulBaseline(t *testing.T) {
 	}
 	if len(bundle.Files) != 1 || bundle.Files[0].Path != "PKGBUILD" {
 		t.Fatalf("differential bundle files = %#v, want only changed complete files", bundle.Files)
+	}
+}
+
+func TestUnchangedAuditSuppliesCompleteRecipeContext(t *testing.T) {
+	dir := t.TempDir()
+	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\npkgver=1\n")
+	identity, files, err := readRecipeIdentity("hello", repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bundle, err := buildAuditBundle("hello", repo, &packageBaseline{
+		Commit:         identity.Commit,
+		ManifestDigest: identity.ManifestDigest,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.Mode != "unchanged" || bundle.PreviousCommit != identity.Commit || bundle.Diff != "" {
+		t.Fatalf("bundle identity state = %#v", bundle)
+	}
+	if !reflect.DeepEqual(bundle.Files, files) {
+		t.Fatalf("unchanged bundle files = %#v, want complete recipe %#v", bundle.Files, files)
+	}
+	if bundle.SRCINFO == "" {
+		t.Fatal("unchanged bundle omitted .SRCINFO")
+	}
+}
+
+func TestDifferentialAuditIncludesSameCommitWorktreeChanges(t *testing.T) {
+	dir := t.TempDir()
+	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\npkgver=1\n")
+	baseline, _, err := readRecipeIdentity("hello", repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "PKGBUILD"), []byte("pkgname=hello\npkgver=1\npkgrel=2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	bundle, err := buildAuditBundle("hello", repo, &packageBaseline{
+		Commit:         baseline.Commit,
+		ManifestDigest: baseline.ManifestDigest,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.Mode != "diff" || bundle.Identity.Commit != baseline.Commit || bundle.Identity.ManifestDigest == baseline.ManifestDigest {
+		t.Fatalf("bundle identity state = %#v", bundle)
+	}
+	if !strings.Contains(bundle.Diff, "pkgrel=2") {
+		t.Fatalf("bundle diff omitted worktree change: %q", bundle.Diff)
+	}
+	if len(bundle.Files) != 1 || bundle.Files[0].Path != "PKGBUILD" {
+		t.Fatalf("differential bundle files = %#v, want changed PKGBUILD", bundle.Files)
 	}
 }
 

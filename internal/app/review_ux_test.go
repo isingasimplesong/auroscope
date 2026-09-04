@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDecisionMenuAcceptsNumbersInitialsAndWords(t *testing.T) {
@@ -34,7 +35,7 @@ func TestDecisionMenuAcceptsNumbersInitialsAndWords(t *testing.T) {
 	}
 }
 
-func TestDecisionMenuNamesFullReportAndShowsCompactAliases(t *testing.T) {
+func TestDecisionMenuNamesFullReportAndShowsMnemonicChoices(t *testing.T) {
 	var stdout bytes.Buffer
 	got := askDecision(
 		bufio.NewReader(strings.NewReader("1\n")),
@@ -44,10 +45,29 @@ func TestDecisionMenuNamesFullReportAndShowsCompactAliases(t *testing.T) {
 	if got != "approve" {
 		t.Fatalf("decision = %q", got)
 	}
-	for _, want := range []string{"[1/a] approve", "[2/i] inspect full report", "[3/e] edit and re-audit", "[4/s] skip", "[5/c] cancel"} {
-		if !strings.Contains(stdout.String(), want) {
-			t.Fatalf("menu missing %q:\n%s", want, stdout.String())
-		}
+	want := "Decision : [a]pprove | [i]nspect full report | [e]dit and re-audit | [s]kip | [c]ancel "
+	if stdout.String() != want {
+		t.Fatalf("menu = %q, want %q", stdout.String(), want)
+	}
+}
+
+func TestReviewSummarySeparatesSections(t *testing.T) {
+	var stdout bytes.Buffer
+	printReviewSummary(runConfig{stdout: &stdout}, "hello", auditReport{Summary: "packaging looks conventional", Risk: "low"})
+
+	want := "AUR audit: hello\n\nAssessment: packaging looks conventional\n\nRisk: low\n\n"
+	if stdout.String() != want {
+		t.Fatalf("summary = %q, want %q", stdout.String(), want)
+	}
+}
+
+func TestCodexProgressSeparatesUpdates(t *testing.T) {
+	var stdout bytes.Buffer
+	printCodexProgress(&stdout, 15*time.Second)
+
+	want := "AURoscope: Codex audit still running (15s elapsed)...\n\n"
+	if stdout.String() != want {
+		t.Fatalf("progress = %q, want %q", stdout.String(), want)
 	}
 }
 
@@ -76,6 +96,8 @@ func TestAuditPromptScopesRiskToPackaging(t *testing.T) {
 		"official upstream",
 		"first full audit",
 		"do not list inability to inspect upstream binary internals",
+		"mode is unchanged",
+		"low rather than unknown",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("audit prompt missing %q:\n%s", want, prompt)
