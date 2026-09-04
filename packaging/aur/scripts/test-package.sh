@@ -101,5 +101,65 @@ if sudo -u builder -- env HOME=/home/builder /usr/bin/auroscope __guard /does/no
 fi
 grep -F 'auroscope guard:' /tmp/guard.err
 
+printf '%s\n' 'checking installed review UX'
+cat >/tmp/package-test-codex <<'SCRIPT'
+#!/bin/sh
+set -eu
+if [ "${1:-}" = "--version" ]; then
+  echo 'codex-cli 0.151.0'
+  exit 0
+fi
+out=''
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = '--output-last-message' ]; then
+    shift
+    out=$1
+  fi
+  shift || true
+done
+[ -n "$out" ]
+printf '%s' '{"summary":"packaging looks conventional","risk":"low","findings":[],"uncertainty":"","inspect":[]}' >"$out"
+SCRIPT
+chmod 0755 /tmp/package-test-codex
+
+cat >/tmp/package-test-paru <<'SCRIPT'
+#!/bin/sh
+set -eu
+if [ "${1:-} ${2:-}" = '-P --order' ]; then
+  printf '%s\n' 'AUR TARGET hello hello'
+  exit 0
+fi
+if [ "${1:-}" = '-G' ]; then
+  mkdir -p "$PWD/$2"
+  cd "$PWD/$2"
+  git init -q
+  git config user.name PackageTest
+  git config user.email package-test@example.invalid
+  printf 'pkgname=hello\npkgver=1\npkgrel=1\n' >PKGBUILD
+  printf 'pkgbase = hello\n' >.SRCINFO
+  git add PKGBUILD .SRCINFO
+  git commit -qm initial
+fi
+exit 0
+SCRIPT
+chmod 0755 /tmp/package-test-paru
+
+rm -rf /tmp/package-test-clones /tmp/package-test-state.sqlite3
+review_output=$(printf 'approve\n' | sudo -u builder -- env \
+  HOME=/home/builder \
+  AUROSCOPE_PARU=/tmp/package-test-paru \
+  AUROSCOPE_CODEX=/tmp/package-test-codex \
+  AUROSCOPE_STATE=/tmp/package-test-state.sqlite3 \
+  AUROSCOPE_CLONE_DIR=/tmp/package-test-clones \
+  /usr/bin/auroscope -S hello)
+expected_review=$'AURoscope: auditing hello with Codex (timeout 5m0s)...\n\nAUR audit: hello\n\nAssessment: packaging looks conventional\n\nRisk: low\n\nDecision : [a]pprove | [i]nspect full report | [e]dit and re-audit | [s]kip | [c]ancel '
+case "$review_output" in
+  *"$expected_review"*) ;;
+  *)
+    printf 'installed review UX mismatch:\n%s\n' "$review_output" >&2
+    exit 1
+    ;;
+esac
+
 echo 'AURoscope package build/install smoke passed'
 BASH
