@@ -23,6 +23,7 @@ AURoscope must preserve Paru's native selection and resolver while obtaining a m
 8. `paru -P --order` is not a stable machine protocol today: `v2.1.0` documents/prints `INSTALL ...` repository records, while post-release `master` commit `9ac3578` prints `REPO ...` from `src/order.rs` and its man page still documents `INSTALL`. The adapter must be version/capability-gated and reject unknown records.
 9. `paru -B` calls makepkg `--printsrcinfo` while constructing its local PKGBUILD repository, before `PreBuildCommand`. Configured PKGBUILD repositories may likewise generate `.SRCINFO` when absent or forced. Paru also special-cases any sync target beginning `./` before normal mode handling. V1 must reject local/path-like targets before starting Paru and reset config mode with trusted CLI flags.
 10. A generated Paru config can include the original effective config and then override `PreBuildCommand` in a final `[bin]` section; a disposable build spike confirmed the later command won.
+11. Pacman 7.1 cannot replace installed `paru 2.1.0` with the absent AUR-only `paru-git` provider while installing an AURoscope package that both depends on `paru` and conflicts with `paru<=2.1.0`: accepting removal leaves the dependency unsatisfied and aborts the transaction. The provider replacement must be a separate AUR-helper transaction. The self-hosted recipe checks this exact installed package in `prepare()` so `makepkg -si` fails before the Go build with an actionable remediation, while package metadata retains the conflict as the final installation guard.
 
 ## Disposable verification
 
@@ -32,6 +33,7 @@ AURoscope must preserve Paru's native selection and resolver while obtaining a m
 - `paru -P --order paru` at `9ac3578` emitted `REPO ...` and `AUR ...`; with synced databases it exited `0`, while absent repository metadata produced `MISSING ...` records and exit `1`.
 - A benign local `paru -B` with layered config confirmed the final `PreBuildCommand` override, but Paru generated `.SRCINFO` through makepkg before that hook.
 - A configured marker-writing PKGBUILD repository with `PkgbuildsOnly` and `GenerateSrcinfo` remained unexecuted when trusted CLI flags `--repo --mode=aur` were injected; the marker was absent, confirming config mode was reset then limited to repo+AUR on commit `9ac3578`.
+- In the pinned Arch package gate, an installed disposable `paru 2.1.0-1` satisfied `depends=('paru')`; the AURoscope recipe then rejected it during `prepare()` before creating an archive. After a separate replacement with a disposable `paru-git` package providing `paru`, the same recipe built and installed successfully.
 
 ## Current use under ADR-0015
 

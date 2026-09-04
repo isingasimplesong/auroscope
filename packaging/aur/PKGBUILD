@@ -2,7 +2,7 @@
 
 pkgname=auroscope
 pkgver=0.1.0.r4.gd0ad113
-pkgrel=2
+pkgrel=3
 pkgdesc='LLM-first safety review wrapper around Paru and Pacman'
 arch=('x86_64')
 url='https://git.2027a.net/2027a/auroscope'
@@ -24,6 +24,18 @@ source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/${_commit}.tar.gz")
 sha256sums=('d9607b11a1daa2dd79be7e1535596abc5fbb949c55c2d4553ca3555c054ab699')
 
 prepare() {
+  local installed package_name paru_version
+
+  if installed=$(pacman -Q paru 2>/dev/null); then
+    package_name=${installed%% *}
+    paru_version=${installed#* }
+    if [[ $package_name == paru ]] && (( $(vercmp "$paru_version" '2.1.0') <= 0 )); then
+      printf '%s\n' \
+        'auroscope: incompatible stable Paru is installed; install paru-git first, then rerun makepkg -si' >&2
+      return 1
+    fi
+  fi
+
   cd "$srcdir/auroscope"
   mkdir -p build
 }

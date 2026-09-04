@@ -73,11 +73,14 @@ sudo -u builder -- bash -lc 'cd /work/package && makepkg --printsrcinfo > /tmp/g
 cmp /work/package/.SRCINFO /tmp/generated.SRCINFO
 grep -Fx $'\tdepends = paru' /tmp/generated.SRCINFO
 grep -Fx $'\tconflicts = paru<=2.1.0' /tmp/generated.SRCINFO
-sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfirm'
-
-printf '%s\n' 'checking rejection of stable Paru 2.1.0'
-if pacman --noconfirm -U /work/package/auroscope-*.pkg.tar.zst; then
-  echo 'AURoscope unexpectedly installed beside incompatible stable Paru' >&2
+printf '%s\n' 'checking fail-fast remediation for stable Paru 2.1.0'
+if sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfirm' >/tmp/stable-build.out 2>/tmp/stable-build.err; then
+  echo 'AURoscope unexpectedly built with incompatible stable Paru installed' >&2
+  exit 1
+fi
+grep -F 'install paru-git first, then rerun makepkg -si' /tmp/stable-build.err
+if compgen -G '/work/package/auroscope-*.pkg.tar.zst' >/dev/null; then
+  echo 'AURoscope package artifact exists after the incompatible-provider check' >&2
   exit 1
 fi
 pacman -Q paru
@@ -88,6 +91,7 @@ fi
 
 pacman --noconfirm -R paru
 install_test_dependency paru-git 2.1.0.r67.g9ac3578 "$paru_stub"
+sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfirm'
 pacman --noconfirm -U /work/package/auroscope-*.pkg.tar.zst
 
 pacman -Q auroscope
