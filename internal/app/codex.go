@@ -217,10 +217,14 @@ func runCodexCommand(cmd *exec.Cmd, signals <-chan os.Signal, timeout time.Durat
 			return fmt.Errorf("timed out after %s", timeout)
 		case <-progressTicker.C:
 			if progress != nil {
-				fmt.Fprintf(progress, "AURoscope: Codex audit still running (%s elapsed)...\n", time.Since(started).Round(time.Second))
+				printCodexProgress(progress, time.Since(started))
 			}
 		}
 	}
+}
+
+func printCodexProgress(progress io.Writer, elapsed time.Duration) {
+	fmt.Fprintf(progress, "AURoscope: Codex audit still running (%s elapsed)...\n\n", elapsed.Round(time.Second))
 }
 
 func waitForCodexStop(pid int, wait <-chan error) {
