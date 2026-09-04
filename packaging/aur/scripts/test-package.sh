@@ -43,7 +43,7 @@ EOF
   pacman --noconfirm -U "$root"/*.pkg.tar.zst
 }
 
-install_test_dependency paru-git 2.1.0.r67.g9ac3578 '  install -Dm755 /dev/stdin "$pkgdir/usr/bin/paru" <<"SCRIPT"
+paru_stub='  install -Dm755 /dev/stdin "$pkgdir/usr/bin/paru" <<"SCRIPT"
 #!/bin/sh
 if [ "${1:-}" = "--version" ]; then
   echo "paru v2.1.0"
@@ -51,6 +51,10 @@ if [ "${1:-}" = "--version" ]; then
 fi
 printf "%s\\n" "$*"
 SCRIPT'
+
+# Stable Paru satisfies the virtual dependency but is the exact package version
+# whose broken stdout redirection made interactive search silent in issue #34.
+install_test_dependency paru 2.1.0 "$paru_stub"
 
 # Simulate Codex installed outside Pacman (for example through npm).
 cat >/usr/local/bin/codex <<'SCRIPT'
@@ -68,7 +72,22 @@ chown -R builder:builder /work/package
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --printsrcinfo > /tmp/generated.SRCINFO'
 cmp /work/package/.SRCINFO /tmp/generated.SRCINFO
 grep -Fx $'\tdepends = paru' /tmp/generated.SRCINFO
+grep -Fx $'\tconflicts = paru<=2.1.0' /tmp/generated.SRCINFO
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfirm'
+
+printf '%s\n' 'checking rejection of stable Paru 2.1.0'
+if pacman --noconfirm -U /work/package/auroscope-*.pkg.tar.zst; then
+  echo 'AURoscope unexpectedly installed beside incompatible stable Paru' >&2
+  exit 1
+fi
+pacman -Q paru
+if pacman -Q auroscope >/dev/null 2>&1; then
+  echo 'AURoscope remained installed after the incompatible-provider check' >&2
+  exit 1
+fi
+
+pacman --noconfirm -R paru
+install_test_dependency paru-git 2.1.0.r67.g9ac3578 "$paru_stub"
 pacman --noconfirm -U /work/package/auroscope-*.pkg.tar.zst
 
 pacman -Q auroscope
