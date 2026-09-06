@@ -56,6 +56,36 @@ if [[ "${AUROSCOPE_E2E_SELECTION_ONLY:-0}" == 1 ]]; then
   exit 0
 fi
 
+# Install the pinned recipe, not the independently built source binary. Package
+# the real compiled Paru as a disposable provider so Pacman checks dependencies.
+install -d -m 0755 -o builder -g builder /work/paru-provider
+cat >/work/paru-provider/PKGBUILD <<'EOF'
+pkgname=paru-git
+pkgver=2.1.0.r67.g9ac3578
+pkgrel=1
+pkgdesc='Disposable pinned real Paru provider'
+arch=('x86_64')
+license=('GPL-3.0-only')
+provides=('paru')
+package() {
+  install -Dm755 /usr/local/bin/paru-real "$pkgdir/usr/bin/paru"
+}
+EOF
+chown builder:builder /work/paru-provider/PKGBUILD
+sudo -u builder -- bash -lc 'cd /work/paru-provider && makepkg --noconfirm'
+pacman --noconfirm -U /work/paru-provider/*.pkg.tar.zst
+chown -R builder:builder /work/auroscope/packaging/aur
+sudo -u builder -- bash -lc 'cd /work/auroscope/packaging/aur && makepkg --syncdeps --noconfirm'
+pacman --noconfirm -U /work/auroscope/packaging/aur/auroscope-*.pkg.tar.zst
+pacman -Q auroscope
+pacman -Qo /usr/bin/auroscope
+rm /usr/local/bin/auroscope
+ln -s /usr/bin/auroscope /usr/local/bin/auroscope
+AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
+  AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
+  GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
+  go test ./internal/app -run '^TestSelectionRealParuColors$' -count=1 -v -timeout=120s
+
 cat >/usr/local/bin/paru <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >>/tmp/paru-calls

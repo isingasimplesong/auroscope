@@ -36,7 +36,18 @@ The accepted architecture is in [`docs/architecture/minimal-v1.md`](docs/archite
 
 ## Current implementation
 
-The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` and `internal/app`. The issue #45 candidate implements [ADR-0046](docs/decisions/0046-codex-minimum-version-without-ceiling.md): an inclusive Codex CLI minimum of `0.150.1` without a ceiling, including future stable major versions. It admits only the strict stable banner `codex-cli MAJOR.MINOR.PATCH` (optionally terminated by LF or CRLF), compared numerically; old versions, prereleases, build suffixes, and malformed banners are rejected. Admission is not qualification: the real `0.153.4` production-client audit passed after the authorized host authentication was selected, and a separate direct sandbox probe demonstrated read access and OS-denied workspace writes. These bounded observations do not establish all model-driven sandbox semantics; see the [qualification evidence and limits](docs/dependency-notes/codex-cli-contract.md). The candidate package `0.1.0.r5.gd42be9f-1` pins this corrected implementation and passed build/install plus installed 0.153.4 admission checks in disposable Arch. The separate real-Paru gate passed too. PR #48 remains subject to human merge; an existing installation is not upgraded by these tests. The unmerged selection-colour follow-up in PR #49 is separate and is not included in this snapshot.
+The v1 implementation lives in `cmd/auroscope` and `internal/app`. Human-merged
+PR #48 implements ADR-0046: strict stable Codex CLI banners at least `0.150.1`,
+compared numerically, without a ceiling. Admission is not qualification; the
+[Codex contract note](docs/dependency-notes/codex-cli-contract.md) records the real
+0.153.4 audit and bounded sandbox evidence, not a guarantee for future versions.
+
+PR #49 preserves that admission fix and restores native Paru selection colors.
+Only machine-target stdout uses a private PTY when both caller outputs are
+terminals; stdin and the menu remain native. Paru still owns disabled `Color`
+and redirected-output behavior. Package metadata and installed-artifact gate
+results are maintained in [the package README](packaging/aur/README.md).
+An existing desktop installation is not upgraded by these disposable tests.
 
 ## Install on Arch Linux
 

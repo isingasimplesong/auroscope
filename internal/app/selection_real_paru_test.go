@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -44,6 +45,12 @@ func TestSelectionRealParuColors(t *testing.T) {
 			}
 			t.Setenv("AUROSCOPE_TEST_PACMAN_CONF", configPath)
 			wrapper := writeExecutable(t, dir, "paru", `#!/bin/sh
+# For the installed-artifact probe, stop after selection with a distinctive
+# status. Verify the exact machine target reached planning, without a recipe.
+if [ "${AUROSCOPE_TEST_BINARY:-}" != "" ] && [ "${1:-}" = '-P' ]; then
+  [ "$#" = 3 ] && [ "$2" = '--order' ] && [ "$3" = 'hello' ] || exit 74
+  exit 73
+fi
 exec "$AUROSCOPE_TEST_REAL_PARU" --config "$AUROSCOPE_TEST_PACMAN_CONF" "$@"
 `)
 			var output bytes.Buffer
@@ -60,13 +67,23 @@ exec "$AUROSCOPE_TEST_REAL_PARU" --config "$AUROSCOPE_TEST_PACMAN_CONF" "$@"
 				stdout, stderr = slave, slave
 			}
 			client := paruClient{config: runConfig{paruPath: wrapper, stdin: strings.NewReader("1\n"), stdout: stdout, stderr: stderr}}
-			targets, err := client.selectPackages([]string{"hello"})
+			var targets []string
+			if binary := os.Getenv("AUROSCOPE_TEST_BINARY"); binary != "" {
+				cmd := exec.Command(binary, "hello")
+				cmd.Env = append(os.Environ(), "AUROSCOPE_PARU="+wrapper)
+				cmd.Stdin, cmd.Stdout, cmd.Stderr = strings.NewReader("1\n"), stdout, stderr
+				if exit, ok := cmd.Run().(*exec.ExitError); !ok || exit.ExitCode() != 73 {
+					t.Errorf("installed selection did not reach exact-target planning: %v", exit)
+				}
+			} else {
+				targets, err = client.selectPackages([]string{"hello"})
+			}
 			slave.Close()
 			output.Write(<-terminalOutput)
 			if err != nil {
 				t.Fatalf("selection: %v; menu %q", err, output.String())
 			}
-			if len(targets) != 1 || unqualifiedTarget(targets[0]) != "hello" {
+			if os.Getenv("AUROSCOPE_TEST_BINARY") == "" && (len(targets) != 1 || unqualifiedTarget(targets[0]) != "hello") {
 				t.Fatalf("targets = %q", targets)
 			}
 			if got := bytes.Contains(output.Bytes(), []byte("\x1b[")); got != (tc.color && tc.terminal) {
