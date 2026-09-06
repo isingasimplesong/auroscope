@@ -11,7 +11,7 @@ Self-hosted AUR-style package recipe for AURoscope. Publication on `aur.archlinu
 
 AURoscope's currently tested Paru surface is commit `9ac3578807a87858651e81a02586ceb947686e7c`. Stable Paru 2.1.0 is not compatible because it mixes the interactive human menu and selected targets on stdout. The package depends on the virtual `paru` capability so an already installed compatible provider such as `paru-git` satisfies `makepkg`, and conflicts with the known-incompatible stable package version `paru<=2.1.0` so it cannot install into the silent-search failure state. Pacman cannot fetch an absent AUR provider or replace stable `paru` with `paru-git` while installing the already-built AURoscope archive. The recipe therefore stops in `prepare()` with the remediation below when that stable package is installed, before compiling AURoscope. AURoscope also validates the required selection and order behavior when those paths run and fails closed on incompatible output; the package name and `paru --version` string alone do not prove compatibility.
 
-AURoscope currently accepts the exact Codex CLI versions `0.150.1` and `0.151.0`. Codex is deliberately **not** a Pacman dependency: an installation from npm, an Arch package, or another method works equally as long as `codex --version` reports a supported version.
+AURoscope admits strict stable Codex CLI versions at least `0.150.1`, with no upper ceiling, including future major versions. Admission is not qualification: the real 0.153.4 audit and direct sandbox checks are documented with their limits in the repository's Codex dependency note; future versions are not automatically tested. Codex is deliberately **not** a Pacman dependency: an installation from npm, an Arch package, or another method works equally as long as `codex --version` reports an admitted version and the user is authenticated.
 
 Examples:
 
@@ -63,10 +63,10 @@ From `packaging/aur` on a machine with Docker:
 scripts/test-package.sh
 ```
 
-The test builds and installs the package inside disposable Arch, validates its dependency metadata and installed files, then exercises the installed binary's native Paru passthrough, guard failure path, and concise review layout. The repository root separately carries the full pinned-Paru disposable integration gate.
+The test builds and installs the package inside disposable Arch, validates its dependency metadata and installed files, then exercises the installed binary's native Paru passthrough, guard failure path, and concise review layout with fake Codex 0.153.4. This reproduces the old package's rejection before validating the new snapshot's admission. The repository root separately carries the full pinned-Paru disposable integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
-This recipe pins immutable AURoscope commit `d0ad113f1169a411b14a56d05e3d23646030d66c`, including the concise review layout from issue #35, the complete-context unchanged-recipe audit fix from issue #36, and the compatible virtual `paru` dependency. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the executable snapshot.
+Candidate package `0.1.0.r5.gd42be9f-1` pins immutable AURoscope commit `d42be9f2e3b06579e08c37631a8ff17ebc8db2e3`, retaining the issue #35/#36 fixes and adding issue #45's stable Codex minimum without a ceiling. Its archive SHA-256 is `c363282770c188c24da75f4a8c4ba06dd2d55f5dacf42478b1250371ba64d6b7`; the build/install gate passed. PR #48 requires human merge; preserve the pinned commit in merge history rather than squashing it away. The unmerged selection-colour PR #49 is not included; its later packaging update must preserve this Codex fix. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the executable snapshot. The packaged README comes from that immutable source and describes its then-candidate state; this package recipe's metadata and gate evidence describe the newer package revision.
 
 Upstream has not yet declared a software license. `LicenseRef-Unspecified` records that fact; it must be replaced when upstream adopts a license.

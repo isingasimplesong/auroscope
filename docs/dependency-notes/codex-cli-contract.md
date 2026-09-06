@@ -6,7 +6,7 @@ AURoscope v1 uses Codex CLI as its mandatory audit backend and runs it outside t
 
 ## Verified baselines
 
-Version evidence below is deliberately separate from admission policy. [ADR-0046](../decisions/0046-codex-minimum-version-without-ceiling.md) accepts stable `codex-cli MAJOR.MINOR.PATCH` versions numerically at least `0.150.1`, without a ceiling, including future majors. Older versions, prereleases, and malformed banners are rejected. This policy is not yet implemented here: current code still checks the two exact versions. Neither `0.153.4` nor future versions are qualified by this decision; real 0.153.4 qualification and the installed-package gate belong to separate execution work. Keep a pinned contract-test matrix and preserve all invocation, process, and validation protections below. Valid JSON alone does not establish unchanged sandbox/execution semantics.
+Version evidence below is deliberately separate from admission policy. [ADR-0046](../decisions/0046-codex-minimum-version-without-ceiling.md) accepts stable `codex-cli MAJOR.MINOR.PATCH` versions numerically at least `0.150.1`, without a ceiling, including future majors. Older versions, prereleases, and malformed banners are rejected. Execution issue #45 implements this admission policy in the candidate source and package. The real 0.153.4 audit, direct sandbox enforcement check and installed-package gate passed as detailed below; those observations qualify only the tested behaviors and environment. Neither 0.153.4 nor future versions are qualified by admission alone. Keep a pinned contract-test matrix and preserve all invocation, process, and validation protections below. Valid JSON alone does not establish unchanged sandbox/execution semantics.
 
 - Codex CLI: `codex-cli 0.150.1` and `codex-cli 0.151.0`.
 - `0.150.1` was verified on 2026-08-31 with the installed executable and a live isolated audit.
@@ -36,7 +36,7 @@ The live contract smoke returned JSONL events on stdout and wrote this schema-va
 
 ## Project usage
 
-AURoscope checks the exact version string before each audit, bounds JSONL/stderr diagnostics and the final-message file, rejects unknown fields and trailing data, and validates every file/line reference against the recipe bundle. It runs Codex in a separate process group with empty stdin, a five-minute timeout, visible 15-second progress, signal forwarding, descendant cleanup, and a fresh private directory for every retry. Any command, version, transport, or validation failure enters the explicit retry/skip/cancel path; it never bypasses the audit silently.
+AURoscope checks the strict stable banner and numeric minimum before each audit, bounds JSONL/stderr diagnostics and the final-message file, rejects unknown fields and trailing data, and validates every file/line reference against the recipe bundle. It runs Codex in a separate process group with empty stdin, a five-minute timeout, visible 15-second progress, signal forwarding, descendant cleanup, and a fresh private directory for every retry. Any command, version, transport, or validation failure enters the explicit retry/skip/cancel path; it never bypasses the audit silently.
 
 ## Verification
 
@@ -44,4 +44,43 @@ AURoscope checks the exact version string before each audit, bounds JSONL/stderr
 - Checksum-matched Codex `0.151.0` release in disposable Arch → exact version plus all required `exec` flags present.
 - Live isolated `0.150.1` invocation with the flags above → exit `0`; JSONL stdout and raw final-message file observed separately.
 - Fake-Codex tests reproduce the same argv/output-file contract deterministically for both accepted exact versions.
+- The issue #45 regression matrix admits the inclusive minimum, 0.153.4, future minor/major versions, and decimal components beyond machine integer range; it rejects old, prerelease, suffixed, noncanonical, and multiline banners. LF and CRLF line terminators are accepted; other surrounding whitespace is not. Numeric comparison uses canonical decimal length then value, without integer overflow.
 - Live `brave-bin` first audit at commit `7b85edf5694c59dd523fabfdec2cedbd525b5e37` with npm-installed Codex 0.150.1 → visible progress at 15-second intervals and a locally schema-valid report after about 45 seconds; Codex consumed no interactive decision input.
+
+## Issue #45 qualification attempt (2026-09-06)
+
+Official release: <https://github.com/openai/codex/releases/tag/rust-v0.153.4>.
+The SHA-256 hashes below matched the release API asset digests before execution:
+
+- `codex-x86_64-unknown-linux-musl.tar.gz`: `f479424eca092484dc40d87ae28c44f4cc40234a60045d6131e493800d814a30`.
+- `codex-package-x86_64-unknown-linux-musl.tar.gz`: `a822187e1a2420c61c5926721bfbd878701ed95547c9bb0d4de4498a16ba1821`.
+
+The standalone executable reports `codex-cli 0.153.4`; its `exec --help` retains all production flags and the documented stdin append behavior. Its audit attempt also reported a missing sibling `codex-code-mode-host`. The complete official package includes that helper (plus runtime resources); retrying with its `bin/codex` removed that helper error. Do not install only the standalone binary for this contract smoke.
+
+The initial full-package live test reached the production invocation but failed after 16.86 seconds with CLI exit 1 / HTTP 401 in the unauthenticated profile-isolated environment. This is historical, not a current authentication blocker. Mathieu's [comment 2164](https://git.2027a.net/2027a/auroscope/issues/45#issuecomment-2164) identified the authenticated host environment. With `HOME=/home/mathieu` and `CODEX_HOME=/home/mathieu/.codex`, `login status` succeeded and the upstream verification lane obtained a locally validated report in 20.79 seconds ([evidence](https://git.2027a.net/2027a/auroscope/issues/45#issuecomment-2170)). The delivery lane independently reran `TestCodexReal01534AuditContract` on source `235916f34adfac0d12fcf7efd7c84ab477a77dd9`: PASS, CLI success and a locally validated report in 26.81 seconds. It used the actual production invocation, including read-only sandbox, isolated empty stdin, private directory, output file and schema. No token contents were read, copied or published; Forgejo identity remained Hephaistos.
+
+### Separate sandbox observations
+
+On the same checksum-verified 0.153.4 package and host, a direct `codex sandbox -c 'sandbox_mode="read-only"' -- /usr/bin/python3 -c '<probe>'` check ran in a disposable private directory. The inert probe first read `input.txt`, then attempted `Path("write-probe.txt").write_text("inert probe")`. Outside the sandbox the identical probe exited 0 and created the marker; the control marker was removed before the sandbox run. Inside the sandbox it printed the input, exited 1 with `OSError: [Errno 30] Read-only file system`, and created no marker. This demonstrates actual filesystem enforcement for that direct sandbox path, not merely a model's description of it. No recipe or package-supplied code was executed.
+
+Version-matched source consulted: [`cli/src/lib.rs`](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/cli/src/lib.rs) (`LandlockCommand`) and [`cli/src/debug_sandbox.rs`](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/cli/src/debug_sandbox.rs) (`load_config`, explicit legacy sandbox-mode override). Set the subprocess working directory rather than adding `-C`: this version's `sandbox -C` requires a named permission profile. The initial probe with `-C` exited 2 before execution and was not counted as an enforcement test.
+
+A separate model-driven probe was inconclusive: the real `exec` command exited 0 with no marker and an assistant message claiming a write denial, but its JSONL contained only `agent_message` items and no `command_execution` event. That self-report is not execution evidence and is excluded from the qualification claim. The initial scratch assertion accepted text alone; review rejected that false-positive criterion. The successful production-client audit plus direct sandbox enforcement check are bounded evidence, not exhaustive qualification of all model-driven tools, network restrictions, configuration combinations or future versions.
+
+The opt-in test is reproducible with an authenticated environment and a verified full release package:
+
+```console
+AUROSCOPE_TEST_REAL_CODEX=/absolute/path/to/codex-package/bin/codex CGO_ENABLED=1 go test ./internal/app -run '^TestCodexReal01534AuditContract$' -count=1 -v
+```
+
+It sends only inert fixture metadata, calls the real production client, and requires a locally validated report. It executes no recipe and makes no Paru/Pacman transaction. Without the environment variable, the live test explicitly skips rather than pretending qualification. Successful execution is still not a general sandbox guarantee; preserve the separate process/stdin/timeout and local-validation regression suite.
+
+### Installed-package regression and authorized Arch gates
+
+The generated Kanban task initially prohibited all PKGBUILD execution, beyond the product's audit-time prohibition. Mathieu explicitly authorized the two disposable-Arch gates in [comment 2187](https://git.2027a.net/2027a/auroscope/issues/45#issuecomment-2187). No recipe was executed during audit or on the host.
+
+The package test was changed first to present fake Codex 0.153.4 to the installed binary. RED: old package `0.1.0.r4.gd0ad113-3` built and installed, then rejected that banner with the exact reported allowlist error; container exit 1. GREEN after changing only the immutable source identity/version/checksum and generated `.SRCINFO`: package `0.1.0.r5.gd42be9f-1` built, ran its Go `check()`, installed, and passed the same test. The installed package admitted the fake 0.153.4 and reached the validated review UI. The test also preserved early incompatible-stable-Paru rejection, compatible-provider installation, npm-style external Codex support, ownership/mode, native passthrough and guard-failure checks. The fake CLI verifies admission and package wiring, not real model behavior; that evidence is the separate authenticated production-client test above.
+
+Source: signed commit `d42be9f2e3b06579e08c37631a8ff17ebc8db2e3`; archive SHA-256 `c363282770c188c24da75f4a8c4ba06dd2d55f5dacf42478b1250371ba64d6b7`. Preserve this source in merge history; do not squash it away while the package pins it. This snapshot does not include the separate, unmerged selection-colour PR #49.
+
+The delivery lane also reran Go tests, vet, fake-Paru Arch, and `scripts/e2e-supported-paru.sh` with real pinned Paru `9ac3578807a87858651e81a02586ceb947686e7c`: all passed. The real-Paru gate built and installed `hello`, exercised edit/re-audit, rejected identity drift, preserved skip without build, and installed official `tree` without another Codex call. It uses fake Codex and a source-built AURoscope; it is distinct from the installed-package gate. All package-manager writes stayed inside disposable containers. PR #48 remains for human review; no merge, tag, AUR publication or workstation upgrade is implied.
