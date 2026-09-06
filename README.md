@@ -36,7 +36,7 @@ The accepted architecture is in [`docs/architecture/minimal-v1.md`](docs/archite
 
 ## Current implementation
 
-The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` and `internal/app`. Exact Codex CLI versions `0.150.1` and `0.151.0` are supported.
+The issue #24 implementation provides the minimal v1 wrapper in `cmd/auroscope` and `internal/app`. The current code admits only exact Codex CLI versions `0.150.1` and `0.151.0`. [ADR-0046](docs/decisions/0046-codex-minimum-version-without-ceiling.md) accepts an inclusive minimum of `0.150.1` without a ceiling, including future stable major versions; that change is not implemented by this documentation-only decision. Admission is not qualification: real compatibility of `0.153.4` remains to be verified in a separate execution issue before delivery.
 
 ## Install on Arch Linux
 

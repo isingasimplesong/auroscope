@@ -6,6 +6,8 @@ AURoscope v1 uses Codex CLI as its mandatory audit backend and runs it outside t
 
 ## Verified baselines
 
+Version evidence below is deliberately separate from admission policy. [ADR-0046](../decisions/0046-codex-minimum-version-without-ceiling.md) accepts stable `codex-cli MAJOR.MINOR.PATCH` versions numerically at least `0.150.1`, without a ceiling, including future majors. Older versions, prereleases, and malformed banners are rejected. This policy is not yet implemented here: current code still checks the two exact versions. Neither `0.153.4` nor future versions are qualified by this decision; real 0.153.4 qualification and the installed-package gate belong to separate execution work. Keep a pinned contract-test matrix and preserve all invocation, process, and validation protections below. Valid JSON alone does not establish unchanged sandbox/execution semantics.
+
 - Codex CLI: `codex-cli 0.150.1` and `codex-cli 0.151.0`.
 - `0.150.1` was verified on 2026-08-31 with the installed executable and a live isolated audit.
 - `0.151.0` was verified on 2026-08-31 from the checksum-matched upstream `x86_64-unknown-linux-musl` release artifact inside disposable Arch; its `exec --help` retains every invocation flag used by AURoscope.

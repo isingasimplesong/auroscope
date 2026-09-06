@@ -14,6 +14,8 @@ Before that authorization, the next permitted work was:
 
 ## Accepted product frame
 
+The later [decision #46](https://git.2027a.net/2027a/auroscope/issues/46), accepted by Mathieu's exact [GO DECISION](https://git.2027a.net/2027a/auroscope/issues/46#issuecomment-1845), is recorded in [ADR-0046](decisions/0046-codex-minimum-version-without-ceiling.md): Codex minimum `0.150.1`, no ceiling, strict stable banners, unchanged execution/validation protections, and explicit separation of admission from qualification. This finalization changes documentation only; production implementation and 0.153.4 qualification require a separate `MODE: EXECUTION` issue. Paru policy is unchanged.
+
 AURoscope has one purpose: audit exact AUR recipe changes with Codex CLI before Paru builds them, present the result, and collect the user's per-package decision.
 
 - Official packages remain native Paru/Pacman operations and are never audited.
