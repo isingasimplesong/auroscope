@@ -60,7 +60,7 @@ install_test_dependency paru 2.1.0 "$paru_stub"
 cat >/usr/local/bin/codex <<'SCRIPT'
 #!/bin/sh
 if [ "${1:-}" = "--version" ]; then
-  echo "codex-cli 0.151.0"
+  echo "codex-cli 0.153.4"
   exit 0
 fi
 exit 64
@@ -106,7 +106,7 @@ if pacman -Qo /usr/local/bin/codex >/dev/null 2>&1; then
   echo 'Codex unexpectedly belongs to a Pacman package' >&2
   exit 1
 fi
-[ "$(/usr/local/bin/codex --version)" = 'codex-cli 0.151.0' ]
+[ "$(/usr/local/bin/codex --version)" = 'codex-cli 0.153.4' ]
 
 printf '%s\n' 'checking installed package files'
 pacman -Ql auroscope | grep -Fx 'auroscope /usr/bin/auroscope'
@@ -124,12 +124,12 @@ if sudo -u builder -- env HOME=/home/builder /usr/bin/auroscope __guard /does/no
 fi
 grep -F 'auroscope guard:' /tmp/guard.err
 
-printf '%s\n' 'checking installed review UX'
+printf '%s\n' 'checking installed review UX with Codex 0.153.4 admission'
 cat >/tmp/package-test-codex <<'SCRIPT'
 #!/bin/sh
 set -eu
 if [ "${1:-}" = "--version" ]; then
-  echo 'codex-cli 0.151.0'
+  echo 'codex-cli 0.153.4'
   exit 0
 fi
 out=''

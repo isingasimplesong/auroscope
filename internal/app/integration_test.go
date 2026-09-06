@@ -700,7 +700,7 @@ func TestCodexExecUsesPinnedOutputLastMessageContract(t *testing.T) {
 	bundleCopy := filepath.Join(dir, "bundle-copy.json")
 	codexPath := writeExecutable(t, dir, "codex", `#!/bin/sh
 if test "$1" = "--version"; then
-  printf 'codex-cli 0.150.1\n'
+  printf 'codex-cli 0.153.4\n'
   exit 0
 fi
 printf '%s\n' "$*" > "$ARGS_FILE"
@@ -764,7 +764,7 @@ func TestCodexAcceptsSupportedVersions(t *testing.T) {
 func TestCodexRejectsUnsupportedVersionAndInvalidManifestReferences(t *testing.T) {
 	dir := t.TempDir()
 	codexPath := writeExecutable(t, dir, "codex", `#!/bin/sh
-printf 'codex-cli 9.9.9\n'
+printf 'codex-cli 0.150.0\n'
 `)
 	_, err := (codexClient{path: codexPath}).audit(auditBundle{}, runConfig{})
 	if err == nil || !strings.Contains(err.Error(), "unsupported Codex CLI version") {
