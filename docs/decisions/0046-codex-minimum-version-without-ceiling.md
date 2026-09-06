@@ -4,7 +4,7 @@
 
 Accepted on 2026-09-06 in [decision issue #46](https://git.2027a.net/2027a/auroscope/issues/46), by Mathieu's exact standalone [GO DECISION, comment 1845](https://git.2027a.net/2027a/auroscope/issues/46#issuecomment-1845). The latest concrete proposal is [comment 1844](https://git.2027a.net/2027a/auroscope/issues/46#issuecomment-1844), retaining the contract detailed in [comment 1830](https://git.2027a.net/2027a/auroscope/issues/46#issuecomment-1830).
 
-This records design acceptance only. Implementation, real qualification of Codex 0.153.4, and a new packaged release require a separate `MODE: EXECUTION` issue. At decision acceptance, the implementation admitted only 0.150.1 and 0.151.0. The separate execution candidate in issue #45 now implements admission; real qualification and the updated installed-package gate remain pending, and the package still pins the earlier implementation. ADR-0015's mandatory Codex audit and human-authority boundaries remain unchanged.
+This records design acceptance only. Implementation, real qualification of Codex 0.153.4, and a new packaged release require a separate `MODE: EXECUTION` issue. At decision acceptance, the implementation admitted only 0.150.1 and 0.151.0. The separate execution candidate in issue #45 now implements admission in source and package; its installed-package gate passed, with the real audit and bounded sandbox evidence recorded in the dependency note. This is execution evidence, not a change to the accepted policy or a claim that the PR has been merged. ADR-0015's mandatory Codex audit and human-authority boundaries remain unchanged.
 
 ## Context and evidence
 
