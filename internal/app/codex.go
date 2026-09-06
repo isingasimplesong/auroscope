@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -53,10 +54,7 @@ const auditOutputSchema = `{
   }
 }`
 
-var supportedCodexVersions = map[string]struct{}{
-	"codex-cli 0.150.1": {},
-	"codex-cli 0.151.0": {},
-}
+var stableCodexBanner = regexp.MustCompile(`^codex-cli (0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 
 type auditReport struct {
 	Summary     string         `json:"summary"`
@@ -147,11 +145,33 @@ func (c codexClient) verifyVersion(config runConfig) error {
 	if err := runCodexCommand(cmd, config.signals, config.codexTimeout, nil); err != nil {
 		return fmt.Errorf("Codex CLI version check failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	version := strings.TrimSpace(stdout.String())
-	if _, ok := supportedCodexVersions[version]; !ok {
-		return fmt.Errorf("unsupported Codex CLI version %q; supported versions are 0.150.1 and 0.151.0", version)
+	version := stdout.String()
+	if strings.HasSuffix(version, "\n") {
+		version = strings.TrimSuffix(strings.TrimSuffix(version, "\n"), "\r")
+	}
+	if !admitsCodexVersion(version) {
+		return fmt.Errorf("unsupported Codex CLI version %q; minimum stable version is 0.150.1 (codex-cli MAJOR.MINOR.PATCH, no upper limit)", version)
 	}
 	return nil
+}
+
+func admitsCodexVersion(banner string) bool {
+	parts := stableCodexBanner.FindStringSubmatch(banner)
+	if parts == nil {
+		return false
+	}
+	for i, minimum := range []string{"0", "150", "1"} {
+		part := parts[i+1]
+		// Canonical decimal digits compare numerically by length, then value.
+		// No integer conversion means no overflow or implicit version ceiling.
+		if len(part) != len(minimum) {
+			return len(part) > len(minimum)
+		}
+		if part != minimum {
+			return part > minimum
+		}
+	}
+	return true
 }
 
 type limitedBuffer struct {

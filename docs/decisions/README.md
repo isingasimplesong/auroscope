@@ -9,7 +9,7 @@ Read these in order; [ADR-0015](0015-minimal-llm-first-wrapper.md) controls on a
 3. [ADR-0004 — official update before AUR review](0004-official-upgrade-before-aur-review.md), amended by ADR-0015
 4. [ADR-0005 — final recipe identity guard](0005-recipe-identity-guard-boundary.md), amended by ADR-0015
 5. [ADR-0007 — `mattn/go-sqlite3` with CGO](0007-mattn-go-sqlite3-cgo.md), amended by ADR-0015
-6. [ADR-0046 — Codex minimum version without a ceiling](0046-codex-minimum-version-without-ceiling.md), accepted policy amendment; separate implementation pending
+6. [ADR-0046 — Codex minimum version without a ceiling](0046-codex-minimum-version-without-ceiling.md), accepted policy amendment; issue #45 admission candidate, qualification and package delivery pending
 
 ## Superseded
 
