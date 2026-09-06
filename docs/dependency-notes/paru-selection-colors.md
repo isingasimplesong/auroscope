@@ -32,4 +32,30 @@ Do not unconditionally add `--color always`: that would override a user's disabl
 
   It exits after real search/selection tests, before recipe acquisition or execution. Docker package-manager activity stays in the disposable container. The default gate still continues to the pre-existing build/install scenarios; do not run it where recipe execution is prohibited.
 
-This proves the source selection fix, not delivery in the currently pinned Arch package. Updating the package snapshot and exercising the installed artifact remain separate delivery obligations.
+## Installed artifact verification
+
+The operator completed delivery verification after Mathieu explicitly authorized
+the disposable recipe gates in #34 comment 2189 and #45 comment 2187.
+Package `0.1.0.r6.gf97d6ab-1` combines the color fix with the merged Codex admission
+change. The pinned source is `f97d6ab75fbcacf60f17cd02649df6c145795e25`.
+
+- The installed old `0.1.0.r5.gd42be9f-1` reproduced missing terminal colors.
+  That first probe also had an incorrect expected exit status: order failures are
+  wrapped as status 1. The probe was corrected to check status 1 and the specific
+  order-status-73 diagnostic, proving the exact selected target reached planning.
+  The additional status assertions in the old log are harness failures, not bugs
+  in the package; the observed missing ANSI colors remain the regression evidence.
+- The corrected matrix passes for the installed `/usr/bin/auroscope` with real
+  pinned Paru: colors enabled, colors disabled, and output redirected. The native
+  prompt remains visible and the exact selected `hello` target reaches planning.
+- The package build/install gate passes with fake Codex 0.153.4. The full real-Paru
+  gate uses the installed artifact for subsequent build/install, edit/re-audit,
+  skip and official-only checks; the fake-Paru smoke also passes.
+- Go tests, focused selection race tests, vet, shell syntax, checksum, generated
+  `.SRCINFO` and namcap checks pass. No host package transaction was performed.
+
+The historical drift scenario accepts any nonzero exit; its successful gate run
+is not sufficient proof of the rejection cause. That test-hardening follow-up and
+an independent official-only search bug are recorded in #50, not silently included
+in this colors fix. PR #49 still requires human review and merge; no workstation
+upgrade or AUR publication is claimed.
