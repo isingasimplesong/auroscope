@@ -70,6 +70,8 @@ AUROSCOPE_E2E_SUPPORTED_PARU=1 scripts/e2e-supported-paru.sh
 
 The package test and both integration scripts require Docker. The package test builds and installs `packaging/aur/PKGBUILD` in disposable Arch. The first integration script is a fast fake-Paru/fake-Codex smoke. The supported-version gate builds pinned Paru commit `9ac3578807a87858651e81a02586ceb947686e7c`, uses real AUR acquisition/resolution/build and Pacman installation only inside the disposable container, proves the real guard and drift rejection, and confirms that official-only work invokes no Codex audit.
 
+For selection/color verification without executing any PKGBUILD, run `AUROSCOPE_E2E_SUPPORTED_PARU=1 AUROSCOPE_E2E_SELECTION_ONLY=1 scripts/e2e-supported-paru.sh`. This checks real native colors with `Color` enabled/disabled and redirected output, then exits before the build/install scenarios. See the [selection color contract](docs/dependency-notes/paru-selection-colors.md).
+
 ## Previous design
 
 The earlier architecture was intentionally superseded because it made the LLM optional and accumulated resolver, approval, state, recovery, and test machinery outside the product's purpose. Historical material remains under [`docs/archive/pre-llm-first/`](docs/archive/pre-llm-first/).

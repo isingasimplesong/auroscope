@@ -17,6 +17,7 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 docker run --rm -i \
   -e AUROSCOPE_E2E_INSIDE=1 \
+  -e AUROSCOPE_E2E_SELECTION_ONLY="${AUROSCOPE_E2E_SELECTION_ONLY:-0}" \
   -e PARU_COMMIT="$PARU_COMMIT" \
   -v "$repo_root:/src:ro" \
   "$IMAGE" /bin/bash <<'BASH'
@@ -43,6 +44,17 @@ install -m 0755 target/release/paru /usr/local/bin/paru-real
 cp -a /src /work/auroscope
 cd /work/auroscope
 GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 go build -o /usr/local/bin/auroscope ./cmd/auroscope
+
+# Exercise actual color detection and uncolored target capture, including the
+# user's disabled Color setting and redirected output. No recipe is executed.
+AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
+  GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
+  go test ./internal/app -run '^TestSelectionRealParuColors$' -count=1 -v -timeout=120s
+
+if [[ "${AUROSCOPE_E2E_SELECTION_ONLY:-0}" == 1 ]]; then
+  echo 'supported Paru selection-only gate passed (no PKGBUILD execution)'
+  exit 0
+fi
 
 cat >/usr/local/bin/paru <<'EOF'
 #!/bin/sh
