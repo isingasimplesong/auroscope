@@ -67,6 +67,22 @@ The test builds and installs the package inside disposable Arch, validates its d
 
 ## Upstream snapshot
 
-Candidate package `0.1.0.r5.gd42be9f-1` pins immutable AURoscope commit `d42be9f2e3b06579e08c37631a8ff17ebc8db2e3`, retaining the issue #35/#36 fixes and adding issue #45's stable Codex minimum without a ceiling. Its archive SHA-256 is `c363282770c188c24da75f4a8c4ba06dd2d55f5dacf42478b1250371ba64d6b7`; the build/install gate passed. PR #48 requires human merge; preserve the pinned commit in merge history rather than squashing it away. The unmerged selection-colour PR #49 is not included; its later packaging update must preserve this Codex fix. Update `_commit`, `pkgver`, and `sha256sums` together when advancing the executable snapshot. The packaged README comes from that immutable source and describes its then-candidate state; this package recipe's metadata and gate evidence describe the newer package revision.
+Candidate package `0.1.0.r6.gf97d6ab-1` pins immutable AURoscope commit
+`f97d6ab75fbcacf60f17cd02649df6c145795e25`.
+It combines native selection colors from #34 with the merged #48 Codex minimum
+and retains the earlier #35/#36 fixes. Its archive SHA-256 is:
+`d900860363298caa751850edcddef30782a74b152e9d63fa6563a624a5d165f5`
+
+The package build/install gate passed. The full pinned-Paru gate also installs this
+exact package and exercises `/usr/bin/auroscope`, including its real selection
+color matrix, build/install, edit/re-audit, skip and official-only paths. The drift
+scenario returned failure, but its historical assertion is too broad to establish
+why it failed; strengthening that evidence is tracked in #50.
+
+PR #49 requires human merge. Preserve the pinned source commit in merge history
+rather than squashing it away. Update `_commit`, `pkgver`, and `sha256sums` together
+when advancing the executable snapshot. The packaged README comes from the
+immutable source and retains its historical candidate status; this recipe's
+metadata and current gate evidence describe the newer revision.
 
 Upstream has not yet declared a software license. `LicenseRef-Unspecified` records that fact; it must be replaced when upstream adopts a license.

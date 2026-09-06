@@ -3,13 +3,17 @@ package app
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"unicode"
+
+	"github.com/creack/pty"
 )
 
 type paruClient struct {
@@ -70,7 +74,10 @@ func (paru paruClient) runInDirWithStdinEnv(stdout io.Writer, dir string, args [
 func (paru paruClient) selectPackages(terms []string) ([]string, error) {
 	var selected bytes.Buffer
 	args := append([]string{"-Ssaq", "--interactive"}, terms...)
-	result := paru.run(&selected, args)
+	result := paru.runSelection(&selected, args)
+	if result.status < 0 && result.err != nil {
+		return nil, fmt.Errorf("run Paru selection: %w", result.err)
+	}
 	if result.status != 1 {
 		return nil, incompatibleParu("interactive selection returned status %d, want 1", result.status)
 	}
@@ -88,6 +95,49 @@ func (paru paruClient) selectPackages(terms []string) ([]string, error) {
 		return nil, fmt.Errorf("read Paru selection: %w", err)
 	}
 	return packages, nil
+}
+
+// Paru's auto colors require both output descriptors to be terminals before it
+// redirects the interactive menu to stderr. Preserve that detection only when
+// the caller's outputs really are terminals. Do not force --color: Paru still
+// owns the user's pacman.conf Color setting. Only machine targets traverse this
+// private PTY; the menu and stdin stay on the user's original terminal.
+func (paru paruClient) runSelection(selected io.Writer, args []string) commandResult {
+	config := paru.config.withDefaults()
+	stdout, stdoutOK := config.stdout.(*os.File)
+	stderr, stderrOK := config.stderr.(*os.File)
+	if !stdoutOK || !stderrOK {
+		return paru.run(selected, args)
+	}
+	size, err := pty.GetsizeFull(stdout)
+	if err != nil {
+		return paru.run(selected, args)
+	}
+	if _, err := pty.GetsizeFull(stderr); err != nil {
+		return paru.run(selected, args)
+	}
+	master, slave, err := pty.Open()
+	if err != nil {
+		return commandResult{status: -1, err: err}
+	}
+	defer master.Close()
+	defer slave.Close()
+	if err := pty.Setsize(slave, size); err != nil {
+		return commandResult{status: -1, err: err}
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(selected, master)
+		done <- err
+	}()
+	result := paru.run(slave, args)
+	// Closing our slave after the child is reaped terminates the reader, including
+	// when exec fails. Linux signals PTY EOF with EIO rather than io.EOF.
+	_ = slave.Close()
+	if err := <-done; err != nil && !errors.Is(err, syscall.EIO) {
+		return commandResult{status: -1, err: err}
+	}
+	return result
 }
 
 func validSelectedTarget(target string) bool {
