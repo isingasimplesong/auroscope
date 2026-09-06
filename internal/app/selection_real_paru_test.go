@@ -72,7 +72,7 @@ exec "$AUROSCOPE_TEST_REAL_PARU" --config "$AUROSCOPE_TEST_PACMAN_CONF" "$@"
 				cmd := exec.Command(binary, "hello")
 				cmd.Env = append(os.Environ(), "AUROSCOPE_PARU="+wrapper)
 				cmd.Stdin, cmd.Stdout, cmd.Stderr = strings.NewReader("1\n"), stdout, stderr
-				if exit, ok := cmd.Run().(*exec.ExitError); !ok || exit.ExitCode() != 73 {
+				if exit, ok := cmd.Run().(*exec.ExitError); !ok || exit.ExitCode() != statusFailure {
 					t.Errorf("installed selection did not reach exact-target planning: %v", exit)
 				}
 			} else {
@@ -80,6 +80,9 @@ exec "$AUROSCOPE_TEST_REAL_PARU" --config "$AUROSCOPE_TEST_PACMAN_CONF" "$@"
 			}
 			slave.Close()
 			output.Write(<-terminalOutput)
+			if os.Getenv("AUROSCOPE_TEST_BINARY") != "" && !strings.Contains(output.String(), "order returned status 73") {
+				t.Fatalf("installed selection lost exact machine target: %q", output.String())
+			}
 			if err != nil {
 				t.Fatalf("selection: %v; menu %q", err, output.String())
 			}
