@@ -67,20 +67,26 @@ The test builds and installs the package inside disposable Arch, validates its d
 
 ## Upstream snapshot
 
-Candidate package `0.1.0.r6.gf97d6ab-1` pins immutable AURoscope commit
-`f97d6ab75fbcacf60f17cd02649df6c145795e25`.
-It combines native selection colors from #34 with the merged #48 Codex minimum
-and retains the earlier #35/#36 fixes. Its archive SHA-256 is:
-`d900860363298caa751850edcddef30782a74b152e9d63fa6563a624a5d165f5`
+Candidate package `0.1.0.r7.g7a8d394-1` pins immutable AURoscope commit
+`7a8d3946ec8581e3daa0db0a32210ae6b35e1a2b`.
+It restores official search results and installs the selected official targets
+without reopening search (#52). It retains merged #49 selection colors, #48
+Codex admission and earlier #35/#36 fixes. Its archive SHA-256 is:
+`39d6918b45b22e9d53da030af40634a06bcd81713fc6050f06fad8171b7b6b20`
 
-The package build/install gate passed. The full pinned-Paru gate also installs this
-exact package and exercises `/usr/bin/auroscope`, including its real selection
-color matrix, build/install, edit/re-audit, skip and official-only paths. The drift
-scenario returned failure, but its historical assertion is too broad to establish
-why it failed; strengthening that evidence is tracked in #50.
+The package build/install gate passed, including generated metadata, checksum,
+`check()`, ownership/modes, passthrough, guard failure and fake-Codex review UX.
+The real pinned-Paru color matrix passed for both source and installed artifact:
+AUR and official results, Color enabled/disabled, and redirected output.
+The initial full integration run stopped at the official Pacman confirmation:
+the test supplied EOF, which cancels that native transaction. The test now waits
+for the actual confirmation and answers it explicitly. The #52 PR records the
+final full-gate result. The historical drift assertion remains too broad to
+establish why it failed; strengthening that evidence is tracked in #50.
 
-PR #49 requires human merge. Preserve the pinned source commit in merge history
-rather than squashing it away. Update `_commit`, `pkgver`, and `sha256sums` together
+PR #49 is merged; this #52 candidate still requires human review and merge.
+Preserve the pinned source commit in merge history rather than squashing it away.
+Update `_commit`, `pkgver`, and `sha256sums` together
 when advancing the executable snapshot. The packaged README comes from the
 immutable source and retains its historical candidate status; this recipe's
 metadata and current gate evidence describe the newer revision.

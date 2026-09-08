@@ -150,7 +150,7 @@ run_as_builder() {
 pacman -Q hello
 first_codex_count=$(wc -l </tmp/codex-calls)
 [ "$first_codex_count" -eq 1 ]
-grep -q -- '-Ssaq --interactive hello' /tmp/paru-calls
+grep -q -- '-Ssq --interactive hello' /tmp/paru-calls
 grep -q -- '-P --order hello' /tmp/paru-calls
 grep -q -- '-G hello' /tmp/paru-calls
 grep -q -- '-S --skipreview -- hello' /tmp/paru-calls
@@ -190,7 +190,54 @@ printf 'skip\n' | run_as_builder /usr/local/bin/auroscope -S --noconfirm hello
 after=$(grep -c -- '--skipreview' /tmp/paru-calls || true)
 [ "$before" -eq "$after" ]
 
-# An official-only install remains native and does not invoke Codex.
+# Selecting an official package installs the resolved target, not the search
+# terms again. Answer Pacman's confirmation explicitly: EOF cancels this path.
+# Wait for the actual prompt so Paru selection cannot buffer the later answer.
+before_codex=$(wc -l </tmp/codex-calls)
+run_as_builder python - <<'PY'
+import os
+import select
+import subprocess
+import sys
+import time
+
+child = subprocess.Popen(['/usr/local/bin/auroscope', 'tree'],
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT)
+child.stdin.write(b'1\n')
+child.stdin.flush()
+output = b''
+answered = False
+deadline = time.monotonic() + 120
+try:
+    while True:
+        if time.monotonic() >= deadline:
+            raise TimeoutError('official selection/install prompt timed out')
+        if not select.select([child.stdout], [], [], 1)[0]:
+            continue
+        chunk = os.read(child.stdout.fileno(), 65536)
+        if not chunk:
+            break
+        sys.stdout.buffer.write(chunk)
+        sys.stdout.buffer.flush()
+        output += chunk
+        if not answered and b'Proceed with installation?' in output:
+            child.stdin.write(b'y\n')
+            child.stdin.flush()
+            answered = True
+    assert answered, 'native installation confirmation was not reached'
+    assert child.wait(timeout=10) == 0, 'official installation failed'
+finally:
+    if child.poll() is None:
+        child.kill()
+        child.wait()
+PY
+pacman -Q tree
+grep -Fx -- '-S -- tree' /tmp/paru-calls
+after_codex=$(wc -l </tmp/codex-calls)
+[ "$before_codex" -eq "$after_codex" ]
+
+# An explicit official-only install also remains native without Codex.
 before_codex=$(wc -l </tmp/codex-calls)
 run_as_builder /usr/local/bin/auroscope -S --repo --noconfirm tree
 pacman -Q tree
