@@ -10,6 +10,30 @@ Before acting, read in full:
 4. `docs/design-phase.md`
 5. `docs/decisions/README.md` and the active ADRs it lists
 
+## Package delivery is part of completion
+
+- A change to shipped code, Go dependencies, tests, or the packaged root README
+  is not delivered until the Arch recipe includes it. A clean Git tree or a
+  passing checkout test is not proof that the installed package contains it.
+- Keep an immutable source pin. Commit source changes first; preserve that commit
+  in remote history. Then update `_commit`, `sha256sums`, and `pkgver` together.
+  Increment the `rN` revision and use the pinned commit's seven-character suffix.
+  For recipe-only rebuilds, increment `pkgrel`; reset it to 1 for a new `pkgver`.
+  Never reuse a published package identity for different contents.
+- Generate `.SRCINFO` with `makepkg --printsrcinfo` as a non-root user in Arch.
+- Before declaring a PR ready, run `bash packaging/aur/scripts/check-freshness.sh`
+  and `packaging/aur/scripts/test-package.sh`. The latter must build and install
+  the new package with the previous archive still present, without `--force`.
+- Run the installed-artifact supported-Paru gate when the shipped behavior
+  changes. Source-only results do not qualify the package. Report `pacman -Q`
+  and the source pin; `auroscope --version` intentionally reports Paru's version.
+- Recheck against current `origin/main` before publication so concurrent fixes
+  are not lost. Packaging belongs in the same PR as the delivered changes.
+  Never merge or squash away a source pin without Mathieu's explicit approval.
+- The freshness check compares the current recipe's build, test, and installed
+  inputs with the pin. Extend its input list if the recipe consumes new paths.
+  Documentation outside the package does not require a new binary release.
+
 Rules:
 
 - Production code is authorized only within the merged issue #24 v1 plan. Any consequential expansion still requires a separate `MODE: DECISION` issue and Mathieu's exact authorization.

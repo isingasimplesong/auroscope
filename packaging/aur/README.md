@@ -63,32 +63,76 @@ From `packaging/aur` on a machine with Docker:
 scripts/test-package.sh
 ```
 
-The test builds and installs the package inside disposable Arch, validates its dependency metadata and installed files, then exercises the installed binary's native Paru passthrough, guard failure path, and concise review layout with fake Codex 0.153.4. This reproduces the old package's rejection before validating the new snapshot's admission. The repository root separately carries the full pinned-Paru disposable integration gate and the opt-in real Codex audit test.
+The test checks source freshness, builds the previous and current packages in
+Arch, and upgrades with the old archives still present. It validates dependency
+metadata and installed files, then exercises native Paru passthrough, guard
+failure, and review layout with fake Codex 0.153.4. The repository root carries
+the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
-Candidate package `0.1.0.r7.g7a8d394-1` pins immutable AURoscope commit
-`7a8d3946ec8581e3daa0db0a32210ae6b35e1a2b`.
-It restores official search results and installs the selected official targets
-without reopening search (#52). It retains merged #49 selection colors, #48
-Codex admission and earlier #35/#36 fixes. Its archive SHA-256 is:
-`39d6918b45b22e9d53da030af40634a06bcd81713fc6050f06fad8171b7b6b20`
+Candidate package `0.1.0.r8.gc338567-1` pins immutable AURoscope commit
+`c338567590d0c35f2798cf822f95374dff51183e`.
+It includes the merged audit presentation (#55), drift recovery (#57), and
+regression tests (#58), with their conflicting drift assertion reconciled.
+Its archive SHA-256 is:
+`b02bcd53af1a936a928a0abb1e240e36546885132a71c219f7d7cbc55d5739f3`
 
-The package build/install gate passed, including generated metadata, checksum,
-`check()`, ownership/modes, passthrough, guard failure and fake-Codex review UX.
-The real pinned-Paru color matrix passed for both source and installed artifact:
-AUR and official results, Color enabled/disabled, and redirected output.
-The initial full integration run stopped at the official Pacman confirmation:
-the test supplied EOF, which cancels that native transaction. The test now waits
-for the actual confirmation and answers it explicitly. The #52 PR records the
-final full-gate result. The historical drift assertion remains too broad to
-establish why it failed; strengthening that evidence is tracked in #50.
+On 2026-09-08, the disposable Arch package gate built and installed the previous
+`0.1.0.r7.g7a8d394-1` package, left its real archives beside the new recipe, then
+ran `makepkg --syncdeps --install --noconfirm` without `--force`. Pacman upgraded
+both AURoscope and its debug package to `0.1.0.r8.gc338567-1`.
+Generated `.SRCINFO`, checksum verification, `namcap PKGBUILD`, Go `check()`,
+installed ownership/modes, passthrough, guard failure, and review layout passed.
 
-PR #49 is merged; this #52 candidate still requires human review and merge.
-Preserve the pinned source commit in merge history rather than squashing it away.
-Update `_commit`, `pkgver`, and `sha256sums` together
-when advancing the executable snapshot. The packaged README comes from the
-immutable source and retains its historical candidate status; this recipe's
-metadata and current gate evidence describe the newer revision.
+The full pinned-Paru gate also passed against `/usr/bin/auroscope`: native
+selection/color behavior, real AUR acquisition/build/install, edit and re-audit,
+exact drift refusal, explicit retry with a second audit and approval, skip,
+and official installs without a Codex call. Codex was a deterministic test
+executable; these runs do not claim a new real-model qualification.
+
+This candidate requires human review and merge before a plain `git pull` on
+`main` obtains it. Preserve the pinned source commit in merge history rather
+than squashing it away. No desktop installation was changed by these tests.
+
+## Keeping the package current
+
+Follow the delivery rules in the root `AGENTS.md`. Before declaring a change
+ready, run:
+
+```console
+bash packaging/aur/scripts/check-freshness.sh
+packaging/aur/scripts/test-package.sh
+AUROSCOPE_E2E_SUPPORTED_PARU=1 scripts/e2e-supported-paru.sh
+```
+
+Run these commands from the repository root. Both package-verification entry
+points invoke the freshness check before starting Docker; source-only E2E mode
+remains explicitly separate. The check compares code, tests, test scripts,
+Go dependencies, and the installed root README with the immutable source pin.
+It rejects changed tracked inputs and new non-ignored source files. Keep its
+input list in sync with the recipe. It is a local release gate, not a configured
+server-side branch protection or an automatic release publisher.
+
+Commit source changes first, then advance `_commit`, the `rN` revision in
+`pkgver`, its commit suffix, and `sha256sums` together. Generate `.SRCINFO` with
+Arch `makepkg --printsrcinfo`. Recipe-only rebuilds increment `pkgrel`.
+A new package identity is required whenever delivered contents change; forcing
+a rebuild of an old pin is not an update. The package test keeps the actual
+previous package archives present to exercise this upgrade path every time.
+
+After merging a package update, from an existing clone:
+
+```console
+git pull --ff-only
+cd packaging/aur
+makepkg -si
+pacman -Q auroscope
+```
+
+If already in `packaging/aur`, omit the `cd` command. `auroscope --version`
+intentionally passes through to Paru; use `pacman -Q auroscope` for this package.
+The installed README comes from the immutable source and may retain historical
+candidate wording; current recipe metadata identifies the delivered snapshot.
 
 Upstream has not yet declared a software license. `LicenseRef-Unspecified` records that fact; it must be replaced when upstream adopts a license.

@@ -9,13 +9,14 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+bash "$repo_root/scripts/check-freshness.sh"
 
 docker run --rm -i \
   -v "$repo_root:/package-source:ro" \
   "$IMAGE" /bin/bash <<'BASH'
 set -euo pipefail
 
-pacman --noconfirm --needed -Sy git go sudo
+pacman --noconfirm --needed -Sy git go sudo namcap
 useradd --create-home --shell /bin/bash builder
 printf 'builder ALL=(ALL:ALL) NOPASSWD: ALL\n' >/etc/sudoers.d/auroscope-package-test
 chmod 0440 /etc/sudoers.d/auroscope-package-test
@@ -71,6 +72,7 @@ cp -a /package-source /work/package
 chown -R builder:builder /work/package
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --printsrcinfo > /tmp/generated.SRCINFO'
 cmp /work/package/.SRCINFO /tmp/generated.SRCINFO
+namcap /work/package/PKGBUILD
 grep -Fx $'\tdepends = paru' /tmp/generated.SRCINFO
 grep -Fx $'\tconflicts = paru<=2.1.0' /tmp/generated.SRCINFO
 printf '%s\n' 'checking fail-fast remediation for stable Paru 2.1.0'
@@ -91,8 +93,25 @@ fi
 
 pacman --noconfirm -R paru
 install_test_dependency paru-git 2.1.0.r67.g9ac3578 "$paru_stub"
-sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfirm'
-pacman --noconfirm -U /work/package/auroscope-*.pkg.tar.zst
+# The pinned archive carries the previous recipe. Build that actual package,
+# install it, and leave its archive beside the new recipe, as after git pull.
+install -d -m 0755 -o builder -g builder /work/previous
+cp /work/package/src/auroscope/packaging/aur/PKGBUILD /work/previous/PKGBUILD
+chown builder:builder /work/previous/PKGBUILD
+sudo -u builder -- bash -lc 'cd /work/previous && makepkg --syncdeps --noconfirm'
+mapfile -t previous_archives < <(sudo -u builder -- bash -lc 'cd /work/previous && makepkg --packagelist')
+pacman --noconfirm -U "${previous_archives[@]}"
+previous_version=$(pacman -Q auroscope)
+cp "${previous_archives[@]}" /work/package/
+mapfile -t new_archives < <(sudo -u builder -- bash -lc 'cd /work/package && makepkg --packagelist')
+for archive in "${new_archives[@]}"; do test ! -e "$archive"; done
+sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --install --noconfirm'
+for archive in "${previous_archives[@]}"; do
+  test -f "/work/package/$(basename "$archive")"
+done
+new_version=$(pacman -Q auroscope)
+test "$(vercmp "${new_version#auroscope }" "${previous_version#auroscope }")" -gt 0
+printf 'Cached-package upgrade passed: %s -> %s (no --force)\n' "$previous_version" "$new_version"
 
 pacman -Q auroscope
 printf '%s\n' 'checking declared runtime dependencies'
@@ -175,7 +194,7 @@ review_output=$(printf 'approve\n' | sudo -u builder -- env \
   AUROSCOPE_STATE=/tmp/package-test-state.sqlite3 \
   AUROSCOPE_CLONE_DIR=/tmp/package-test-clones \
   /usr/bin/auroscope -S hello)
-expected_review=$'AURoscope: auditing hello with Codex (timeout 5m0s)...\n\nAUR audit: hello\n\nAssessment: packaging looks conventional\n\nRisk: low\n\nDecision : [a]pprove | [i]nspect full report | [e]dit and re-audit | [s]kip | [c]ancel '
+expected_review=$'AURoscope: auditing hello with Codex (timeout 5m0s)...\nAUR audit: hello\n\n---\nAssessment: packaging looks conventional\n\nRisk: low\n---\n\nDecision : [a]pprove | [i]nspect full report | [e]dit and re-audit | [s]kip | [c]ancel '
 case "$review_output" in
   *"$expected_review"*) ;;
   *)
