@@ -47,6 +47,8 @@ install -m 0755 target/release/paru /usr/local/bin/paru-real
 # Build the candidate AURoscope with the pinned CGO SQLite driver.
 cp -a /src /work/auroscope
 cd /work/auroscope
+# cp -a retains the host UID; this root-only disposable build trusts this copy.
+git config --global --add safe.directory /work/auroscope
 GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 go build -o /usr/local/bin/auroscope ./cmd/auroscope
 
 # Exercise actual color detection and uncolored target capture, including the

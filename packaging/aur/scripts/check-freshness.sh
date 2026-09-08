@@ -26,7 +26,7 @@ git merge-base --is-ancestor "$commit" HEAD || {
 }
 # These are the source, test, dependency and documentation inputs shipped by
 # the current recipe. Extend this list when build()/check()/package() changes.
-inputs=(cmd internal go.mod go.sum README.md)
+inputs=(cmd internal scripts go.mod go.sum README.md)
 if ! git diff --quiet "$commit" -- "${inputs[@]}" ||
    [[ -n $(git ls-files --others --exclude-standard -- "${inputs[@]}") ]]; then
   echo 'Package freshness: source pin is stale; update _commit, pkgver, checksum and .SRCINFO.' >&2

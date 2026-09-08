@@ -99,14 +99,16 @@ install -d -m 0755 -o builder -g builder /work/previous
 cp /work/package/src/auroscope/packaging/aur/PKGBUILD /work/previous/PKGBUILD
 chown builder:builder /work/previous/PKGBUILD
 sudo -u builder -- bash -lc 'cd /work/previous && makepkg --syncdeps --noconfirm'
-previous_archive=$(sudo -u builder -- bash -lc 'cd /work/previous && makepkg --packagelist')
-pacman --noconfirm -U "$previous_archive"
+mapfile -t previous_archives < <(sudo -u builder -- bash -lc 'cd /work/previous && makepkg --packagelist')
+pacman --noconfirm -U "${previous_archives[@]}"
 previous_version=$(pacman -Q auroscope)
-cp "$previous_archive" /work/package/
-new_archive=$(sudo -u builder -- bash -lc 'cd /work/package && makepkg --packagelist')
-test ! -e "$new_archive"
+cp "${previous_archives[@]}" /work/package/
+mapfile -t new_archives < <(sudo -u builder -- bash -lc 'cd /work/package && makepkg --packagelist')
+for archive in "${new_archives[@]}"; do test ! -e "$archive"; done
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --install --noconfirm'
-test -f "/work/package/$(basename "$previous_archive")"
+for archive in "${previous_archives[@]}"; do
+  test -f "/work/package/$(basename "$archive")"
+done
 new_version=$(pacman -Q auroscope)
 test "$(vercmp "${new_version#auroscope }" "${previous_version#auroscope }")" -gt 0
 printf 'Cached-package upgrade passed: %s -> %s (no --force)\n' "$previous_version" "$new_version"
