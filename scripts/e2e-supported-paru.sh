@@ -172,6 +172,7 @@ sudo -u builder -- git -C /home/builder/aur/hello log -1 --format=%s | grep -q '
 grep -q 'reviewed local edit' /home/builder/aur/hello/PKGBUILD
 
 # A committed mutation after bundle construction must fail at the real hook.
+before_drift=$(grep -Fxc -- '-S --noconfirm --rebuild --skipreview -- hello' /tmp/paru-calls || true)
 if printf 'approve\n' | sudo -u builder -- env \
   HOME=/home/builder PATH=/usr/local/bin:/usr/bin \
   AUROSCOPE_PARU=/usr/local/bin/paru \
@@ -179,10 +180,22 @@ if printf 'approve\n' | sudo -u builder -- env \
   AUROSCOPE_CLONE_DIR=/home/builder/aur \
   AUROSCOPE_STATE=/home/builder/state/state.sqlite3 \
   AUROSCOPE_E2E_DRIFT=1 \
-  /usr/local/bin/auroscope -S --noconfirm --rebuild hello; then
+  /usr/local/bin/auroscope -S --noconfirm --rebuild hello >/tmp/drift-output 2>&1; then
+  cat /tmp/drift-output
   echo 'guard drift scenario unexpectedly succeeded' >&2
   exit 1
 fi
+cat /tmp/drift-output
+after_drift=$(grep -Fxc -- '-S --noconfirm --rebuild --skipreview -- hello' /tmp/paru-calls || true)
+if [ "$after_drift" -ne $((before_drift + 1)) ]; then
+  echo 'guard drift scenario did not reach a new final --skipreview handoff' >&2
+  exit 1
+fi
+if ! grep -Exq 'auroscope guard: recipe identity drift for hello: got [0-9a-f]{40}/[0-9a-f]{64} want [0-9a-f]{40}/[0-9a-f]{64}' /tmp/drift-output; then
+  echo 'guard drift scenario failed without the exact identity-refusal diagnostic' >&2
+  exit 1
+fi
+echo 'guard drift scenario: new final handoff and exact identity refusal verified'
 
 # Skipping the only AUR target performs no final build resolution.
 before=$(grep -c -- '--skipreview' /tmp/paru-calls || true)
