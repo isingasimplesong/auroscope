@@ -194,7 +194,7 @@ review_output=$(printf 'approve\n' | sudo -u builder -- env \
   AUROSCOPE_STATE=/tmp/package-test-state.sqlite3 \
   AUROSCOPE_CLONE_DIR=/tmp/package-test-clones \
   /usr/bin/auroscope -S hello)
-expected_review=$'AURoscope: auditing hello with Codex (timeout 5m0s)...\n\nAUR audit: hello\n\n---\nAssessment: packaging looks conventional\n\nRisk: low\n---\n\nDecision : [a]pprove | [i]nspect full report | [e]dit and re-audit | [s]kip | [c]ancel '
+expected_review=$'AURoscope: auditing hello with Codex (timeout 5m0s)...\nAUR audit: hello\n\n---\nAssessment: packaging looks conventional\n\nRisk: low\n---\n\nDecision : [a]pprove | [i]nspect full report | [e]dit and re-audit | [s]kip | [c]ancel '
 case "$review_output" in
   *"$expected_review"*) ;;
   *)
