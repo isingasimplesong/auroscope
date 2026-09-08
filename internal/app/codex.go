@@ -244,7 +244,7 @@ func runCodexCommand(cmd *exec.Cmd, signals <-chan os.Signal, timeout time.Durat
 }
 
 func printCodexProgress(progress io.Writer, elapsed time.Duration) {
-	fmt.Fprintf(progress, "AURoscope: Codex audit still running (%s elapsed)...\n\n", elapsed.Round(time.Second))
+	fmt.Fprintf(progress, "AURoscope: Codex audit still running (%s elapsed)...\n", elapsed.Round(time.Second))
 }
 
 func waitForCodexStop(pid int, wait <-chan error) {

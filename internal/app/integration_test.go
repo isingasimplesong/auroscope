@@ -44,10 +44,9 @@ func TestApprovedAURPackageEndToEndWithFirstAudit(t *testing.T) {
 		t.Fatalf("calls = %s", callsText)
 	}
 	if !strings.Contains(stdout.String(), "AURoscope: acquiring AUR recipe hello with Paru...") ||
-		!strings.Contains(stdout.String(), "\nAURoscope: auditing hello with Codex (timeout 5m0s)...\n\n") ||
-		!strings.Contains(stdout.String(), "AUR audit: hello\n\n") ||
+		!strings.Contains(stdout.String(), "with Paru...\nAURoscope: auditing hello with Codex (timeout 5m0s)...\nAUR audit: hello\n\n---\n") ||
 		!strings.Contains(stdout.String(), "Assessment: looks bounded\n\n") ||
-		!strings.Contains(stdout.String(), "Risk: low\n\n") {
+		!strings.Contains(stdout.String(), "Risk: low\n---\n\nDecision : ") {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 	for _, unwanted := range []string{"commit:", "manifest:", "Inspect:", "Diff:"} {

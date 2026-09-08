@@ -45,7 +45,7 @@ func TestDecisionMenuNamesFullReportAndShowsMnemonicChoices(t *testing.T) {
 	if got != "approve" {
 		t.Fatalf("decision = %q", got)
 	}
-	want := "Decision : [a]pprove | [i]nspect full report | [e]dit and re-audit | [s]kip | [c]ancel "
+	want := "Decision : [a]pprove | [i]nspect full report | [e]dit and re-audit | [s]kip | [c]ancel \n"
 	if stdout.String() != want {
 		t.Fatalf("menu = %q, want %q", stdout.String(), want)
 	}
@@ -55,17 +55,17 @@ func TestReviewSummarySeparatesSections(t *testing.T) {
 	var stdout bytes.Buffer
 	printReviewSummary(runConfig{stdout: &stdout}, "hello", auditReport{Summary: "packaging looks conventional", Risk: "low"})
 
-	want := "AUR audit: hello\n\nAssessment: packaging looks conventional\n\nRisk: low\n\n"
+	want := "AUR audit: hello\n\n---\nAssessment: packaging looks conventional\n\nRisk: low\n---\n\n"
 	if stdout.String() != want {
 		t.Fatalf("summary = %q, want %q", stdout.String(), want)
 	}
 }
 
-func TestCodexProgressSeparatesUpdates(t *testing.T) {
+func TestCodexProgressUsesSingleLine(t *testing.T) {
 	var stdout bytes.Buffer
 	printCodexProgress(&stdout, 15*time.Second)
 
-	want := "AURoscope: Codex audit still running (15s elapsed)...\n\n"
+	want := "AURoscope: Codex audit still running (15s elapsed)...\n"
 	if stdout.String() != want {
 		t.Fatalf("progress = %q, want %q", stdout.String(), want)
 	}

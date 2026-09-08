@@ -185,7 +185,7 @@ auditLoop:
 		if err != nil {
 			return reviewedPackage{}, err
 		}
-		fmt.Fprintf(o.config.stdout, "\nAURoscope: auditing %s with Codex (timeout %s)...\n\n", escapeTerminal(pkgbase), o.config.codexTimeout)
+		fmt.Fprintf(o.config.stdout, "AURoscope: auditing %s with Codex (timeout %s)...\n", escapeTerminal(pkgbase), o.config.codexTimeout)
 		report, err := (codexClient{path: o.config.codexPath}).audit(bundle, o.config)
 		if err != nil {
 			fmt.Fprintf(o.config.stderr, "auroscope: audit failed for %s: %v\n", pkgbase, err)
@@ -232,7 +232,7 @@ auditLoop:
 }
 
 func printReviewSummary(config runConfig, pkgbase string, report auditReport) {
-	fmt.Fprintf(config.stdout, "AUR audit: %s\n\nAssessment: %s\n\nRisk: %s\n\n", escapeTerminal(pkgbase), escapeTerminal(report.Summary), escapeTerminal(report.Risk))
+	fmt.Fprintf(config.stdout, "AUR audit: %s\n\n---\nAssessment: %s\n\nRisk: %s\n---\n\n", escapeTerminal(pkgbase), escapeTerminal(report.Summary), escapeTerminal(report.Risk))
 }
 
 func printReview(config runConfig, pkgbase string, bundle auditBundle, report auditReport) {
@@ -297,6 +297,8 @@ func askDecision(reader *bufio.Reader, config runConfig, allowed []string) strin
 		}
 		fmt.Fprintf(config.stdout, "Decision : %s ", strings.Join(items, " | "))
 		line, err := reader.ReadString('\n')
+		// The terminal echoes Enter; add a blank line before the next phase.
+		fmt.Fprintln(config.stdout)
 		if err != nil {
 			return "cancel"
 		}
