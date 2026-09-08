@@ -113,6 +113,27 @@ Both commands exited `0`. The complete `PreBuildCommand` log had the same SHA-25
 6. Relaunch Paru with approved targets only, a transaction-private `PreBuildCommand`, and `--skipreview`; the hook rejects unknown or changed worktrees.
 7. Let Paru perform the fresh final resolution, makepkg build, and Pacman installation. Official-only commands bypass all audit machinery.
 
+## Drift recovery verified for issue #56
+
+The source-only supported-Paru gate passed with the pinned commit above:
+
+```console
+AUROSCOPE_E2E_SUPPORTED_PARU=1 AUROSCOPE_E2E_SOURCE_ONLY=1 scripts/e2e-supported-paru.sh
+```
+
+The fixture commits a recipe change after audit bundle construction. The real
+`PreBuildCommand` rejects it and writes the package base to an attempt-private
+result file. After Paru exits, AURoscope offers retry, skip, or cancel without
+parsing Paru's localized error text. Explicit retry performs another acquisition,
+Codex audit and approval before a new guarded Paru build/install succeeds.
+The gate asserts two audits and the human drift/retry messages. Codex is a fake
+for this orchestration test; Paru, the guard, makepkg and Pacman are real inside
+disposable Arch. The source-only mode does not qualify the immutable package pin.
+
+Local tests also cover repeated drift, EOF/cancel, missing fresh approval, skip,
+mixed targets, excluded dependencies, ordinary errors, signal exit status,
+transaction cleanup and baseline advancement only after successful completion.
+
 ## Packaging implication verified for issue #34
 
 On 2026-09-03, the exact stable tag `70f66dc9eddb40e264ee6c9197541262b7792c9c` was rebuilt in the pinned disposable Arch image. `printf '1\n' | paru -Ssaq --interactive hello` returned status `1`, wrote the complete localized menu, prompt, and final `hello` target to stdout, and wrote nothing to stderr. This reproduces the silent `auroscope <terms>` report: AURoscope correctly captures stdout as the machine stream, but stable Paru puts the human UI there too.

@@ -24,6 +24,22 @@ auroscope <other Paru args>  # transparent passthrough when no AUR build occurs
 
 AURoscope does not replace Paru's search UI, resolver, build machinery, or Pacman. It does not audit official packages.
 
+### Recipe changed after approval
+
+If the final guard detects a changed recipe, Paru stops before executing it.
+AURoscope names the package and offers `retry`, `skip`, or `cancel`:
+
+- `retry` acquires that package again through Paru, reruns Codex, and requires
+  a new approval before another final Paru transaction;
+- `skip` removes its approval and targets; Paru may reject remaining packages
+  that still need the skipped dependency;
+- `cancel` or end-of-input stops the AUR phase without retrying.
+
+Other approved recipes remain subject to the exact identity guard on every
+attempt. A successful official update is not repeated. Ordinary Paru failures
+and signal exit statuses do not trigger this menu. Paru's native hook-failure
+diagnostic can still appear above AURoscope's explanation.
+
 ## V1 shape
 
 - Go executable for Arch Linux `linux/amd64`.
@@ -82,6 +98,12 @@ AUROSCOPE_E2E_SUPPORTED_PARU=1 scripts/e2e-supported-paru.sh
 The package test and both integration scripts require Docker. The package test builds and installs `packaging/aur/PKGBUILD` in disposable Arch. The first integration script is a fast fake-Paru/fake-Codex smoke. The supported-version gate builds pinned Paru commit `9ac3578807a87858651e81a02586ceb947686e7c`, uses real AUR acquisition/resolution/build and Pacman installation only inside the disposable container, proves the real guard and drift rejection, and confirms that official-only work invokes no Codex audit.
 
 For selection/color verification without executing any PKGBUILD, run `AUROSCOPE_E2E_SUPPORTED_PARU=1 AUROSCOPE_E2E_SELECTION_ONLY=1 scripts/e2e-supported-paru.sh`. This checks real native colors with `Color` enabled/disabled and redirected output, then exits before the build/install scenarios. See the [selection color contract](docs/dependency-notes/paru-selection-colors.md).
+
+For unpublished worktree changes, set `AUROSCOPE_E2E_SOURCE_ONLY=1` alongside
+`AUROSCOPE_E2E_SUPPORTED_PARU=1`. This tests the checkout binary, including drift
+and explicit retry, without fetching the immutable AURoscope package snapshot.
+Builds and installations still occur only inside disposable Arch. This source
+gate does not qualify the packaged artifact or advance its source pin.
 
 ## Previous design
 

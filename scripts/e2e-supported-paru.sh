@@ -18,6 +18,7 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 docker run --rm -i \
   -e AUROSCOPE_E2E_INSIDE=1 \
   -e AUROSCOPE_E2E_SELECTION_ONLY="${AUROSCOPE_E2E_SELECTION_ONLY:-0}" \
+  -e AUROSCOPE_E2E_SOURCE_ONLY="${AUROSCOPE_E2E_SOURCE_ONLY:-0}" \
   -e PARU_COMMIT="$PARU_COMMIT" \
   -v "$repo_root:/src:ro" \
   "$IMAGE" /bin/bash <<'BASH'
@@ -58,6 +59,9 @@ fi
 
 # Install the pinned recipe, not the independently built source binary. Package
 # the real compiled Paru as a disposable provider so Pacman checks dependencies.
+# Source-only checks exercise unpublished worktree fixes without fetching the
+# immutable package pin. They do not qualify the packaged artifact.
+if [[ "${AUROSCOPE_E2E_SOURCE_ONLY:-0}" != 1 ]]; then
 install -d -m 0755 -o builder -g builder /work/paru-provider
 cat >/work/paru-provider/PKGBUILD <<'EOF'
 pkgname=paru-git
@@ -85,6 +89,7 @@ AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
   AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
   GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
   go test ./internal/app -run '^TestSelectionRealParuColors$' -count=1 -v -timeout=120s
+fi
 
 cat >/usr/local/bin/paru <<'EOF'
 #!/bin/sh
@@ -112,10 +117,12 @@ done
 [ "$PWD" != /home/builder/aur/hello ]
 [ -f bundle.json ]
 printf 'audit\n' >>/tmp/codex-calls
-if [ "${AUROSCOPE_E2E_DRIFT:-}" = 1 ]; then
+if [ "${AUROSCOPE_E2E_DRIFT:-}" = 1 ] ||
+   { [ "${AUROSCOPE_E2E_DRIFT:-}" = once ] && [ ! -f /tmp/auroscope-drift-once ]; }; then
   printf '\n# post-audit drift\n' >>/home/builder/aur/hello/PKGBUILD
   git -C /home/builder/aur/hello -c user.name=E2E -c user.email=e2e@example.invalid add PKGBUILD
   git -C /home/builder/aur/hello -c user.name=E2E -c user.email=e2e@example.invalid commit -m drift >/dev/null
+  touch /tmp/auroscope-drift-once
 fi
 printf '%s' '{"summary":"supported-Paru E2E audit","risk":"low","findings":[],"uncertainty":"","inspect":["PKGBUILD"]}' >"$out"
 EOF
@@ -196,6 +203,23 @@ if ! grep -Exq 'auroscope guard: recipe identity drift for hello: got [0-9a-f]{4
   exit 1
 fi
 echo 'guard drift scenario: new final handoff and exact identity refusal verified'
+
+# The candidate must recover from the real hook refusal only after an explicit
+# retry and a second Codex audit/approval. Keep this source gate separate from
+# the immutable packaged artifact until publication advances its source pin.
+if [[ "${AUROSCOPE_E2E_SOURCE_ONLY:-0}" == 1 ]]; then
+  rm -f /tmp/auroscope-drift-once
+  before_retry_codex=$(wc -l </tmp/codex-calls)
+  printf 'approve\nretry\napprove\n' | run_as_builder env \
+    AUROSCOPE_E2E_DRIFT=once \
+    /usr/local/bin/auroscope -S --noconfirm --rebuild hello \
+    2>&1 | tee /tmp/drift-retry-output
+  after_retry_codex=$(wc -l </tmp/codex-calls)
+  [ "$after_retry_codex" -eq $((before_retry_codex + 2)) ]
+  grep -Fq 'the recipe for hello changed after approval' /tmp/drift-retry-output
+  grep -Fq 'Decision : [r]etry | [s]kip | [c]ancel' /tmp/drift-retry-output
+  pacman -Q hello
+fi
 
 # Skipping the only AUR target performs no final build resolution.
 before=$(grep -c -- '--skipreview' /tmp/paru-calls || true)

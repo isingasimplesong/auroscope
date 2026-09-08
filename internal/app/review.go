@@ -79,6 +79,42 @@ func (o orchestrator) run(originalArgs, targets []string) error {
 		}
 	}
 
+	for {
+		err := o.installReviewed(store, originalArgs, targets, plan, reviewed)
+		var drift recipeDrift
+		if !errors.As(err, &drift) {
+			return err
+		}
+		fmt.Fprintf(o.config.stdout, "\nAURoscope: %s.\nRetry acquires and audits this package again, then asks for approval.\nSkip omits it; Paru may refuse remaining targets that depend on it.\n", drift)
+		switch askDecision(reader, o.config, []string{"retry", "skip", "cancel"}) {
+		case "retry":
+			for i := range reviewed {
+				if reviewed[i].Identity.Pkgbase != drift.Pkgbase {
+					continue
+				}
+				item, err := o.reviewPackage(store, drift.Pkgbase, reader)
+				if err != nil {
+					return err
+				}
+				if item.Decision == decisionCancel {
+					return childExit{status: statusFailure}
+				}
+				reviewed[i] = item
+			}
+		case "skip":
+			for i := range reviewed {
+				if reviewed[i].Identity.Pkgbase == drift.Pkgbase {
+					reviewed[i].Decision = decisionSkip
+				}
+			}
+		default:
+			fmt.Fprintln(o.config.stdout, "AURoscope: AUR phase cancelled; no retry was started.")
+			return childExit{status: statusFailure}
+		}
+	}
+}
+
+func (o orchestrator) installReviewed(store *stateStore, originalArgs, targets []string, plan resolvedPlan, reviewed []reviewedPackage) error {
 	var approved []recipeIdentity
 	var finalTargets []string
 	finalTargets = append(finalTargets, plan.RepoTargets...)
@@ -108,6 +144,19 @@ func (o orchestrator) run(originalArgs, targets []string) error {
 	args = insertBeforeTargets(args, "--skipreview")
 	result := o.paru.finalInstall(args, []string{"PARU_CONF=" + confPath})
 	if result.status != 0 {
+		// Only a guard-produced result for an approved package is recoverable.
+		// Signals, startup errors and ordinary Paru failures keep their status.
+		if result.status > 0 && result.status < 128 {
+			data, err := os.ReadFile(filepath.Join(txDir, "approved.json.drift.json"))
+			var drift recipeDrift
+			if err == nil && json.Unmarshal(data, &drift) == nil {
+				for _, identity := range approved {
+					if drift.Pkgbase == identity.Pkgbase {
+						return drift
+					}
+				}
+			}
+		}
 		return childExit{status: result.status}
 	}
 	if err := store.advanceBaselines(approved); err != nil {

@@ -6,6 +6,14 @@ import (
 	"os"
 )
 
+type recipeDrift struct {
+	Pkgbase string `json:"pkgbase"`
+}
+
+func (d recipeDrift) Error() string {
+	return fmt.Sprintf("the recipe for %s changed after approval (recipe identity drift); build stopped before executing the changed recipe", escapeTerminal(d.Pkgbase))
+}
+
 func runGuard(txPath, worktree string) error {
 	if worktree == "" {
 		var err error
@@ -41,7 +49,17 @@ func runGuard(txPath, worktree string) error {
 		return err
 	}
 	if actual.Commit != expected.Commit || actual.ManifestDigest != expected.ManifestDigest {
-		return fmt.Errorf("recipe identity drift for %s: got %s/%s want %s/%s", pkgbase, actual.Commit, actual.ManifestDigest, expected.Commit, expected.ManifestDigest)
+		drift := recipeDrift{Pkgbase: pkgbase}
+		data, err := json.Marshal(drift)
+		if err != nil {
+			return err
+		}
+		// This private, attempt-local result is independent of Paru's localized
+		// diagnostics and exit status. It never authorizes a recipe.
+		if err := os.WriteFile(txPath+".drift.json", data, 0o600); err != nil {
+			return fmt.Errorf("%s; cannot report drift to AURoscope: %w", drift, err)
+		}
+		return drift
 	}
 	return nil
 }
