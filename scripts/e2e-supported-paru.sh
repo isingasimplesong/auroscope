@@ -150,7 +150,7 @@ run_as_builder() {
 pacman -Q hello
 first_codex_count=$(wc -l </tmp/codex-calls)
 [ "$first_codex_count" -eq 1 ]
-grep -q -- '-Ssaq --interactive hello' /tmp/paru-calls
+grep -q -- '-Ssq --interactive hello' /tmp/paru-calls
 grep -q -- '-P --order hello' /tmp/paru-calls
 grep -q -- '-G hello' /tmp/paru-calls
 grep -q -- '-S --skipreview -- hello' /tmp/paru-calls
@@ -190,7 +190,16 @@ printf 'skip\n' | run_as_builder /usr/local/bin/auroscope -S --noconfirm hello
 after=$(grep -c -- '--skipreview' /tmp/paru-calls || true)
 [ "$before" -eq "$after" ]
 
-# An official-only install remains native and does not invoke Codex.
+# Selecting an official package installs the resolved target, not the search
+# terms again. Native EOF accepts the final confirmation; Codex stays unused.
+before_codex=$(wc -l </tmp/codex-calls)
+printf '1\n' | run_as_builder /usr/local/bin/auroscope tree
+pacman -Q tree
+grep -Fx -- '-S -- tree' /tmp/paru-calls
+after_codex=$(wc -l </tmp/codex-calls)
+[ "$before_codex" -eq "$after_codex" ]
+
+# An explicit official-only install also remains native without Codex.
 before_codex=$(wc -l </tmp/codex-calls)
 run_as_builder /usr/local/bin/auroscope -S --repo --noconfirm tree
 pacman -Q tree

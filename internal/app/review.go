@@ -118,8 +118,10 @@ func (o orchestrator) run(originalArgs, targets []string) error {
 
 func finishNative(paru paruClient, originalArgs, repoTargets []string) error {
 	args := originalArgs
-	if len(args) == 0 {
-		args = append([]string{"-S"}, repoTargets...)
+	if len(args) == 0 || !strings.HasPrefix(args[0], "-") {
+		// Search terms have already been resolved by native selection. Install
+		// only those selected targets rather than opening the search again.
+		args = append([]string{"-S", "--"}, repoTargets...)
 	}
 	result := paru.finalInstall(args, nil)
 	if result.status != 0 {

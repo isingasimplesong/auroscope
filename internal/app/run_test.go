@@ -314,6 +314,68 @@ exit 99
 	}
 }
 
+func TestOfficialSelectionInstallsSelectedTargetsWithoutCodex(t *testing.T) {
+	for _, exitStatus := range []string{"0", "42"} {
+		t.Run(exitStatus, func(t *testing.T) {
+			dir := t.TempDir()
+			calls := filepath.Join(dir, "calls")
+			codexMarker := filepath.Join(dir, "codex-called")
+			t.Setenv("CALLS", calls)
+			t.Setenv("CODEX_MARKER", codexMarker)
+			t.Setenv("INSTALL_STATUS", exitStatus)
+			paruPath := writeExecutable(t, dir, "paru", `#!/bin/sh
+printf '%s\n' "$*" >> "$CALLS"
+case "$1" in
+  -Ssq) printf 'tree\n'; exit 1 ;;
+  -P) printf 'REPO TARGET extra tree\n'; exit 0 ;;
+esac
+read -r answer
+printf 'native stdout: %s\n' "$answer"
+printf 'native stderr\n' >&2
+exit "$INSTALL_STATUS"
+`)
+			codexPath := writeExecutable(t, dir, "codex", `#!/bin/sh
+: > "$CODEX_MARKER"
+exit 99
+`)
+			stdin, err := os.CreateTemp(dir, "stdin")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stdin.Close()
+			if _, err := stdin.WriteString("yes\n"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := stdin.Seek(0, io.SeekStart); err != nil {
+				t.Fatal(err)
+			}
+			var stdout, stderr bytes.Buffer
+			status := run([]string{"tree", "search-term"}, runConfig{
+				paruPath: paruPath, codexPath: codexPath,
+				statePath: filepath.Join(dir, "state.sqlite3"), cloneDir: filepath.Join(dir, "clones"),
+				stdin: stdin, stdout: &stdout, stderr: &stderr,
+			})
+			wantStatus := 0
+			if exitStatus == "42" {
+				wantStatus = 42
+			}
+			if status != wantStatus {
+				t.Fatalf("status = %d, want %d; stderr = %s", status, wantStatus, stderr.String())
+			}
+			wantCalls := []string{"-Ssq --interactive tree search-term", "-P --order tree", "-S -- tree"}
+			if got := strings.Split(strings.TrimSpace(readString(t, calls)), "\n"); !reflect.DeepEqual(got, wantCalls) {
+				t.Fatalf("calls = %#v, want %#v", got, wantCalls)
+			}
+			if stdout.String() != "native stdout: yes\n" || stderr.String() != "native stderr\n" {
+				t.Fatalf("native streams changed: stdout=%q stderr=%q", stdout.String(), stderr.String())
+			}
+			if _, err := os.Stat(codexMarker); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("Codex was called or marker stat failed: %v", err)
+			}
+		})
+	}
+}
+
 func TestChildSignalExitStatusIsPreserved(t *testing.T) {
 	dir := t.TempDir()
 	paruPath := writeExecutable(t, dir, "paru", `#!/bin/sh
@@ -378,7 +440,7 @@ exit 1
 	if !reflect.DeepEqual(selected, []string{"aur/hello", "world-bin"}) {
 		t.Fatalf("selected = %#v", selected)
 	}
-	if got := readLines(t, argsFile); !reflect.DeepEqual(got, []string{"-Ssaq", "--interactive", "hello", "world"}) {
+	if got := readLines(t, argsFile); !reflect.DeepEqual(got, []string{"-Ssq", "--interactive", "hello", "world"}) {
 		t.Fatalf("args = %#v", got)
 	}
 	if !strings.Contains(menu.String(), "Choose packages") {

@@ -73,7 +73,7 @@ func (paru paruClient) runInDirWithStdinEnv(stdout io.Writer, dir string, args [
 // denotes successful completion of this special selection path.
 func (paru paruClient) selectPackages(terms []string) ([]string, error) {
 	var selected bytes.Buffer
-	args := append([]string{"-Ssaq", "--interactive"}, terms...)
+	args := append([]string{"-Ssq", "--interactive"}, terms...)
 	result := paru.runSelection(&selected, args)
 	if result.status < 0 && result.err != nil {
 		return nil, fmt.Errorf("run Paru selection: %w", result.err)

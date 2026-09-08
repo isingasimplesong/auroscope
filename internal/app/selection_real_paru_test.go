@@ -22,10 +22,15 @@ func TestSelectionRealParuColors(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name            string
+		name, term      string
 		color, terminal bool
 	}{
-		{"color terminal", true, true}, {"no color terminal", false, true}, {"color redirected", true, false},
+		{"aur color terminal", "hello", true, true},
+		{"aur no color terminal", "hello", false, true},
+		{"aur color redirected", "hello", true, false},
+		{"official color terminal", "tree", true, true},
+		{"official no color terminal", "tree", false, true},
+		{"official color redirected", "tree", true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -44,11 +49,12 @@ func TestSelectionRealParuColors(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Setenv("AUROSCOPE_TEST_PACMAN_CONF", configPath)
+			t.Setenv("AUROSCOPE_TEST_TARGET", tc.term)
 			wrapper := writeExecutable(t, dir, "paru", `#!/bin/sh
 # For the installed-artifact probe, stop after selection with a distinctive
 # status. Verify the exact machine target reached planning, without a recipe.
 if [ "${AUROSCOPE_TEST_BINARY:-}" != "" ] && [ "${1:-}" = '-P' ]; then
-  [ "$#" = 3 ] && [ "$2" = '--order' ] && [ "$3" = 'hello' ] || exit 74
+  [ "$#" = 3 ] && [ "$2" = '--order' ] && [ "$3" = "$AUROSCOPE_TEST_TARGET" ] || exit 74
   exit 73
 fi
 exec "$AUROSCOPE_TEST_REAL_PARU" --config "$AUROSCOPE_TEST_PACMAN_CONF" "$@"
@@ -69,14 +75,14 @@ exec "$AUROSCOPE_TEST_REAL_PARU" --config "$AUROSCOPE_TEST_PACMAN_CONF" "$@"
 			client := paruClient{config: runConfig{paruPath: wrapper, stdin: strings.NewReader("1\n"), stdout: stdout, stderr: stderr}}
 			var targets []string
 			if binary := os.Getenv("AUROSCOPE_TEST_BINARY"); binary != "" {
-				cmd := exec.Command(binary, "hello")
+				cmd := exec.Command(binary, tc.term)
 				cmd.Env = append(os.Environ(), "AUROSCOPE_PARU="+wrapper)
 				cmd.Stdin, cmd.Stdout, cmd.Stderr = strings.NewReader("1\n"), stdout, stderr
 				if exit, ok := cmd.Run().(*exec.ExitError); !ok || exit.ExitCode() != statusFailure {
 					t.Errorf("installed selection did not reach exact-target planning: %v", exit)
 				}
 			} else {
-				targets, err = client.selectPackages([]string{"hello"})
+				targets, err = client.selectPackages([]string{tc.term})
 			}
 			slave.Close()
 			output.Write(<-terminalOutput)
@@ -86,11 +92,16 @@ exec "$AUROSCOPE_TEST_REAL_PARU" --config "$AUROSCOPE_TEST_PACMAN_CONF" "$@"
 			if err != nil {
 				t.Fatalf("selection: %v; menu %q", err, output.String())
 			}
-			if os.Getenv("AUROSCOPE_TEST_BINARY") == "" && (len(targets) != 1 || unqualifiedTarget(targets[0]) != "hello") {
+			if os.Getenv("AUROSCOPE_TEST_BINARY") == "" && (len(targets) != 1 || unqualifiedTarget(targets[0]) != tc.term) {
 				t.Fatalf("targets = %q", targets)
 			}
 			if got := bytes.Contains(output.Bytes(), []byte("\x1b[")); got != (tc.color && tc.terminal) {
 				t.Fatalf("color=%v, menu=%q", got, output.String())
+			}
+			// A tree search must keep both repository and AUR entries in Paru's
+			// own menu. Parsing here is a test assertion, never a resolver.
+			if tc.term == "tree" && (!strings.Contains(output.String(), "extra/") || !strings.Contains(output.String(), "aur/")) {
+				t.Fatalf("search lost repository or AUR entries: %q", output.String())
 			}
 			if !strings.Contains(output.String(), "Select packages") {
 				t.Fatalf("missing native prompt: %q", output.String())
