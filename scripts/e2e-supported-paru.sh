@@ -14,6 +14,9 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+if [ "${AUROSCOPE_E2E_SOURCE_ONLY:-0}" != 1 ]; then
+  bash "$repo_root/packaging/aur/scripts/check-freshness.sh"
+fi
 
 docker run --rm -i \
   -e AUROSCOPE_E2E_INSIDE=1 \
@@ -198,34 +201,31 @@ if [ "$after_drift" -ne $((before_drift + 1)) ]; then
   echo 'guard drift scenario did not reach a new final --skipreview handoff' >&2
   exit 1
 fi
-if ! grep -Exq 'auroscope guard: recipe identity drift for hello: got [0-9a-f]{40}/[0-9a-f]{64} want [0-9a-f]{40}/[0-9a-f]{64}' /tmp/drift-output; then
+if ! grep -Fxq 'auroscope guard: the recipe for hello changed after approval (recipe identity drift); build stopped before executing the changed recipe' /tmp/drift-output; then
   echo 'guard drift scenario failed without the exact identity-refusal diagnostic' >&2
   exit 1
 fi
 echo 'guard drift scenario: new final handoff and exact identity refusal verified'
-
-# The candidate must recover from the real hook refusal only after an explicit
-# retry and a second Codex audit/approval. Keep this source gate separate from
-# the immutable packaged artifact until publication advances its source pin.
-if [[ "${AUROSCOPE_E2E_SOURCE_ONLY:-0}" == 1 ]]; then
-  rm -f /tmp/auroscope-drift-once
-  before_retry_codex=$(wc -l </tmp/codex-calls)
-  printf 'approve\nretry\napprove\n' | run_as_builder env \
-    AUROSCOPE_E2E_DRIFT=once \
-    /usr/local/bin/auroscope -S --noconfirm --rebuild hello \
-    2>&1 | tee /tmp/drift-retry-output
-  after_retry_codex=$(wc -l </tmp/codex-calls)
-  [ "$after_retry_codex" -eq $((before_retry_codex + 2)) ]
-  grep -Fq 'the recipe for hello changed after approval' /tmp/drift-retry-output
-  grep -Fq 'Decision : [r]etry | [s]kip | [c]ancel' /tmp/drift-retry-output
-  pacman -Q hello
-fi
 
 # Skipping the only AUR target performs no final build resolution.
 before=$(grep -c -- '--skipreview' /tmp/paru-calls || true)
 printf 'skip\n' | run_as_builder /usr/local/bin/auroscope -S --noconfirm hello
 after=$(grep -c -- '--skipreview' /tmp/paru-calls || true)
 [ "$before" -eq "$after" ]
+
+# Recover from the real hook refusal only after explicit retry and reapproval.
+# This exercises the installed artifact unless source-only mode was requested.
+rm -f /tmp/auroscope-drift-once
+before_retry_codex=$(wc -l </tmp/codex-calls)
+printf 'approve\nretry\napprove\n' | run_as_builder env \
+  AUROSCOPE_E2E_DRIFT=once \
+  /usr/local/bin/auroscope -S --noconfirm --rebuild hello \
+  2>&1 | tee /tmp/drift-retry-output
+after_retry_codex=$(wc -l </tmp/codex-calls)
+[ "$after_retry_codex" -eq $((before_retry_codex + 2)) ]
+grep -Fq 'the recipe for hello changed after approval' /tmp/drift-retry-output
+grep -Fq 'Decision : [r]etry | [s]kip | [c]ancel' /tmp/drift-retry-output
+pacman -Q hello
 
 # Selecting an official package installs the resolved target, not the search
 # terms again. Answer Pacman's confirmation explicitly: EOF cancels this path.

@@ -25,7 +25,7 @@ func TestSupportedParuDriftGate(t *testing.T) {
 		t.Fatal("cannot locate the bounded drift scenario")
 	}
 	// Ground the positive control in the production guard's actual diagnostic,
-	// including its observed and approved commit/manifest identities.
+	// including its package identity and explicit pre-execution refusal.
 	fixture := t.TempDir()
 	repo := createRecipeRepo(t, fixture, "hello", "pkgname=hello\n")
 	identity, _, err := readRecipeIdentity("hello", repo)
@@ -64,7 +64,7 @@ func TestSupportedParuDriftGate(t *testing.T) {
 		{"audit before handoff", 1, false, "audit failed", false},
 		{"resolution after handoff", 1, true, "resolution failed", false},
 		{"diagnostic without new handoff", 1, false, diagnostic, false},
-		{"wrong package", 1, true, strings.Replace(diagnostic, "hello:", "other:", 1), false},
+		{"wrong package", 1, true, strings.Replace(diagnostic, "hello changed", "other changed", 1), false},
 		{"truncated diagnostic", 1, true, "auroscope guard: recipe identity drift for hello", false},
 		{"near match", 1, true, diagnostic + "-other", false},
 		{"zero status despite evidence", 0, true, diagnostic, false},
