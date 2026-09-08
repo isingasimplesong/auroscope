@@ -191,9 +191,47 @@ after=$(grep -c -- '--skipreview' /tmp/paru-calls || true)
 [ "$before" -eq "$after" ]
 
 # Selecting an official package installs the resolved target, not the search
-# terms again. Native EOF accepts the final confirmation; Codex stays unused.
+# terms again. Answer Pacman's confirmation explicitly: EOF cancels this path.
+# Wait for the actual prompt so Paru selection cannot buffer the later answer.
 before_codex=$(wc -l </tmp/codex-calls)
-printf '1\n' | run_as_builder /usr/local/bin/auroscope tree
+run_as_builder python - <<'PY'
+import os
+import select
+import subprocess
+import sys
+import time
+
+child = subprocess.Popen(['/usr/local/bin/auroscope', 'tree'],
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT)
+child.stdin.write(b'1\n')
+child.stdin.flush()
+output = b''
+answered = False
+deadline = time.monotonic() + 120
+try:
+    while True:
+        if time.monotonic() >= deadline:
+            raise TimeoutError('official selection/install prompt timed out')
+        if not select.select([child.stdout], [], [], 1)[0]:
+            continue
+        chunk = os.read(child.stdout.fileno(), 65536)
+        if not chunk:
+            break
+        sys.stdout.buffer.write(chunk)
+        sys.stdout.buffer.flush()
+        output += chunk
+        if not answered and b'Proceed with installation?' in output:
+            child.stdin.write(b'y\n')
+            child.stdin.flush()
+            answered = True
+    assert answered, 'native installation confirmation was not reached'
+    assert child.wait(timeout=10) == 0, 'official installation failed'
+finally:
+    if child.poll() is None:
+        child.kill()
+        child.wait()
+PY
 pacman -Q tree
 grep -Fx -- '-S -- tree' /tmp/paru-calls
 after_codex=$(wc -l </tmp/codex-calls)
