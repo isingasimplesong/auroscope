@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -319,10 +318,7 @@ func ensurePrivateDir(path string) error {
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		return err
 	}
-	return filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || p != path {
-			return err
-		}
-		return os.Chmod(path, 0o700)
-	})
+	// Only the clone root belongs to this preparation step. Paru/makepkg may
+	// leave unreadable build artifacts below it; do not traverse or chmod them.
+	return os.Chmod(path, 0o700)
 }
