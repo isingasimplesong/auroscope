@@ -86,6 +86,12 @@ chown builder:builder /work/paru-provider/PKGBUILD
 sudo -u builder -- bash -lc 'cd /work/paru-provider && makepkg --noconfirm'
 pacman --noconfirm -U /work/paru-provider/*.pkg.tar.zst
 chown -R builder:builder /work/auroscope/packaging/aur
+if [[ -d /src/packaging/aur/cache/sources ]]; then
+  install -d -m 0755 -o builder -g builder /work/source-cache
+  cp -a /src/packaging/aur/cache/sources/. /work/source-cache/
+  chown -R builder:builder /work/source-cache
+  printf 'SRCDEST=/work/source-cache\n' >/etc/makepkg.conf.d/auroscope-cache.conf
+fi
 sudo -u builder -- bash -lc 'cd /work/auroscope/packaging/aur && makepkg --syncdeps --noconfirm'
 pacman --noconfirm -U /work/auroscope/packaging/aur/auroscope-*.pkg.tar.zst
 pacman -Q auroscope

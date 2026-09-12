@@ -70,6 +70,12 @@ chmod 0755 /usr/local/bin/codex
 
 cp -a /package-source /work/package
 chown -R builder:builder /work/package
+if [[ -d /package-source/cache/sources ]]; then
+  install -d -m 0755 -o builder -g builder /work/source-cache
+  cp -a /package-source/cache/sources/. /work/source-cache/
+  chown -R builder:builder /work/source-cache
+  printf 'SRCDEST=/work/source-cache\n' >/etc/makepkg.conf.d/auroscope-cache.conf
+fi
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --printsrcinfo > /tmp/generated.SRCINFO'
 cmp /work/package/.SRCINFO /tmp/generated.SRCINFO
 namcap /work/package/PKGBUILD
@@ -80,7 +86,10 @@ if sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfi
   echo 'AURoscope unexpectedly built with incompatible stable Paru installed' >&2
   exit 1
 fi
-grep -F 'install paru-git first, then rerun makepkg -si' /tmp/stable-build.err
+if ! grep -F 'install paru-git first, then rerun makepkg -si' /tmp/stable-build.err; then
+  cat /tmp/stable-build.out /tmp/stable-build.err >&2
+  exit 1
+fi
 if compgen -G '/work/package/auroscope-*.pkg.tar.zst' >/dev/null; then
   echo 'AURoscope package artifact exists after the incompatible-provider check' >&2
   exit 1

@@ -71,6 +71,53 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+The recovery below established a transport-only release-gate failure: the normal
+supported-Paru script did not use the authenticated archive cache, unlike the
+successful retained worker run. Both gate entry points now use the same optional
+`packaging/aur/cache/sources` directory, with makepkg checksum validation and no
+credentials in containers. This script correction requires a new immutable source
+checkpoint and package pin before final release validation. The r12 evidence below
+is retained evidence, not qualification of that forthcoming checkpoint.
+
+Candidate `0.1.0.r12.g46bef00-1` packages issue #65: Codex receives `luna` by
+default, or the literal `model` from the shared `auroscope/config.json` file.
+Provider selection from #68 is preserved. Prompt configuration remains in #64's
+separate execution lane; this package does not claim to deliver that feature.
+
+The source checkpoint is present on remote `loop/subject-65` and includes
+`origin/main` at `23f64e17fbf9c3d477f5a4405fdea0bcf147168a`:
+`46bef004e9db34870c736737d3d5402e59f5f5eb`
+
+The downloaded archive SHA-256 is:
+`a18d8267386c269cbfb5133f6acfafda5cfd1969942155063a76f3bc2fbde57e`
+
+Non-root Arch `.SRCINFO` generation, freshness, Go tests/vet, package build and
+upgrade passed. The upgrade retained r11's real archives and installed r12
+without `--force`. Installed tests verified both default `luna` and an explicit
+model. The full supported-Paru gate passed against `/usr/bin/auroscope`, retaining
+provider failure/no-bypass, auxiliary recipe context, native colors, real AUR
+build/install, edit/re-audit, drift refusal/retry and audit-free official work.
+Both gates reported:
+
+```text
+auroscope 0.1.0.r12.g46bef00-1
+```
+
+The archive endpoint returned HTTP 404 anonymously and succeeded with profile
+authentication. The package gate now accepts real, checksum-checked archives in
+ignored `packaging/aur/cache/sources`; credentials are not sent to the container.
+It also displays makepkg diagnostics when source retrieval fails before the
+expected incompatible-Paru check. The supported-Paru run used the same archives
+through a local Docker mount and makepkg `SRCDEST`, without changing its scenarios.
+These caches affect download transport only, not the pinned contents or checksums.
+
+Worker evidence is retained in ignored `logs/recovery-65/package-cached.log` and
+`logs/recovery-65/paru.log`. These deterministic tests do not qualify a live
+Codex account's access to `luna`. Publication and human review/merge remain
+pending. No user-machine installation was changed; preserve the source pin.
+
+### Previous r11 verification
+
 Candidate package `0.1.0.r11.gad96e16-1` delivers the explicit audit-provider
 selection authorized by #68: Codex remains the default, with Claude Code,
 Anthropic API, OpenAI API and configurable OpenAI-compatible API alternatives.
