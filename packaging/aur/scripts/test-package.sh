@@ -103,6 +103,12 @@ mapfile -t previous_archives < <(sudo -u builder -- bash -lc 'cd /work/previous 
 pacman --noconfirm -U "${previous_archives[@]}"
 previous_version=$(pacman -Q auroscope)
 
+# User configuration is not package-owned and must survive a real upgrade.
+install -d -m 0700 -o builder -g builder /home/builder/.config/auroscope
+printf '%s\n' '{"prompt":"My preserved packaging audit prompt"}' >/tmp/expected-audit-config
+install -m 0600 -o builder -g builder /tmp/expected-audit-config \
+  /home/builder/.config/auroscope/config.json
+
 # Reproduce #60 on the old installed artifact before testing the upgrade.
 install -d -m 0755 -o builder -g builder /home/builder/permission-clones/hermes-agent-desktop/pkg
 chown -R builder:builder /home/builder/permission-clones
@@ -147,6 +153,7 @@ done
 new_version=$(pacman -Q auroscope)
 test "$(vercmp "${new_version#auroscope }" "${previous_version#auroscope }")" -gt 0
 printf 'Cached-package upgrade passed: %s -> %s (no --force)\n' "$previous_version" "$new_version"
+cmp /tmp/expected-audit-config /home/builder/.config/auroscope/config.json
 
 rm -f /home/builder/permission-paru-calls
 permission_run
@@ -201,9 +208,11 @@ while [ "$#" -gt 0 ]; do
     shift
     out=$1
   fi
+  last=$1
   shift || true
 done
 [ -n "$out" ]
+[ "$last" = 'My preserved packaging audit prompt' ]
 printf '%s' '{"summary":"packaging looks conventional","risk":"low","findings":[],"uncertainty":"","inspect":[]}' >"$out"
 SCRIPT
 chmod 0755 /tmp/package-test-codex
@@ -247,5 +256,7 @@ case "$review_output" in
     ;;
 esac
 
+cmp /tmp/expected-audit-config /home/builder/.config/auroscope/config.json
+echo 'Installed custom prompt received by Codex and preserved through upgrade and audit'
 echo 'AURoscope package build/install smoke passed'
 BASH

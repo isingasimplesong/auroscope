@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -50,8 +51,11 @@ func TestAuditConfiguration(t *testing.T) {
 		`{"prompt":"Custom packaging audit.\nReturn the supplied JSON schema."}`,
 		`{"prompt":""}`,
 		`{"prompt":" \n	"}`,
-		`{}`,
 		`{"prompt":null}`,
+		`null`,
+		`[]`,
+		`{} {}`,
+		`{"prompt":42}`,
 		`{broken`,
 	} {
 		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
@@ -69,5 +73,59 @@ func TestAuditConfiguration(t *testing.T) {
 		if err != nil || string(got) != text {
 			t.Fatalf("existing configuration overwritten: %q, %v", got, err)
 		}
+	}
+}
+
+func TestPromptSharesExistingConfiguration(t *testing.T) {
+	for _, text := range []string{
+		`{}`,
+		`{"model":"luna"}`,
+		`{"provider":"codex","model":"custom model;not-a-shell"}`,
+		"{\n  \"provider\": \"codex\", \"model\": \"luna\", \"prompt\": \"User prompt\"\n}\n",
+	} {
+		t.Run(text, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			want := auditPrompt()
+			if strings.Contains(text, "User prompt") {
+				want = "User prompt"
+			}
+			for attempt := 0; attempt < 2; attempt++ {
+				got, err := loadAuditPrompt(path)
+				if err != nil || got != want {
+					t.Fatalf("prompt = %q, error = %v", got, err)
+				}
+				if got := readString(t, path); got != text {
+					t.Fatalf("shared configuration rewritten: %q", got)
+				}
+			}
+		})
+	}
+}
+
+func TestPromptRejectedBeforeCodexAndRereadAfterCorrection(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	path := filepath.Join(dir, "auroscope", "config.json")
+	if _, err := loadAuditPrompt(path); err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{`{"prompt":""}`, `{"prompt":42}`, `{"prompt":null}`} {
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_, err := (codexClient{path: "/does/not/exist"}).audit(auditBundle{}, runConfig{userConfig: true})
+		if err == nil || !strings.Contains(err.Error(), "audit configuration") {
+			t.Fatalf("want configuration rejection before CLI invocation, got %v", err)
+		}
+	}
+	if err := os.WriteFile(path, []byte(`{"model":"luna","prompt":"Corrected prompt"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prompt, err := loadAuditPrompt(path)
+	if err != nil || prompt != "Corrected prompt" {
+		t.Fatalf("corrected prompt = %q, error = %v", prompt, err)
 	}
 }

@@ -40,14 +40,23 @@ func loadAuditPrompt(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read audit configuration %s: %w", path, err)
 	}
-	var config struct {
-		Prompt string `json:"prompt"`
-	}
+	// Missing prompt supports existing model/provider-only configurations.
+	// Do not rewrite the file to add defaults: it belongs to the user.
+	config := struct {
+		Prompt *string `json:"prompt"`
+	}{}
 	if err := json.Unmarshal(data, &config); err != nil {
-		return "", fmt.Errorf("invalid audit configuration %s: %w", path, err)
+		return "", fmt.Errorf("invalid audit configuration %s: expected a JSON object", path)
 	}
-	if strings.TrimSpace(config.Prompt) == "" {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
+		return "", fmt.Errorf("invalid audit configuration %s: expected a JSON object", path)
+	}
+	if _, present := fields["prompt"]; !present {
+		return auditPrompt(), nil
+	}
+	if config.Prompt == nil || strings.TrimSpace(*config.Prompt) == "" {
 		return "", fmt.Errorf("audit configuration %s requires a nonempty prompt", path)
 	}
-	return config.Prompt, nil
+	return *config.Prompt, nil
 }

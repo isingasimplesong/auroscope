@@ -98,6 +98,12 @@ AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
   go test ./internal/app -run '^TestSelectionRealParuColors$' -count=1 -v -timeout=120s
 fi
 
+if [[ "${AUROSCOPE_E2E_SOURCE_ONLY:-0}" != 1 ]]; then
+AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
+  GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
+  go test ./internal/app -run '^TestPromptConfigurationLifecycle$' -count=1 -v -timeout=120s
+fi
+
 cat >/usr/local/bin/paru <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >>/tmp/paru-calls

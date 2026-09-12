@@ -2,8 +2,10 @@ package app
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -38,6 +40,95 @@ func TestOfficialOperationDoesNotTouchAuditConfiguration(t *testing.T) {
 			}
 		} else if !os.IsNotExist(err) {
 			t.Fatalf("official operation created configuration: %v", err)
+		}
+	}
+}
+
+// AUROSCOPE_TEST_BINARY runs the same contract against the installed Arch artifact.
+func TestPromptConfigurationLifecycle(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	path := filepath.Join(dir, "auroscope", "config.json")
+	captured := filepath.Join(dir, "prompt")
+	t.Setenv("TEST_CAPTURED_PROMPT", captured)
+	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\n")
+	calls := filepath.Join(dir, "calls")
+	paru := fakeParu(t, dir, calls, repo, "AUR TARGET hello hello\n")
+	codex := writeExecutable(t, dir, "codex", `#!/bin/sh
+set -eu
+if [ "$1" = --version ]; then
+  printf 'codex-cli 0.150.1\n'
+  exit 0
+fi
+out=''
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --output-last-message ]; then shift; out=$1; fi
+  last=$1
+  shift
+done
+printf '%s' "$last" > "$TEST_CAPTURED_PROMPT"
+printf '%s' '{"summary":"prompt received","risk":"low","findings":[],"uncertainty":"","inspect":[]}' > "$out"
+`)
+	invoke := func(args []string, input string) (int, string) {
+		t.Helper()
+		var output bytes.Buffer
+		config := runConfig{
+			userConfig: true, paruPath: paru, codexPath: codex,
+			statePath: filepath.Join(dir, "state.sqlite3"), cloneDir: filepath.Join(dir, "clones"),
+			stdin: strings.NewReader(input), stdout: &output, stderr: &output,
+		}
+		if binary := os.Getenv("AUROSCOPE_TEST_BINARY"); binary != "" {
+			cmd := exec.Command(binary, args...)
+			cmd.Env = append(os.Environ(), "AUROSCOPE_PARU="+paru, "AUROSCOPE_CODEX="+codex,
+				"AUROSCOPE_STATE="+config.statePath, "AUROSCOPE_CLONE_DIR="+config.cloneDir)
+			cmd.Stdin, cmd.Stdout, cmd.Stderr = config.stdin, &output, &output
+			if err := cmd.Run(); err != nil {
+				if exit, ok := err.(*exec.ExitError); ok {
+					return exit.ExitCode(), output.String()
+				}
+				t.Fatal(err)
+			}
+			return 0, output.String()
+		}
+		status := run(args, config)
+		return status, output.String()
+	}
+	if status, output := invoke([]string{"-S", "--repo", "tree"}, ""); status != 0 {
+		t.Fatalf("official operation: %d, %s", status, output)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("official operation touched config: %v", err)
+	}
+	for _, custom := range []bool{false, true} {
+		want := auditPrompt()
+		if custom {
+			want = "Custom audit\nPreserve my instructions exactly."
+			data, err := json.Marshal(map[string]string{"prompt": want, "model": "luna", "provider": "codex"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, data, 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for attempt := 0; attempt < 2; attempt++ {
+			before, readErr := os.ReadFile(path)
+			if status, output := invoke([]string{"-S", "hello"}, "approve\n"); status != 0 {
+				t.Fatalf("audit: %d, %s", status, output)
+			}
+			if got := readString(t, captured); got != want {
+				t.Fatalf("Codex prompt = %q, want %q", got, want)
+			}
+			if readErr == nil && readString(t, path) != string(before) {
+				t.Fatal("audit rewrote existing shared configuration")
+			}
+			var saved struct {
+				Prompt string `json:"prompt"`
+			}
+			readJSON(t, path, &saved)
+			if saved.Prompt != want {
+				t.Fatalf("saved prompt overwritten: %q", saved.Prompt)
+			}
 		}
 	}
 }

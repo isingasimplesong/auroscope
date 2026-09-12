@@ -94,6 +94,11 @@ to customize the audit; use `\n` for line breaks. Existing files are never
 rewritten by AURoscope or package upgrades. Keep a copy of your custom prompt
 before deleting the file to regenerate the default on the next audit.
 
+If an existing configuration has no `prompt` field, the built-in default is used
+without changing the file. Add `prompt` alongside model/provider settings in
+this same file rather than creating a second configuration. Empty or null
+prompts are errors, not a request for the default.
+
 An empty prompt or invalid JSON stops the audit with retry/skip/cancel, not an
 automatic approval. Native official-only operations do not load or create this
 file. Prompt changes do not disable the read-only Codex invocation, local report
