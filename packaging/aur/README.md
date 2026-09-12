@@ -85,19 +85,44 @@ a missing expected diagnostic.
 
 ## Upstream snapshot
 
-### Recovery checkpoint pending
+### Verified r13 recovery
 
-The retained r12 results below qualify the earlier source, not the current
-working tree. The subsequent wrapper run passed the package gate but failed
-in the supported-Paru gate while anonymously fetching the private archive
-(HTTP 404, `test-64.log` lines 926-936).
+Candidate `0.1.0.r13.geb7109a-1` preserves the editable prompt and shared provider
+configuration. It pins the remotely verified source checkpoint:
+`eb7109aa3d46fb9f689ba68528f8c39423f19f44`
 
-The supported-Paru script now consumes the same prefetched archive directory
-as the package gate, with checksum verification and no Docker PATH shim.
-This changes a tracked test input under `scripts/`: the wrapper must preserve
-a new immutable source checkpoint before the recipe can advance. The retained
-r12 recipe is not fresh for this change. New metadata, checksum and full
-installed-artifact validation remain pending; this is not a ready release.
+The real authenticated archive has SHA-256:
+`2cb12936a01331aa61cd5fd8bc0dddeb2a81afe64c23276b76477e035183f8e2`
+
+The previous wrapper failure came from an anonymous private-archive download
+(HTTP 404, `test-64.log` lines 926-936), after a successful package gate.
+The checkpoint makes both gates use the same prefetched archive cache, without
+a Docker PATH shim or credentials in containers. Checksums remain mandatory.
+
+Non-root Arch `.SRCINFO` generation and byte comparison, freshness, Go tests
+and vet passed. The package gate built and upgraded the actual r12 package to
+r13 with its old archives present, without `--force`. It verified that the custom
+prompt survived the upgrade and reached Codex unchanged. Both gates reported:
+
+```text
+auroscope 0.1.0.r13.geb7109a-1
+```
+
+The full supported-Paru gate passed on `/usr/bin/auroscope`, including prompt
+creation/customization/preservation, auxiliary scripts, provider failure without
+bypass, native colors, real AUR build/install, edit/re-audit, identity drift,
+explicit retry, skip and audit-free official operations. The complete container
+log and exact Docker exit event confirm success with exit code 0. Evidence:
+
+- `logs/recovery-64/package-r13.log`
+- `logs/recovery-64/paru-r13-docker.log`
+- `logs/recovery-64/paru-r13-docker-exit.json`
+
+The final fetch found `origin/main` at `23f64e1`, included in this source.
+Preserve this checkpoint and earlier pins in remote history. Wrapper publication
+and human review/merge remain pending. No desktop installation was changed;
+deterministic providers do not qualify a new live model. The separate #65 work
+and the unrelated `docs/user-readme` PR are not included or modified here.
 
 ### Retained r12 verification
 
