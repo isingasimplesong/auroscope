@@ -102,6 +102,41 @@ sudo -u builder -- bash -lc 'cd /work/previous && makepkg --syncdeps --noconfirm
 mapfile -t previous_archives < <(sudo -u builder -- bash -lc 'cd /work/previous && makepkg --packagelist')
 pacman --noconfirm -U "${previous_archives[@]}"
 previous_version=$(pacman -Q auroscope)
+
+# Reproduce #60 on the old installed artifact before testing the upgrade.
+install -d -m 0755 -o builder -g builder /home/builder/permission-clones/hermes-agent-desktop/pkg
+chown -R builder:builder /home/builder/permission-clones
+chmod 000 /home/builder/permission-clones/hermes-agent-desktop/pkg
+cat >/tmp/permission-paru <<'SCRIPT'
+#!/bin/sh
+set -eu
+printf '%s\n' "$*" >>/home/builder/permission-paru-calls
+case "$*" in
+  '-Syu --repo'|'-Qua --quiet') exit 0 ;;
+  *) exit 64 ;;
+esac
+SCRIPT
+chmod 0755 /tmp/permission-paru
+permission_run() {
+  sudo -u builder -- env HOME=/home/builder \
+    AUROSCOPE_PARU=/tmp/permission-paru \
+    AUROSCOPE_CODEX=/does/not/exist \
+    AUROSCOPE_CLONE_DIR=/home/builder/permission-clones \
+    AUROSCOPE_STATE=/home/builder/permission-state.sqlite3 \
+    /usr/bin/auroscope
+}
+if sudo -u builder -- ls /home/builder/permission-clones/hermes-agent-desktop/pkg >/dev/null 2>&1; then
+  echo 'permission regression requires an unreadable artifact' >&2
+  exit 1
+fi
+if [[ "$previous_version" == 'auroscope 0.1.0.r8.gc338567-1' ]]; then
+  if permission_run >/tmp/old-permission.out 2>&1; then
+    echo 'r8 unexpectedly passed the permission negative control' >&2
+    exit 1
+  fi
+  grep -F 'prepare clone directory:' /tmp/old-permission.out | grep -F 'permission denied'
+  echo 'Old installed package reproduces #60 with unreadable build artifacts'
+fi
 cp "${previous_archives[@]}" /work/package/
 mapfile -t new_archives < <(sudo -u builder -- bash -lc 'cd /work/package && makepkg --packagelist')
 for archive in "${new_archives[@]}"; do test ! -e "$archive"; done
@@ -112,6 +147,15 @@ done
 new_version=$(pacman -Q auroscope)
 test "$(vercmp "${new_version#auroscope }" "${previous_version#auroscope }")" -gt 0
 printf 'Cached-package upgrade passed: %s -> %s (no --force)\n' "$previous_version" "$new_version"
+
+rm -f /home/builder/permission-paru-calls
+permission_run
+printf '%s\n' '-Syu --repo' '-Qua --quiet' >/tmp/expected-permission-paru-calls
+cmp /tmp/expected-permission-paru-calls /home/builder/permission-paru-calls
+test "$(stat -c %a /home/builder/permission-clones)" = 700
+test "$(stat -c %a /home/builder/permission-clones/hermes-agent-desktop/pkg)" = 0
+pacman -Qo /usr/bin/auroscope
+echo 'Installed permission regression passed: bare command, no Codex, artifact mode 000 preserved'
 
 pacman -Q auroscope
 printf '%s\n' 'checking declared runtime dependencies'
