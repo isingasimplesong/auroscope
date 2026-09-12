@@ -22,6 +22,7 @@ const (
 type runConfig struct {
 	paruPath     string
 	codexPath    string
+	auditModel   string
 	statePath    string
 	cloneDir     string
 	editorPath   string

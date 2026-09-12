@@ -196,14 +196,19 @@ if [ "${1:-}" = "--version" ]; then
   exit 0
 fi
 out=''
+model=''
 while [ "$#" -gt 0 ]; do
   if [ "$1" = '--output-last-message' ]; then
     shift
     out=$1
+  elif [ "$1" = '--model' ]; then
+    shift
+    model=$1
   fi
   shift || true
 done
 [ -n "$out" ]
+[ "$model" = "${EXPECTED_MODEL:-luna}" ]
 printf '%s' '{"summary":"packaging looks conventional","risk":"low","findings":[],"uncertainty":"","inspect":[]}' >"$out"
 SCRIPT
 chmod 0755 /tmp/package-test-codex
@@ -246,6 +251,20 @@ case "$review_output" in
     exit 1
     ;;
 esac
+
+install -d -m 0700 -o builder -g builder /home/builder/.config/auroscope
+printf '%s\n' '{"model":"package-test-model"}' >/home/builder/.config/auroscope/config.json
+chown builder:builder /home/builder/.config/auroscope/config.json
+# Start a fresh fixture: the fake acquisition above creates an initial commit.
+rm -rf /tmp/package-test-clones /tmp/package-test-state.sqlite3
+printf 'approve\n' | sudo -u builder -- env \
+  HOME=/home/builder EXPECTED_MODEL=package-test-model \
+  AUROSCOPE_PARU=/tmp/package-test-paru \
+  AUROSCOPE_CODEX=/tmp/package-test-codex \
+  AUROSCOPE_STATE=/tmp/package-test-state.sqlite3 \
+  AUROSCOPE_CLONE_DIR=/tmp/package-test-clones \
+  /usr/bin/auroscope -S hello
+echo 'Installed model configuration passed: default luna and explicit model'
 
 echo 'AURoscope package build/install smoke passed'
 BASH

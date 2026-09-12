@@ -1,6 +1,9 @@
 # AURoscope
 
-AURoscope is a small terminal wrapper around [Paru](https://github.com/Morganamilo/paru) and Pacman. Its purpose is narrow: before Paru builds an AUR recipe, AURoscope asks Codex CLI to audit the exact recipe change, shows the result to the user, and records a per-package decision.
+AURoscope is a small terminal wrapper around
+[Paru](https://github.com/Morganamilo/paru) and Pacman. Before Paru builds an AUR
+recipe, AURoscope asks the selected LLM provider to audit the exact recipe change,
+shows the result, and records a per-package decision. Codex CLI remains the default.
 
 ## Intended interface
 
@@ -16,7 +19,7 @@ auroscope <other Paru args>  # transparent passthrough when no AUR build occurs
 1. Official repository updates and installs remain native Paru/Pacman operations. They receive no AURoscope audit.
 2. Paru identifies the AUR package bases that would be built.
 3. AURoscope compares each exact recipe with the last successfully approved commit, or sends the full recipe on first use.
-4. Codex CLI returns a structured audit of the packaging diff and relevant recipe files.
+4. The selected provider returns a structured audit of the diff and recipe files.
 5. AURoscope shows a concise assessment and packaging-risk level; the full findings and diff appear only when the user chooses `inspect`.
 6. The user chooses by number, initial, or full word: `approve`, `inspect`, `edit` and re-audit, `skip`, or `cancel` per AUR package base.
 7. AURoscope relaunches Paru with the official targets and approved AUR targets. Paru resolves dependencies, calls `makepkg`, and installs through Pacman normally.
@@ -43,7 +46,7 @@ diagnostic can still appear above AURoscope's explanation.
 ## V1 shape
 
 - Go executable for Arch Linux `linux/amd64`.
-- Codex CLI is the only LLM backend.
+- Codex CLI by default; explicit alternatives implement accepted ADR-0066.
 - SQLite stores only the last successful recipe baseline and audit history.
 - One internal Go package initially; split only when demonstrated behavior requires it.
 - No deterministic rule engine, plugin system, build sandbox, cached artifact reuse, or same-UID security protocol.
@@ -85,6 +88,26 @@ makepkg -si
 
 Stable Paru 2.1.0 is not compatible: its interactive search writes the human menu and selected targets to the same stream, so AURoscope cannot recover the selection without parsing localized UI. The package depends on the virtual `paru` capability so an installed compatible provider such as `paru-git` satisfies `makepkg`, but it conflicts with the known-incompatible stable package version `paru<=2.1.0` instead of allowing installation to produce a silent search prompt. Pacman still cannot fetch an absent AUR provider, so install `paru-git` before bootstrapping AURoscope. The currently tested Paru surface is commit `9ac3578807a87858651e81a02586ceb947686e7c`. AURoscope validates the required selection and order behavior when those paths run and fails closed on incompatible output; a package name or `paru --version` string alone cannot prove that post-release contract. Codex is deliberately not a Pacman dependency: AURoscope uses the `codex` executable found on `PATH`, whether it came from npm, an Arch package, or another installation method. `codex --version` must report a supported version, and Codex must be authenticated for the user who runs AURoscope. During the first desktop trial, invoke `auroscope` explicitly rather than replacing `paru` with an alias.
 
+## Audit model configuration
+
+AURoscope explicitly requests `luna` by default. To select another Codex model,
+create `${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.json`:
+
+```json
+{"model": "your-exact-codex-model-id"}
+```
+
+For Codex, the file is optional; an omitted `model` uses `luna`.
+The value is passed unchanged
+as one `--model` argument, overriding Codex's default model. Use an identifier
+available to your Codex account; AURoscope does not translate aliases or fall back
+to another model. Invalid configuration stops the audit and offers the existing
+retry/skip/cancel choices. Official-only operations do not read this file.
+
+This is the same configuration file as provider selection below, not a second
+configuration. Claude Code keeps its native default when `model` is omitted;
+API providers still require an explicit model available to the selected service.
+
 ## Development verification
 
 ```console
@@ -104,6 +127,73 @@ For unpublished worktree changes, set `AUROSCOPE_E2E_SOURCE_ONLY=1` alongside
 and explicit retry, without fetching the immutable AURoscope package snapshot.
 Builds and installations still occur only inside disposable Arch. This source
 gate does not qualify the packaged artifact or advance its source pin.
+
+## Audit provider configuration
+
+Use `${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.json`. With no file,
+AURoscope selects Codex CLI and explicitly requests the `luna` model.
+This candidate implements the provider extension authorized by #68. It is not a
+new packaged release until the source pin and Arch gates have been completed.
+
+The file is read only when an AUR audit is required, and reread on explicit retry.
+Official operations do not depend on it. AURoscope never overwrites this file.
+Automatic creation and editable prompt defaults remain separate work in #64;
+model selection from #65 uses this same file and reader.
+
+Choose exactly one provider. Minimal CLI configurations are:
+
+```json
+{"provider": "codex"}
+```
+
+```json
+{"provider": "claude-code"}
+```
+
+CLI authentication stays with the CLI; no API key is stored by AURoscope. Claude
+Code uses the `claude` executable on `PATH`, with tools, MCP, user/project settings,
+skills and ordinary hooks disabled for the audit. Native login credentials remain
+available. Model selection is optional for CLI providers via `model`.
+
+For API providers, specify an actual model identifier available to your account:
+
+```json
+{
+  "provider": "anthropic",
+  "model": "YOUR_MODEL_ID",
+  "api_key_env": "ANTHROPIC_API_KEY"
+}
+```
+
+For OpenAI, use `"provider": "openai"` and `"api_key_env": "OPENAI_API_KEY"`.
+These providers use their official HTTPS API roots. For another service:
+
+```json
+{
+  "provider": "openai-compatible",
+  "base_url": "https://openrouter.ai/api/v1",
+  "model": "YOUR_PROVIDER/MODEL_ID",
+  "api_key_env": "OPENROUTER_API_KEY"
+}
+```
+
+`base_url` is the API root, not the full `/chat/completions` endpoint. HTTPS is
+required; credentials in URLs, query strings, fragments and redirects are refused.
+The referenced environment variable must hold the key when AURoscope starts.
+Never put a key value in this file. Unknown fields and invalid configuration fail
+the audit rather than selecting a different provider. The file is limited to 64 KiB.
+
+API selection sends the same bounded recipe bundle to that service. OpenAI and
+compatible services must support Chat Completions with `response_format.json_schema`;
+Anthropic must support Messages with `output_config.format`. Refusal, truncation,
+HTTP error or invalid local report validation offers retry, skip or cancel only.
+There is no automatic provider fallback, schema-mode downgrade or audit bypass.
+
+Compatibility is not guaranteed by a provider name. Claude Code 2.1.269 was checked
+with its real executable and simulated transport in isolated Arch. API contracts
+have deterministic local HTTPS tests; no new live service/model is qualified yet.
+See the [provider contract note](docs/dependency-notes/audit-providers.md) for exact
+evidence, limitations and opt-in live qualification commands.
 
 ## Previous design
 

@@ -6,6 +6,13 @@ Accepted on 2026-08-30 through [decision issue #19](https://git.2027a.net/2027a/
 
 ## Context
 
+Accepted amendment:
+[ADR-0066](0066-configurable-audit-provider.md)
+replaces the Codex-only/no-HTTP restriction in point 4 with explicit provider
+choice and Codex by default. All other boundaries remain active. This is an
+accepted design extension, not implemented behavior; separate execution is
+required. The original decision and rejected alternatives below record v1.
+
 AURoscope's previous design treated deterministic scanning as the core and LLM analysis as optional. It then accumulated a multi-stage closure protocol, broad SQLite lifecycle model, durable one-shot approvals, extensive recovery and retention, multiple inference backends, and many package boundaries.
 
 That architecture no longer matched the product. AURoscope exists to add one LLM audit and one human decision between Paru's selection of an AUR recipe and Paru's normal build/install path.

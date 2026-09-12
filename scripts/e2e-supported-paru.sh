@@ -96,6 +96,9 @@ AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
   AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
   GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
   go test ./internal/app -run '^TestSelectionRealParuColors$' -count=1 -v -timeout=120s
+AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
+  GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
+  go test ./internal/app -run '^(TestAuditIncludesAuxiliaryScripts|TestProviderSelectionAndNoBypass|TestProviderInstalledHTTP)$' -count=1 -v -timeout=120s
 fi
 
 cat >/usr/local/bin/paru <<'EOF'
@@ -113,14 +116,19 @@ if [ "${1:-}" = --version ]; then
   exit 0
 fi
 out=''
+model=''
 while [ "$#" -gt 0 ]; do
   if [ "$1" = --output-last-message ]; then
     shift
     out=$1
+  elif [ "$1" = --model ]; then
+    shift
+    model=$1
   fi
   shift || true
 done
 [ -n "$out" ]
+[ "$model" = luna ]
 [ "$PWD" != /home/builder/aur/hello ]
 [ -f bundle.json ]
 printf 'audit\n' >>/tmp/codex-calls

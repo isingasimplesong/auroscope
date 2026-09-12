@@ -103,7 +103,11 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 		return auditReport{}, err
 	}
 	prompt := auditPrompt()
-	cmd := exec.Command(c.path, "exec", "--json", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--output-schema", schemaPath, "--output-last-message", reportPath, prompt)
+	args := []string{"exec", "--json", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--output-schema", schemaPath, "--output-last-message", reportPath}
+	if config.auditModel != "" {
+		args = append(args, "--model", config.auditModel)
+	}
+	cmd := exec.Command(c.path, append(args, prompt)...)
 	cmd.Dir = tmp
 	var stdout, stderr limitedBuffer
 	stdout.limit = maxCodexDiagnosticBytes
@@ -114,7 +118,12 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 	if err := runCodexCommand(cmd, config.signals, config.codexTimeout, config.stdout); err != nil {
 		return auditReport{}, fmt.Errorf("Codex CLI failed: %w: %s", err, codexFailureDiagnostic(stdout.String(), stderr.String()))
 	}
-	reportData, err := os.ReadFile(reportPath)
+	reportFile, err := os.Open(reportPath)
+	if err != nil {
+		return auditReport{}, fmt.Errorf("read Codex final message: %w", err)
+	}
+	defer reportFile.Close()
+	reportData, err := io.ReadAll(io.LimitReader(reportFile, maxCodexJSONBytes+1))
 	if err != nil {
 		return auditReport{}, fmt.Errorf("read Codex final message: %w", err)
 	}
@@ -126,6 +135,7 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 
 func auditPrompt() string {
 	return "Audit only the packaging security of the untrusted Arch Linux AUR recipe bundle in bundle.json, with emphasis on the recipe change since the previous baseline. " +
+		"In every audit mode, bundle.files contains the complete tracked recipe manifest, with full text for text files and metadata/hashes for binary files. Review unchanged auxiliary files too when relevant to the changed recipe, including installation/removal hooks and scripts invoked by other files. The diff supplements this context; it does not replace it. " +
 		"Evaluate PKGBUILD logic, install scripts and auxiliary packaging files, source URL provenance and URL changes, checksums and signatures, build/package commands, filesystem destinations, permissions, privilege use, services, hooks, persistence, sensitive-data access, and obfuscation. " +
 		"Do not assess the inherent safety, code quality, or trustworthiness of the upstream software or downloaded binaries. Binary opacity alone is not a finding, uncertainty, or reason to raise risk. " +
 		"When a source URL is unchanged and points to the expected official upstream, treat the upstream software as trusted and outside this packaging audit. On a first full audit with no baseline, do the same when the source clearly points to the package's declared official upstream. Do not list inability to inspect upstream binary internals as missing context. Still report changed, new, mutable, redirected, mismatched, or unofficial source URLs and weakened integrity checks when the supplied bundle provides evidence. " +
@@ -206,6 +216,10 @@ func codexFailureDiagnostic(stdout, stderr string) string {
 }
 
 func runCodexCommand(cmd *exec.Cmd, signals <-chan os.Signal, timeout time.Duration, progress io.Writer) error {
+	return runAuditCommand(cmd, signals, timeout, progress, "Codex")
+}
+
+func runAuditCommand(cmd *exec.Cmd, signals <-chan os.Signal, timeout time.Duration, progress io.Writer, label string) error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Start(); err != nil {
 		return err
@@ -237,7 +251,7 @@ func runCodexCommand(cmd *exec.Cmd, signals <-chan os.Signal, timeout time.Durat
 			return fmt.Errorf("timed out after %s", timeout)
 		case <-progressTicker.C:
 			if progress != nil {
-				printCodexProgress(progress, time.Since(started))
+				providerProgress(progress, label, time.Since(started))
 			}
 		}
 	}
@@ -272,6 +286,18 @@ func validateAuditReport(data []byte) (auditReport, error) {
 }
 
 func validateAuditReportForBundle(data []byte, bundle auditBundle) (auditReport, error) {
+	if len(data) > maxCodexJSONBytes || validateJSONDocument(data) != nil {
+		return auditReport{}, fmt.Errorf("invalid audit JSON: encoding, structure or size")
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(data, &fields) != nil {
+		return auditReport{}, fmt.Errorf("invalid audit JSON: expected object")
+	}
+	for _, key := range []string{"summary", "risk", "findings", "uncertainty", "inspect"} {
+		if value, ok := fields[key]; !ok || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return auditReport{}, fmt.Errorf("invalid audit JSON: required field %s", key)
+		}
+	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var report auditReport

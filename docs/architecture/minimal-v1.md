@@ -2,6 +2,15 @@
 
 ## Product boundary
 
+Accepted extension, candidate implementation in execution issue #68:
+[ADR-0066](../decisions/0066-configurable-audit-provider.md)
+amends the Codex-only backend restriction below. The target selects one provider
+explicitly in the shared configuration file, keeping Codex CLI by default.
+Alternatives are Claude Code, Anthropic API, OpenAI API, and OpenAI-compatible
+API with configurable URL. This does not authorize a plugin framework, fallback,
+audit bypass, or a different Paru boundary. The Codex-labelled audit step below
+becomes the selected-provider step only through separately authorized execution.
+
 AURoscope is a transparent Paru wrapper with one intervention: before Paru builds an AUR recipe, Codex CLI audits the exact change and the user decides whether that package base proceeds.
 
 ```text
