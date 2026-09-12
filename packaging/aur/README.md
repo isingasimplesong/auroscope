@@ -71,6 +71,34 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+Candidate package `0.1.0.r11.g396e770-1` pins the user-documentation source commit
+`396e770762af39321d3c76749149103ac4a07eea`, published on `docs/user-readme`.
+It replaces the installed root README with a French user guide and preserves the
+previous technical README under `docs/README.md` in the repository. Runtime code,
+dependencies and tests are unchanged from the merged r10 inputs.
+
+The archive SHA-256 is:
+`dac0c10e53d36d7185964b1f8e44a2f9784b18bcf94347bb8ece23841d51c232`
+
+Non-root Arch `.SRCINFO` generation, source freshness, checksum validation,
+`namcap`, Go tests, installed file ownership, passthrough, guard failure and
+review layout passed. The disposable package gate upgraded r10 to r11 with the
+previous real package archives still present, without `--force`:
+
+```text
+auroscope 0.1.0.r11.g396e770-1
+AURoscope package build/install smoke passed
+```
+
+The container exited with status 0. This documentation-only change does not
+requalify real Codex or rerun the full supported-Paru gate; runtime behavior is
+unchanged. No desktop installation was changed. Human review and merge remain
+required; preserve the immutable source commit in history rather than squashing
+it away. The installed README links target the repository documentation, which
+is not bundled in the Arch package.
+
+### Previous r10 verification
+
 Candidate package `0.1.0.r10.g04025fc-1` pins immutable AURoscope commit
 `04025fceaaa0df59d357275f4f337b6b6c9693e7`, verified on the remote issue branch.
 It retains r9's fixes and supplies every tracked recipe file to each audit,
