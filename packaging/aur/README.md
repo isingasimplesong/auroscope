@@ -71,29 +71,42 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
-Candidate package `0.1.0.r8.gc338567-1` pins immutable AURoscope commit
-`c338567590d0c35f2798cf822f95374dff51183e`.
-It includes the merged audit presentation (#55), drift recovery (#57), and
-regression tests (#58), with their conflicting drift assertion reconciled.
+Candidate package `0.1.0.r9.g3c5f935-1` pins immutable AURoscope commit
+`3c5f935e71f88445290522119f4cb2f8b56f9e97`.
+It descends from current `main` (`8d9b844c093269286a8e5d2818d77665fecf7e99`),
+retains the previous fixes and includes merged PR #61: clone preparation
+neither traverses nor chmods unreadable build artifacts below the clone root.
+It also makes the disposable gate work from linked Git worktrees by copying
+source without host `.git` metadata, with a checkout/worktree regression test.
 Its archive SHA-256 is:
-`b02bcd53af1a936a928a0abb1e240e36546885132a71c219f7d7cbc55d5739f3`
+`9eff0b666631389abb79f0b38731bab6b4545f6506d86cfcfbfc0f443fe5f3c6`
 
-On 2026-09-08, the disposable Arch package gate built and installed the previous
-`0.1.0.r7.g7a8d394-1` package, left its real archives beside the new recipe, then
+On 2026-09-12, the disposable Arch package gate built and installed the previous
+`0.1.0.r8.gc338567-1` package, left its real archives beside the new recipe, then
 ran `makepkg --syncdeps --install --noconfirm` without `--force`. Pacman upgraded
-both AURoscope and its debug package to `0.1.0.r8.gc338567-1`.
-Generated `.SRCINFO`, checksum verification, `namcap PKGBUILD`, Go `check()`,
-installed ownership/modes, passthrough, guard failure, and review layout passed.
+both AURoscope and its debug package to `0.1.0.r9.g3c5f935-1`.
+Generated non-root `.SRCINFO`, checksum verification, `namcap PKGBUILD`, Go
+`check()`, installed ownership/modes, passthrough, guard failure, and review
+layout passed. `pacman -Q auroscope` reported `auroscope 0.1.0.r9.g3c5f935-1`.
 
-The full pinned-Paru gate also passed against `/usr/bin/auroscope`: native
+The package gate first reproduced #60 on the old installed r8 artifact with
+an unreadable `hermes-agent-desktop/pkg` directory. After the upgrade, bare
+`/usr/bin/auroscope` completed with deterministic Paru responses for the official
+update and empty AUR query, without invoking Codex. It left the artifact mode
+at `000` and set only the clone root to `700`.
+
+The full pinned-Paru gate passed against `/usr/bin/auroscope`: native
 selection/color behavior, real AUR acquisition/build/install, edit and re-audit,
 exact drift refusal, explicit retry with a second audit and approval, skip,
-and official installs without a Codex call. Codex was a deterministic test
-executable; these runs do not claim a new real-model qualification.
+and official installs without a Codex call. The original container completed
+successfully (Docker exit code 0); its complete logs were recovered after the
+calling agent timed out. Codex was a deterministic test executable; these runs
+do not claim a new real-model qualification.
 
 This candidate requires human review and merge before a plain `git pull` on
 `main` obtains it. Preserve the pinned source commit in merge history rather
-than squashing it away. No desktop installation was changed by these tests.
+than squashing it away or deleting its only reachable branch. No desktop
+installation was changed by these tests.
 
 ## Keeping the package current
 
