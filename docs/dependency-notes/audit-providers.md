@@ -7,10 +7,13 @@ His comment 3065, `PR de documentation fusionnée, passe à l'implémentation`,
 authorizes the execution formalized in #68. This candidate uses one internal
 package and a fixed provider switch, not a backend framework or plugin system.
 
-The source is prepared for an immutable pin. Packaging still requires the wrapper
-source commit/push, then the real archive checksum, new package identity, non-root
-Arch `.SRCINFO`, freshness, upgrade and installed supported-Paru gates. No package
-release, deployment, human merge or live-provider qualification is claimed here.
+The wrapper preserved source commit `ad96e164679bbdd0a2b474d9712f238cc3a06679`
+on remote `loop/subject-68`. Candidate package `0.1.0.r11.gad96e16-1` now pins that
+source with a verified archive checksum and non-root generated Arch `.SRCINFO`.
+Freshness, Go tests/vet, the r10-to-r11 upgrade with cached archives and the full
+installed supported-Paru gate passed. See `packaging/aur/README.md` for exact
+package evidence. Publication and human review/merge remain pending; no deployment
+or live-provider qualification is claimed here.
 
 ## Shared configuration
 
