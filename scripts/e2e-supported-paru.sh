@@ -96,6 +96,9 @@ AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
   AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
   GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
   go test ./internal/app -run '^TestSelectionRealParuColors$' -count=1 -v -timeout=120s
+AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
+  GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
+  go test ./internal/app -run '^TestAuditIncludesAuxiliaryScripts$' -count=1 -v -timeout=120s
 fi
 
 cat >/usr/local/bin/paru <<'EOF'
