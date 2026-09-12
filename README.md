@@ -85,6 +85,20 @@ makepkg -si
 
 Stable Paru 2.1.0 is not compatible: its interactive search writes the human menu and selected targets to the same stream, so AURoscope cannot recover the selection without parsing localized UI. The package depends on the virtual `paru` capability so an installed compatible provider such as `paru-git` satisfies `makepkg`, but it conflicts with the known-incompatible stable package version `paru<=2.1.0` instead of allowing installation to produce a silent search prompt. Pacman still cannot fetch an absent AUR provider, so install `paru-git` before bootstrapping AURoscope. The currently tested Paru surface is commit `9ac3578807a87858651e81a02586ceb947686e7c`. AURoscope validates the required selection and order behavior when those paths run and fails closed on incompatible output; a package name or `paru --version` string alone cannot prove that post-release contract. Codex is deliberately not a Pacman dependency: AURoscope uses the `codex` executable found on `PATH`, whether it came from npm, an Arch package, or another installation method. `codex --version` must report a supported version, and Codex must be authenticated for the user who runs AURoscope. During the first desktop trial, invoke `auroscope` explicitly rather than replacing `paru` with an alias.
 
+## Audit prompt configuration
+
+On the first AUR audit, AURoscope creates
+`${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.json` if absent.
+Its `prompt` JSON string contains the full default audit prompt. Edit that string
+to customize the audit; use `\n` for line breaks. Existing files are never
+rewritten by AURoscope or package upgrades. Keep a copy of your custom prompt
+before deleting the file to regenerate the default on the next audit.
+
+An empty prompt or invalid JSON stops the audit with retry/skip/cancel, not an
+automatic approval. Native official-only operations do not load or create this
+file. Prompt changes do not disable the read-only Codex invocation, local report
+validation, human approval, or final recipe-identity guard.
+
 ## Development verification
 
 ```console

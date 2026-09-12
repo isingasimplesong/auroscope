@@ -103,6 +103,16 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 		return auditReport{}, err
 	}
 	prompt := auditPrompt()
+	if config.userConfig {
+		dir, err := os.UserConfigDir()
+		if err != nil {
+			return auditReport{}, fmt.Errorf("locate audit configuration: %w", err)
+		}
+		prompt, err = loadAuditPrompt(filepath.Join(dir, "auroscope", "config.json"))
+		if err != nil {
+			return auditReport{}, err
+		}
+	}
 	cmd := exec.Command(c.path, "exec", "--json", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--output-schema", schemaPath, "--output-last-message", reportPath, prompt)
 	cmd.Dir = tmp
 	var stdout, stderr limitedBuffer
