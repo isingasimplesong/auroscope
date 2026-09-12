@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-Accepted extension, not yet implemented:
+Accepted extension, candidate implementation in execution issue #68:
 [ADR-0066](../decisions/0066-configurable-audit-provider.md)
 amends the Codex-only backend restriction below. The target selects one provider
 explicitly in the shared configuration file, keeping Codex CLI by default.

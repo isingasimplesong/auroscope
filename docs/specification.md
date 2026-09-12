@@ -76,11 +76,12 @@ The first implementation task is a disposable-Arch spike proving how Paru expose
 
 ## 6. Codex CLI audit
 
-### Accepted provider extension, pending separate execution
+### Accepted provider extension, candidate execution in #68
 
 [ADR-0066](decisions/0066-configurable-audit-provider.md)
 amends the Codex-only/no-HTTP restriction below and the multiple-backend exclusion
-in section 12. Codex CLI remains the default and the only implemented provider.
+in section 12. Codex CLI remains the default. Execution issue #68 implements the
+listed alternatives; package delivery and live qualification are separate gates.
 The accepted target allows explicit selection of one provider in the shared
 configuration file: Codex CLI, Claude Code, Anthropic API, OpenAI API, or an
 OpenAI-compatible API with configurable URL. API keys are referenced through
@@ -92,8 +93,10 @@ provider; Codex-specific admission and invocation protections still apply to
 Codex. Audit scope, strict local JSON validation, human approval, final identity
 guard, and native official operations remain unchanged. Provider failure offers
 retry, skip, or cancel without automatic fallback or audit bypass. No new
-provider is qualified by this decision. A separate `MODE: EXECUTION` issue is
-required before implementation and packaged qualification.
+provider is qualified by this decision. Separate `MODE: EXECUTION` issue #68
+authorizes implementation and packaged verification. The candidate configuration
+and its bounded evidence are in the
+[provider contract note](dependency-notes/audit-providers.md).
 
 ### Current Codex implementation contract
 

@@ -71,6 +71,40 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+Candidate package `0.1.0.r11.gad96e16-1` delivers the explicit audit-provider
+selection authorized by #68: Codex remains the default, with Claude Code,
+Anthropic API, OpenAI API and configurable OpenAI-compatible API alternatives.
+Configuration and bounded qualification evidence are documented in the root
+README and `docs/dependency-notes/audit-providers.md`.
+
+The immutable source pin, verified on remote `loop/subject-68`, is:
+`ad96e164679bbdd0a2b474d9712f238cc3a06679`
+
+The downloaded archive SHA-256 is:
+`ba45ebc42831195e9e474fc9cc715978c205eb888d0b622ff2487e7c43f5fde1`
+
+Non-root Arch `.SRCINFO` generation, freshness, Go tests/vet and both disposable
+Arch gates passed. The upgrade test retained the real r10 archives and installed
+r11 without `--force`. Both gates reported:
+
+```text
+auroscope 0.1.0.r11.gad96e16-1
+```
+
+The supported-Paru gate exercised `/usr/bin/auroscope`, including configured HTTP
+approval and failed-audit skip, explicit Claude selection, retry/cancel/skip with
+no Codex fallback, and complete auxiliary-script audit input. Native colors,
+real AUR build/install, edit/re-audit, identity drift refusal, explicit recovery
+and audit-free official operations also passed. These deterministic provider
+tests do not qualify a live API endpoint/model or native Claude authentication.
+
+The final fetch confirmed that the source includes current `origin/main` at
+`da9dca7`; no concurrent source fix is omitted. Preserve the source commit in
+remote merge history. Publication and human review/merge remain pending; no
+desktop installation was changed.
+
+### Previous r10 verification
+
 Candidate package `0.1.0.r10.g04025fc-1` pins immutable AURoscope commit
 `04025fceaaa0df59d357275f4f337b6b6c9693e7`, verified on the remote issue branch.
 It retains r9's fixes and supplies every tracked recipe file to each audit,
