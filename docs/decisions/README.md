@@ -2,7 +2,8 @@
 
 ## Active for the minimal v1
 
-Read these in order; [ADR-0015](0015-minimal-llm-first-wrapper.md) controls on any conflict:
+Read these in order. ADR-0015 controls except for the explicit amendments in
+ADR-0046 (Codex admission) and ADR-0066 (accepted provider choice, not yet shipped).
 
 1. [ADR-0015 — minimal LLM-first wrapper](0015-minimal-llm-first-wrapper.md)
 2. [ADR-0001 — Go and self-hosted Arch packaging](0001-go-and-self-hosted-arch-packaging.md)
@@ -10,6 +11,11 @@ Read these in order; [ADR-0015](0015-minimal-llm-first-wrapper.md) controls on a
 4. [ADR-0005 — final recipe identity guard](0005-recipe-identity-guard-boundary.md), amended by ADR-0015
 5. [ADR-0007 — `mattn/go-sqlite3` with CGO](0007-mattn-go-sqlite3-cgo.md), amended by ADR-0015
 6. [ADR-0046 — Codex minimum version without a ceiling](0046-codex-minimum-version-without-ceiling.md), accepted policy amendment; issue #45 admission candidate and installed-package gate passed, bounded real-CLI evidence recorded, human PR review pending
+
+The active list also includes
+[ADR-0066 — configurable audit provider](0066-configurable-audit-provider.md).
+Mathieu accepted the provider extension; implementation and Arch delivery require
+a separate `MODE: EXECUTION` issue. Codex remains the only implemented provider.
 
 ## Superseded
 
