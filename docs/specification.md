@@ -76,6 +76,27 @@ The first implementation task is a disposable-Arch spike proving how Paru expose
 
 ## 6. Codex CLI audit
 
+### Accepted provider extension, pending separate execution
+
+[ADR-0066](decisions/0066-configurable-audit-provider.md)
+amends the Codex-only/no-HTTP restriction below and the multiple-backend exclusion
+in section 12. Codex CLI remains the default and the only implemented provider.
+The accepted target allows explicit selection of one provider in the shared
+configuration file: Codex CLI, Claude Code, Anthropic API, OpenAI API, or an
+OpenAI-compatible API with configurable URL. API keys are referenced through
+environment variables; CLI authentication remains native. Issues #65 and #64
+retain model and prompt configuration and must share this file.
+
+For that extension, references to Codex in the audit/review flow mean the chosen
+provider; Codex-specific admission and invocation protections still apply to
+Codex. Audit scope, strict local JSON validation, human approval, final identity
+guard, and native official operations remain unchanged. Provider failure offers
+retry, skip, or cancel without automatic fallback or audit bypass. No new
+provider is qualified by this decision. A separate `MODE: EXECUTION` issue is
+required before implementation and packaged qualification.
+
+### Current Codex implementation contract
+
 Codex CLI is the only v1 LLM backend. The model is configurable, but there is no HTTP backend, automatic fallback, or product mode with the LLM disabled.
 
 The accepted version policy is an inclusive minimum of `0.150.1` with no ceiling, including future stable major versions. Admit only the strict stable banner `codex-cli MAJOR.MINOR.PATCH`, comparing the triplet numerically; reject older versions, prereleases, and malformed banners. Admission does not mean test qualification. Preserve the read-only invocation, isolated empty stdin, private working directory, timeout/signals, and strict local report validation. [ADR-0046](decisions/0046-codex-minimum-version-without-ceiling.md) records this design change. Execution issue #45 implements admission in the candidate source and package; its installed-package gate passed with 0.153.4 admission. The [dependency note](dependency-notes/codex-cli-contract.md) records the successful real audit, direct sandbox enforcement check and their limits. Future versions remain unqualified by admission, and PR #48 still requires human merge.
