@@ -1,5 +1,11 @@
 # AURoscope
 
+Documentation technique et historique du projet, déplacée depuis le README principal.
+Pour comprendre, installer et utiliser le programme, voir le
+[guide utilisateur](../README.md).
+Les mentions de phases et de PR ci-dessous conservent leur contexte historique.
+Les commandes de développement se lancent depuis la racine du dépôt.
+
 AURoscope is a small terminal wrapper around [Paru](https://github.com/Morganamilo/paru) and Pacman. Its purpose is narrow: before Paru builds an AUR recipe, AURoscope asks Codex CLI to audit the exact recipe change, shows the result to the user, and records a per-package decision.
 
 ## Intended interface
@@ -48,26 +54,32 @@ diagnostic can still appear above AURoscope's explanation.
 - One internal Go package initially; split only when demonstrated behavior requires it.
 - No deterministic rule engine, plugin system, build sandbox, cached artifact reuse, or same-UID security protocol.
 
-The accepted architecture is in [`docs/architecture/minimal-v1.md`](docs/architecture/minimal-v1.md) and [`ADR-0015`](docs/decisions/0015-minimal-llm-first-wrapper.md). A narrow disposable-Arch Paru worktree spike must be completed before the new implementation plan is written.
+The accepted architecture is in
+[`docs/architecture/minimal-v1.md`](architecture/minimal-v1.md)
+and [`ADR-0015`](decisions/0015-minimal-llm-first-wrapper.md).
+A narrow disposable-Arch Paru worktree spike must be completed
+before the new implementation plan is written.
 
 ## Current implementation
 
 The v1 implementation lives in `cmd/auroscope` and `internal/app`. Human-merged
 PR #48 implements ADR-0046: strict stable Codex CLI banners at least `0.150.1`,
 compared numerically, without a ceiling. Admission is not qualification; the
-[Codex contract note](docs/dependency-notes/codex-cli-contract.md) records the real
+[Codex contract note](dependency-notes/codex-cli-contract.md) records the real
 0.153.4 audit and bounded sandbox evidence, not a guarantee for future versions.
 
 PR #49 preserves that admission fix and restores native Paru selection colors.
 Only machine-target stdout uses a private PTY when both caller outputs are
 terminals; stdin and the menu remain native. Paru still owns disabled `Color`
 and redirected-output behavior. Package metadata and installed-artifact gate
-results are maintained in [the package README](packaging/aur/README.md).
+results are maintained in [the package README](../packaging/aur/README.md).
 An existing desktop installation is not upgraded by these disposable tests.
 
 ## Install on Arch Linux
 
-The self-hosted AUR-style recipe lives in [`packaging/aur`](packaging/aur). Publication on `aur.archlinux.org` remains deferred.
+The self-hosted AUR-style recipe lives in
+[`packaging/aur`](../packaging/aur).
+Publication on `aur.archlinux.org` remains deferred.
 
 ```console
 # Install Codex by any supported method, for example:
@@ -97,7 +109,13 @@ AUROSCOPE_E2E_SUPPORTED_PARU=1 scripts/e2e-supported-paru.sh
 
 The package test and both integration scripts require Docker. The package test builds and installs `packaging/aur/PKGBUILD` in disposable Arch. The first integration script is a fast fake-Paru/fake-Codex smoke. The supported-version gate builds pinned Paru commit `9ac3578807a87858651e81a02586ceb947686e7c`, uses real AUR acquisition/resolution/build and Pacman installation only inside the disposable container, proves the real guard and drift rejection, and confirms that official-only work invokes no Codex audit.
 
-For selection/color verification without executing any PKGBUILD, run `AUROSCOPE_E2E_SUPPORTED_PARU=1 AUROSCOPE_E2E_SELECTION_ONLY=1 scripts/e2e-supported-paru.sh`. This checks real native colors with `Color` enabled/disabled and redirected output, then exits before the build/install scenarios. See the [selection color contract](docs/dependency-notes/paru-selection-colors.md).
+For selection/color verification without executing any PKGBUILD, run
+```sh
+AUROSCOPE_E2E_SUPPORTED_PARU=1 AUROSCOPE_E2E_SELECTION_ONLY=1 scripts/e2e-supported-paru.sh
+```
+This checks real native colors with `Color` enabled/disabled and redirected output,
+then exits before the build/install scenarios. See the
+[selection color contract](dependency-notes/paru-selection-colors.md).
 
 For unpublished worktree changes, set `AUROSCOPE_E2E_SOURCE_ONLY=1` alongside
 `AUROSCOPE_E2E_SUPPORTED_PARU=1`. This tests the checkout binary, including drift
@@ -107,4 +125,7 @@ gate does not qualify the packaged artifact or advance its source pin.
 
 ## Previous design
 
-The earlier architecture was intentionally superseded because it made the LLM optional and accumulated resolver, approval, state, recovery, and test machinery outside the product's purpose. Historical material remains under [`docs/archive/pre-llm-first/`](docs/archive/pre-llm-first/).
+The earlier architecture was intentionally superseded because it made the LLM optional
+and accumulated resolver, approval, state, recovery, and test machinery outside the
+product's purpose. Historical material remains under
+[`docs/archive/pre-llm-first/`](archive/pre-llm-first/).
