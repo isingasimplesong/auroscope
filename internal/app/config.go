@@ -5,58 +5,47 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // loadAuditPrompt creates user configuration only when an AUR audit needs it.
 // Existing configuration is never rewritten, including during upgrades.
 func loadAuditPrompt(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-			return "", fmt.Errorf("create audit configuration directory: %w", err)
-		}
-		defaults, marshalErr := json.MarshalIndent(struct {
-			Prompt string `json:"prompt"`
-		}{auditPrompt()}, "", "  ")
-		if marshalErr != nil {
-			return "", marshalErr
-		}
-		file, createErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-		if createErr == nil {
-			_, writeErr := file.Write(append(defaults, '\n'))
-			closeErr := file.Close()
-			if writeErr != nil {
-				return "", fmt.Errorf("write audit configuration: %w", writeErr)
-			}
-			if closeErr != nil {
-				return "", closeErr
-			}
-		} else if !os.IsExist(createErr) {
-			return "", fmt.Errorf("create audit configuration: %w", createErr)
-		}
-		data, err = os.ReadFile(path)
-	}
+	c, err := loadAuditConfigPath(path)
 	if err != nil {
-		return "", fmt.Errorf("read audit configuration %s: %w", path, err)
+		return "", err
 	}
-	// Missing prompt supports existing model/provider-only configurations.
-	// Do not rewrite the file to add defaults: it belongs to the user.
-	config := struct {
-		Prompt *string `json:"prompt"`
-	}{}
-	if err := json.Unmarshal(data, &config); err != nil {
-		return "", fmt.Errorf("invalid audit configuration %s: expected a JSON object", path)
+	return c.prompt(), nil
+}
+
+func (c auditConfig) prompt() string {
+	if c.Prompt != nil {
+		return *c.Prompt
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
-		return "", fmt.Errorf("invalid audit configuration %s: expected a JSON object", path)
+	return auditPrompt()
+}
+
+func createAuditConfig(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return fmt.Errorf("create audit configuration directory: %w", err)
 	}
-	if _, present := fields["prompt"]; !present {
-		return auditPrompt(), nil
+	defaults, marshalErr := json.MarshalIndent(struct {
+		Prompt string `json:"prompt"`
+	}{auditPrompt()}, "", "  ")
+	if marshalErr != nil {
+		return marshalErr
 	}
-	if config.Prompt == nil || strings.TrimSpace(*config.Prompt) == "" {
-		return "", fmt.Errorf("audit configuration %s requires a nonempty prompt", path)
+	file, createErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if createErr == nil {
+		_, writeErr := file.Write(append(defaults, '\n'))
+		closeErr := file.Close()
+		if writeErr != nil {
+			return fmt.Errorf("write audit configuration: %w", writeErr)
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+	} else if !os.IsExist(createErr) {
+		return fmt.Errorf("create audit configuration: %w", createErr)
 	}
-	return *config.Prompt, nil
+	return nil
 }

@@ -60,15 +60,45 @@ The audit bundle contains only bounded required data:
 
 - current Git commit and a deterministic recipe manifest digest;
 - diff from the last successfully approved and built commit;
-- complete changed files needed to understand the diff;
-- full recipe content on first use;
+- all tracked recipe files in every audit mode, including unchanged install,
+  removal, helper scripts and auxiliary packaging files;
+- full text for text files; metadata and hashes only for binary files;
 - committed `.SRCINFO` and minimal package metadata as untrusted data.
 
 AURoscope never sources or executes `PKGBUILD`, `.install`, patches, source archives, or another package-supplied file while preparing the audit.
 
+The diff supplements the complete current recipe context rather than filtering
+it. Existing file and bundle limits still apply: an oversized bundle fails the
+audit preparation instead of silently dropping scripts. Downloaded upstream
+sources, generated build artifacts and untracked build leftovers are not collected.
+
 The first implementation task is a disposable-Arch spike proving how Paru exposes the exact worktree before build, how an edited worktree is reused, and how `PreBuildCommand` observes that same worktree.
 
 ## 6. Codex CLI audit
+
+### Accepted provider extension, candidate execution in #68
+
+[ADR-0066](decisions/0066-configurable-audit-provider.md)
+amends the Codex-only/no-HTTP restriction below and the multiple-backend exclusion
+in section 12. Codex CLI remains the default. Execution issue #68 implements the
+listed alternatives; package delivery and live qualification are separate gates.
+The accepted target allows explicit selection of one provider in the shared
+configuration file: Codex CLI, Claude Code, Anthropic API, OpenAI API, or an
+OpenAI-compatible API with configurable URL. API keys are referenced through
+environment variables; CLI authentication remains native. Issues #65 and #64
+retain model and prompt configuration and must share this file.
+
+For that extension, references to Codex in the audit/review flow mean the chosen
+provider; Codex-specific admission and invocation protections still apply to
+Codex. Audit scope, strict local JSON validation, human approval, final identity
+guard, and native official operations remain unchanged. Provider failure offers
+retry, skip, or cancel without automatic fallback or audit bypass. No new
+provider is qualified by this decision. Separate `MODE: EXECUTION` issue #68
+authorizes implementation and packaged verification. The candidate configuration
+and its bounded evidence are in the
+[provider contract note](dependency-notes/audit-providers.md).
+
+### Current Codex implementation contract
 
 Codex CLI is the only v1 LLM backend. The model is configurable, but there is no HTTP backend, automatic fallback, or product mode with the LLM disabled.
 

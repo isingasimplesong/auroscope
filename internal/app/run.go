@@ -23,6 +23,8 @@ type runConfig struct {
 	userConfig   bool
 	paruPath     string
 	codexPath    string
+	auditModel   string
+	auditPrompt  string
 	statePath    string
 	cloneDir     string
 	editorPath   string
