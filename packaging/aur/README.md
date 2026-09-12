@@ -71,6 +71,38 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+Candidate package `0.1.0.r10.g04025fc-1` pins immutable AURoscope commit
+`04025fceaaa0df59d357275f4f337b6b6c9693e7`, verified on the remote issue branch.
+It retains r9's fixes and supplies every tracked recipe file to each audit,
+including unchanged installation, removal and helper scripts. The diff remains
+additional context. Binary files retain metadata and hashes; downloaded upstream
+sources and untracked build leftovers remain outside this recipe audit.
+The real archive SHA-256 is:
+`d3774042b9466e2eb03af00acfff3b2fd91e449643b7293681815773d369c5d8`
+
+The disposable Arch package gate passed: non-root generated `.SRCINFO`, archive
+checksum, `namcap`, Go tests, and upgrade from r9 with its archives still present,
+without `--force`. `pacman -Q auroscope` returned:
+
+```text
+auroscope 0.1.0.r10.g04025fc-1
+```
+
+The full supported-Paru gate also passed against `/usr/bin/auroscope`.
+`TestAuditIncludesAuxiliaryScripts` verified full, differential and unchanged
+audits, complete auxiliary text and no execution during collection. The gate
+also retained native selection/colors, real AUR build/install, edit/re-audit,
+drift refusal, explicit retry, skip and audit-free official installations.
+Codex was deterministic in these tests; this is not a new real-model qualification.
+
+The final remote check found `main` at
+`1b70f8c67e5afe9239fbccdac9738d942c61e7fc`. Its additional commits change only
+unpackaged provider-decision documentation, not shipped inputs. Publication must
+preserve those additions and the immutable source pin. Human review and merge
+remain required; no desktop installation was changed.
+
+### Previous r9 verification
+
 Candidate package `0.1.0.r9.g3c5f935-1` pins immutable AURoscope commit
 `3c5f935e71f88445290522119f4cb2f8b56f9e97`.
 It descends from current `main` (`8d9b844c093269286a8e5d2818d77665fecf7e99`),

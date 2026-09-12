@@ -60,11 +60,17 @@ The audit bundle contains only bounded required data:
 
 - current Git commit and a deterministic recipe manifest digest;
 - diff from the last successfully approved and built commit;
-- complete changed files needed to understand the diff;
-- full recipe content on first use;
+- all tracked recipe files in every audit mode, including unchanged install,
+  removal, helper scripts and auxiliary packaging files;
+- full text for text files; metadata and hashes only for binary files;
 - committed `.SRCINFO` and minimal package metadata as untrusted data.
 
 AURoscope never sources or executes `PKGBUILD`, `.install`, patches, source archives, or another package-supplied file while preparing the audit.
+
+The diff supplements the complete current recipe context rather than filtering
+it. Existing file and bundle limits still apply: an oversized bundle fails the
+audit preparation instead of silently dropping scripts. Downloaded upstream
+sources, generated build artifacts and untracked build leftovers are not collected.
 
 The first implementation task is a disposable-Arch spike proving how Paru exposes the exact worktree before build, how an edited worktree is reused, and how `PreBuildCommand` observes that same worktree.
 

@@ -208,8 +208,12 @@ func TestDifferentialAuditUsesSuccessfulBaseline(t *testing.T) {
 	if bundle.Mode != "diff" || bundle.PreviousCommit != firstCommit || !strings.Contains(bundle.Diff, "pkgrel=2") {
 		t.Fatalf("bundle = %#v", bundle)
 	}
-	if len(bundle.Files) != 1 || bundle.Files[0].Path != "PKGBUILD" {
-		t.Fatalf("differential bundle files = %#v, want only changed complete files", bundle.Files)
+	_, files, err := readRecipeIdentity("hello", repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(bundle.Files, files) {
+		t.Fatalf("differential bundle files = %#v, want complete recipe %#v", bundle.Files, files)
 	}
 }
 
@@ -263,8 +267,12 @@ func TestDifferentialAuditIncludesSameCommitWorktreeChanges(t *testing.T) {
 	if !strings.Contains(bundle.Diff, "pkgrel=2") {
 		t.Fatalf("bundle diff omitted worktree change: %q", bundle.Diff)
 	}
-	if len(bundle.Files) != 1 || bundle.Files[0].Path != "PKGBUILD" {
-		t.Fatalf("differential bundle files = %#v, want changed PKGBUILD", bundle.Files)
+	_, files, err := readRecipeIdentity("hello", repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(bundle.Files, files) {
+		t.Fatalf("differential bundle files = %#v, want complete recipe %#v", bundle.Files, files)
 	}
 }
 
