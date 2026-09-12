@@ -85,6 +85,11 @@ EOF
 chown builder:builder /work/paru-provider/PKGBUILD
 sudo -u builder -- bash -lc 'cd /work/paru-provider && makepkg --noconfirm'
 pacman --noconfirm -U /work/paru-provider/*.pkg.tar.zst
+# Use the same prefetched archive data as the package gate. The checkout export
+# already copied this ignored cache; no host credentials or PATH shim are needed.
+# makepkg still verifies the recipe checksum and downloads any missing source.
+mkdir -p /work/auroscope/packaging/aur/cache/sources
+printf '%s\n' 'SRCDEST=/work/auroscope/packaging/aur/cache/sources' >/etc/makepkg.conf.d/auroscope-sources.conf
 chown -R builder:builder /work/auroscope/packaging/aur
 sudo -u builder -- bash -lc 'cd /work/auroscope/packaging/aur && makepkg --syncdeps --noconfirm'
 pacman --noconfirm -U /work/auroscope/packaging/aur/auroscope-*.pkg.tar.zst

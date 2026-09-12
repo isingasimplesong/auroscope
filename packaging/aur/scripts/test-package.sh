@@ -69,6 +69,11 @@ SCRIPT
 chmod 0755 /usr/local/bin/codex
 
 cp -a /package-source /work/package
+# An operator may prefetch authenticated source archives into this ignored
+# directory. Share only archive data, never credentials or host makepkg config.
+# Both the previous and candidate recipes still verify their own checksums.
+mkdir -p /work/package/cache/sources
+printf '%s\n' 'SRCDEST=/work/package/cache/sources' >/etc/makepkg.conf.d/auroscope-sources.conf
 chown -R builder:builder /work/package
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --printsrcinfo > /tmp/generated.SRCINFO'
 cmp /work/package/.SRCINFO /tmp/generated.SRCINFO
@@ -80,7 +85,11 @@ if sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfi
   echo 'AURoscope unexpectedly built with incompatible stable Paru installed' >&2
   exit 1
 fi
-grep -F 'install paru-git first, then rerun makepkg -si' /tmp/stable-build.err
+if ! grep -F 'install paru-git first, then rerun makepkg -si' /tmp/stable-build.err; then
+  echo 'Stable-Paru check did not reach prepare(); inspect source acquisition below.' >&2
+  cat /tmp/stable-build.out /tmp/stable-build.err >&2
+  exit 1
+fi
 if compgen -G '/work/package/auroscope-*.pkg.tar.zst' >/dev/null; then
   echo 'AURoscope package artifact exists after the incompatible-provider check' >&2
   exit 1
