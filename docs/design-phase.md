@@ -19,10 +19,11 @@ Decision #66 is accepted through Mathieu's exact standalone
 [ADR-0066](decisions/0066-configurable-audit-provider.md)
 records Codex by default and explicit choice of Claude Code, Anthropic API,
 OpenAI API, or an OpenAI-compatible API. It amends the Codex-only product frame
-below, not the mandatory audit or Paru responsibilities. Production remains
-Codex-only until a separate `MODE: EXECUTION` issue authorizes implementation
-and Arch delivery. This finalization contains documentation only, not an
-implementation plan, provider qualification, or permission to deploy.
+below, not the mandatory audit or Paru responsibilities. Mathieu subsequently
+requested implementation in comment 3065; separate execution issue #68 carries
+the candidate code, its tests and Arch delivery. The decision finalization was
+documentation only. Candidate source is not a packaged release, live-provider
+qualification, or permission to deploy.
 
 The later [decision #46](https://git.2027a.net/2027a/auroscope/issues/46), accepted by Mathieu's exact [GO DECISION](https://git.2027a.net/2027a/auroscope/issues/46#issuecomment-1845), is recorded in [ADR-0046](decisions/0046-codex-minimum-version-without-ceiling.md): Codex minimum `0.150.1`, no ceiling, strict stable banners, unchanged execution/validation protections, and explicit separation of admission from qualification. That decision finalization changed documentation only. Issue #45 is the separate `MODE: EXECUTION` lane implementing the admission candidate; its installed-package gate passed, together with the real 0.153.4 audit and bounded sandbox checks documented in the dependency note. The candidate remains under human PR review, not automatically merged or installed on Mathieu's workstation. Paru policy is unchanged.
 

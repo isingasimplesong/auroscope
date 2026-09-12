@@ -6,9 +6,9 @@ Accepted on 2026-09-12 in [decision issue #66][issue], through Mathieu's exact
 standalone [GO DECISION, comment 3051][acceptance], accepting the concrete
 [proposal in comment 3046][proposal].
 
-This is design acceptance only. Production still uses Codex CLI exclusively.
-Implementation and Arch delivery require a separate `MODE: EXECUTION` issue;
-this decision does not authorize an implementation plan or production changes.
+This records design acceptance only. Mathieu subsequently requested execution
+in comment 3065 of #66. Separate `MODE: EXECUTION` issue #68 carries the provider
+implementation and Arch delivery; this ADR alone does not authorize them.
 
 This amends ADR-0015 point 4 only for provider selection. ADR-0046 continues to
 control Codex version admission and its distinction from qualification.
