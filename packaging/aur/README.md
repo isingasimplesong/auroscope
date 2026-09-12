@@ -71,13 +71,36 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
-The recovery below established a transport-only release-gate failure: the normal
-supported-Paru script did not use the authenticated archive cache, unlike the
-successful retained worker run. Both gate entry points now use the same optional
-`packaging/aur/cache/sources` directory, with makepkg checksum validation and no
-credentials in containers. This script correction requires a new immutable source
-checkpoint and package pin before final release validation. The r12 evidence below
-is retained evidence, not qualification of that forthcoming checkpoint.
+Candidate `0.1.0.r13.g281d061-1` completes the package preparation for #65.
+It pins remote source checkpoint `281d061fa9c9e3d67de408c6adbb415bb04af3cc`.
+The downloaded archive SHA-256 is:
+`49d5c9f07d78d4f0a172dda118a6620885944343c41ac693200615fa3e10097f`
+
+The previous failure was an anonymous HTTP 404 downloading the private archive,
+not a failed model test. Both gates now use the optional authenticated archive
+cache, with makepkg checksum validation and no credentials in containers.
+
+Non-root Arch `.SRCINFO` generation, freshness, Go tests/vet and both complete
+disposable Arch gates passed. The package gate upgraded r12 to r13 with the old
+archives still present, without `--force`, and verified default `luna` and a
+literal configured model against the installed binary. The supported-Paru gate
+verified the installed artifact, provider failures without bypass, native colors,
+auxiliary recipe context, real build/install, edit/re-audit, drift refusal/retry
+and audit-free official operations. Both gates reported:
+
+```text
+auroscope 0.1.0.r13.g281d061-1
+```
+
+Evidence: `logs/recovery-65/r13-package.log` and `logs/recovery-65/r13-paru.log`.
+The final fetch confirmed current main remains included at
+`23f64e17fbf9c3d477f5a4405fdea0bcf147168a`.
+Provider configuration remains intact; #64 prompt delivery remains separate.
+These deterministic tests do not qualify live access to `luna`. Wrapper
+validation/publication and human review/merge remain pending. No deployment or
+user-machine installation was performed. Preserve the source checkpoint.
+
+### Previous r12 verification
 
 Candidate `0.1.0.r12.g46bef00-1` packages issue #65: Codex receives `luna` by
 default, or the literal `model` from the shared `auroscope/config.json` file.
