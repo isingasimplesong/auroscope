@@ -23,6 +23,8 @@ const (
 	trackedRegularType    = "regular"
 	trackedRegularMode    = "100644"
 	trackedExecutableMode = "100755"
+	trackedSymlinkMode    = "120000"
+	trackedSymlinkType    = "symlink"
 )
 
 type recipeIdentity struct {
@@ -80,7 +82,7 @@ func buildAuditBundle(pkgbase, dir string, previous *packageBaseline) (auditBund
 		}
 	}
 	for _, file := range manifestFiles {
-		if file.Path == ".SRCINFO" {
+		if file.Path == ".SRCINFO" && file.Type == trackedRegularType {
 			bundle.SRCINFO = file.Text
 			break
 		}
@@ -130,19 +132,33 @@ func readRecipeFiles(dir string) ([]recipeFile, error) {
 		if err := validateRelativeRecipePath(name); err != nil {
 			return nil, err
 		}
-		if mode != trackedRegularMode && mode != trackedExecutableMode {
+		if mode != trackedRegularMode && mode != trackedExecutableMode && mode != trackedSymlinkMode {
 			return nil, fmt.Errorf("recipe path %s has unsupported tracked mode %s", name, mode)
+		}
+		// Reject substituted parent directories before touching the leaf. This
+		// is an ordinary drift check, not a same-UID race protection boundary.
+		parent := dir
+		parts := strings.Split(filepath.FromSlash(name), string(os.PathSeparator))
+		for _, part := range parts[:len(parts)-1] {
+			parent = filepath.Join(parent, part)
+			info, err := os.Lstat(parent)
+			if err != nil || !info.IsDir() {
+				return nil, fmt.Errorf("recipe path %s has a non-directory parent", name)
+			}
 		}
 		path := filepath.Join(dir, filepath.FromSlash(name))
 		info, err := os.Lstat(path)
 		if err != nil {
 			return nil, fmt.Errorf("stat recipe file %s: %w", name, err)
 		}
-		if !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("recipe path %s is not a regular file", name)
-		}
 		actualMode := trackedRegularMode
-		if info.Mode().Perm()&0o111 != 0 {
+		fileType := trackedRegularType
+		if info.Mode()&os.ModeSymlink != 0 {
+			actualMode = trackedSymlinkMode
+			fileType = trackedSymlinkType
+		} else if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("recipe path %s is not a regular file or symlink", name)
+		} else if info.Mode().Perm()&0o111 != 0 {
 			actualMode = trackedExecutableMode
 		}
 		if actualMode != mode {
@@ -155,7 +171,15 @@ func readRecipeFiles(dir string) ([]recipeFile, error) {
 		if total > maxRecipeTotalBytes {
 			return nil, fmt.Errorf("recipe files exceed %d aggregate bytes", maxRecipeTotalBytes)
 		}
-		data, err := os.ReadFile(path)
+		var data []byte
+		if fileType == trackedSymlinkType {
+			// The target is untrusted text, never a path to open or resolve.
+			var target string
+			target, err = os.Readlink(path)
+			data = []byte(target)
+		} else {
+			data, err = os.ReadFile(path)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("read recipe file %s: %w", name, err)
 		}
@@ -163,7 +187,7 @@ func readRecipeFiles(dir string) ([]recipeFile, error) {
 			return nil, fmt.Errorf("recipe file %s contains invalid UTF-8 text", name)
 		}
 		sum := sha256.Sum256(data)
-		file := recipeFile{Path: name, Mode: mode, Type: trackedRegularType, SHA256: hex.EncodeToString(sum[:]), Size: info.Size()}
+		file := recipeFile{Path: name, Mode: mode, Type: fileType, SHA256: hex.EncodeToString(sum[:]), Size: int64(len(data))}
 		if bytes.IndexByte(data, 0) < 0 {
 			file.Text = string(data)
 		}

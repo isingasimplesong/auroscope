@@ -232,7 +232,17 @@ auditLoop:
 		}
 		bundle, err := buildAuditBundle(pkgbase, dir, baseline)
 		if err != nil {
-			return reviewedPackage{}, err
+			fmt.Fprintf(o.config.stderr, "auroscope: audit preparation failed for %s: %s\n", escapeTerminal(pkgbase), escapeTerminal(err.Error()))
+			switch askDecision(reader, o.config, []string{"retry", "skip", "cancel"}) {
+			case "retry":
+				continue
+			case "skip":
+				// Only the package name is known. Do not persist a fictitious
+				// audit or put this incomplete identity in the approval list.
+				return reviewedPackage{Identity: recipeIdentity{Pkgbase: pkgbase}, Decision: decisionSkip}, nil
+			default:
+				return reviewedPackage{Identity: recipeIdentity{Pkgbase: pkgbase}, Decision: decisionCancel}, nil
+			}
 		}
 		report, err := auditWithProvider(bundle, o.config)
 		if err != nil {
