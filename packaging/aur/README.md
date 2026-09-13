@@ -75,6 +75,32 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r16: combined prompt and Codex model configuration
+
+Package `0.1.0.r16.g20bdd79-1` combines main's configurable prompt with Codex
+model selection (default `luna`), preserving providers and the short English guide.
+Source pin: `20bdd799a285c1988d850416265b53023a288a3a`.
+SHA-256: `27401cd67aec84ff89533421d0b6699e541d6960e181aae7eb9bb5dd33116982`.
+Preserve this checkpoint and all earlier pins in merge history, without squash.
+
+Full Go tests/vet, freshness, non-root Arch `.SRCINFO` generation and exact
+comparison, archive checksums, namcap and both package gates passed. The real
+r15-to-r16 upgrade retained old archives and used no `--force`. The installed
+artifact received both default/explicit models and the preserved custom prompt.
+The full supported-Paru gate passed on `/usr/bin/auroscope`: prompt lifecycle,
+providers without bypass, auxiliary scripts, native colors, real AUR build/install,
+edit/re-audit, drift refusal, explicit retry, skip and audit-free official work.
+Both gates reported `auroscope 0.1.0.r16.g20bdd79-1`.
+
+Retained containers `pr73-package-r16` and `pr73-paru-r16` exited 0; full logs
+are in Hephaistos artifacts `pr73-main-gates/{package,paru}-r16-docker.log`.
+The caller interruption did not stop the named Paru container; its completion
+and final success marker were recovered directly from Docker. No assertions
+were removed. Private archives used a host-authenticated, checksum-verified
+cache without credentials in containers. No workstation installation or agent
+merge occurred. Real account access to `luna` and inference quality remain
+unqualified; deterministic tests establish argument delivery, not live inference.
+
 ### Verified r15: prompt configuration on current main
 
 Package `0.1.0.r15.g6429418-1` combines the editable audit prompt with `main`
