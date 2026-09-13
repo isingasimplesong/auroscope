@@ -75,6 +75,12 @@ cp -a /package-source /work/package
 mkdir -p /work/package/cache/sources
 printf '%s\n' 'SRCDEST=/work/package/cache/sources' >/etc/makepkg.conf.d/auroscope-sources.conf
 chown -R builder:builder /work/package
+if [[ -d /package-source/cache/sources ]]; then
+  install -d -m 0755 -o builder -g builder /work/source-cache
+  cp -a /package-source/cache/sources/. /work/source-cache/
+  chown -R builder:builder /work/source-cache
+  printf 'SRCDEST=/work/source-cache\n' >/etc/makepkg.conf.d/auroscope-cache.conf
+fi
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --printsrcinfo > /tmp/generated.SRCINFO'
 cmp /work/package/.SRCINFO /tmp/generated.SRCINFO
 namcap /work/package/PKGBUILD
@@ -212,15 +218,20 @@ if [ "${1:-}" = "--version" ]; then
   exit 0
 fi
 out=''
+model=''
 while [ "$#" -gt 0 ]; do
   if [ "$1" = '--output-last-message' ]; then
     shift
     out=$1
+  elif [ "$1" = '--model' ]; then
+    shift
+    model=$1
   fi
   last=$1
   shift || true
 done
 [ -n "$out" ]
+[ "$model" = "${EXPECTED_MODEL:-luna}" ]
 [ "$last" = 'My preserved packaging audit prompt' ]
 printf '%s' '{"summary":"packaging looks conventional","risk":"low","findings":[],"uncertainty":"","inspect":[]}' >"$out"
 SCRIPT
@@ -265,7 +276,21 @@ case "$review_output" in
     ;;
 esac
 
-cmp /tmp/expected-audit-config /home/builder/.config/auroscope/config.json
+install -d -m 0700 -o builder -g builder /home/builder/.config/auroscope
+printf '%s\n' '{"model":"package-test-model","prompt":"My preserved packaging audit prompt"}' >/home/builder/.config/auroscope/config.json
+chown builder:builder /home/builder/.config/auroscope/config.json
+# Start a fresh fixture: the fake acquisition above creates an initial commit.
+rm -rf /tmp/package-test-clones /tmp/package-test-state.sqlite3
+printf 'approve\n' | sudo -u builder -- env \
+  HOME=/home/builder EXPECTED_MODEL=package-test-model \
+  AUROSCOPE_PARU=/tmp/package-test-paru \
+  AUROSCOPE_CODEX=/tmp/package-test-codex \
+  AUROSCOPE_STATE=/tmp/package-test-state.sqlite3 \
+  AUROSCOPE_CLONE_DIR=/tmp/package-test-clones \
+  /usr/bin/auroscope -S hello
+echo 'Installed model configuration passed: default luna and explicit model'
+
+grep -F '"prompt":"My preserved packaging audit prompt"' /home/builder/.config/auroscope/config.json
 echo 'Installed custom prompt received by Codex and preserved through upgrade and audit'
 echo 'AURoscope package build/install smoke passed'
 BASH

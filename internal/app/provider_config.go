@@ -72,6 +72,9 @@ func loadAuditConfigPath(path string) (auditConfig, error) {
 	if err := d.Decode(new(any)); err != io.EOF {
 		return c, errors.New("invalid AURoscope configuration: trailing data")
 	}
+	if _, present := fields["model"]; present && strings.TrimSpace(c.Model) == "" {
+		return c, errors.New("invalid AURoscope configuration: model must be non-empty")
+	}
 	return c.normalized()
 }
 
@@ -81,6 +84,9 @@ func (c auditConfig) normalized() (auditConfig, error) {
 	}
 	if c.Provider == "" {
 		c.Provider = "codex"
+	}
+	if c.Provider == "codex" && c.Model == "" {
+		c.Model = "luna"
 	}
 	if len(c.Model) > 200 || strings.ContainsAny(c.Model, "\r\n\x00") {
 		return c, errors.New("invalid audit model")

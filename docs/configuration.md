@@ -2,14 +2,19 @@
 
 
 Use `${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.json`. With no file,
-AURoscope keeps its original Codex CLI behavior, including Codex's default model.
+AURoscope uses Codex CLI and explicitly requests `luna`.
 The provider extension from #68 is included in `main` through merged PR #71.
 
 The file is read only when an AUR audit is required, and reread on explicit retry.
 Official operations do not depend on it. AURoscope never overwrites this file.
 On the first AUR audit, a missing file is created with the complete built-in
-audit prompt in `prompt`. The default-model request (`luna`) remains separate in
-#65 / PR #73; this branch uses the CLI's native model unless `model` is set.
+audit prompt in `prompt`. For Codex, an omitted `model` selects `luna`; an
+explicit nonempty `model` is passed unchanged as one `--model` argument. For
+example, `{"model":"your-exact-codex-model-id"}` selects another model. Empty
+or null models are rejected. Claude Code retains its native default when the
+model is omitted; API providers require an explicit model. AURoscope does not
+translate model aliases or fall back. Access to `luna` and real inference quality
+have not been qualified; use a model available to your account.
 
 Choose exactly one provider. Minimal CLI configurations are:
 

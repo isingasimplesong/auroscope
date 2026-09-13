@@ -57,7 +57,7 @@ updates. Local recipe builds (`-B`, `--build`, local paths) are outside scope.
 
 ## Configure
 
-With no configuration file, AURoscope uses Codex CLI and its native model.
+With no configuration file, AURoscope uses Codex CLI and requests `luna`.
 Codex must report a stable `codex-cli MAJOR.MINOR.PATCH` version of at least
 `0.150.1`; admission does not guarantee compatibility with every later version.
 

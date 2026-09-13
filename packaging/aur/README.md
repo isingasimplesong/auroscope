@@ -75,6 +75,67 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r16: combined prompt and Codex model configuration
+
+Package `0.1.0.r16.g20bdd79-1` combines main's configurable prompt with Codex
+model selection (default `luna`), preserving providers and the short English guide.
+Source pin: `20bdd799a285c1988d850416265b53023a288a3a`.
+SHA-256: `27401cd67aec84ff89533421d0b6699e541d6960e181aae7eb9bb5dd33116982`.
+Preserve this checkpoint and all earlier pins in merge history, without squash.
+
+Full Go tests/vet, freshness, non-root Arch `.SRCINFO` generation and exact
+comparison, archive checksums, namcap and both package gates passed. The real
+r15-to-r16 upgrade retained old archives and used no `--force`. The installed
+artifact received both default/explicit models and the preserved custom prompt.
+The full supported-Paru gate passed on `/usr/bin/auroscope`: prompt lifecycle,
+providers without bypass, auxiliary scripts, native colors, real AUR build/install,
+edit/re-audit, drift refusal, explicit retry, skip and audit-free official work.
+Both gates reported `auroscope 0.1.0.r16.g20bdd79-1`.
+
+Retained containers `pr73-package-r16` and `pr73-paru-r16` exited 0; full logs
+are in Hephaistos artifacts `pr73-main-gates/{package,paru}-r16-docker.log`.
+The caller interruption did not stop the named Paru container; its completion
+and final success marker were recovered directly from Docker. No assertions
+were removed. Private archives used a host-authenticated, checksum-verified
+cache without credentials in containers. No workstation installation or agent
+merge occurred. Real account access to `luna` and inference quality remain
+unqualified; deterministic tests establish argument delivery, not live inference.
+
+### Verified r15: prompt configuration on current main
+
+Package `0.1.0.r15.g6429418-1` combines the editable audit prompt with `main`
+commit `70718ea6568170f93681bfcd9c0d1479019f4b59`, including PR #70's short
+English README and configuration guide, provider selection and existing fixes.
+The shared guide now documents automatic prompt creation and preservation;
+the separate #65 / PR #73 default-model change is not included.
+
+Immutable source pin: `6429418b8003a0360e9adb4aa18f6eafe86d393c`.
+Archive SHA-256: `1423f8c4050e236e5fe5c6aba4d6a6f36a5cefa726a89562a4c97522ba78f1a7`.
+The source checkpoint is a merge commit preserved on remote `loop/subject-64`.
+Preserve it and earlier pins when merging; do not squash them away.
+
+Verified: non-root Arch `.SRCINFO` generation and byte comparison, freshness,
+checksums, `namcap`, full Go tests and vet, package build/check/install, and the
+real r14-to-r15 upgrade with old archives present, without `--force`.
+The preserved custom prompt reached Codex unchanged after upgrade.
+
+The full supported-Paru gate passed against installed `/usr/bin/auroscope`,
+including prompt lifecycle, auxiliary recipe context, configured providers and
+failure without bypass, native colors, real AUR acquisition/build/install,
+edit/re-audit, identity-drift refusal, explicit retry, skip and audit-free official
+operations. Both gates reported `auroscope 0.1.0.r15.g6429418-1`.
+
+Both named containers (`pr72-package-r15`, `pr72-paru-r15`) completed with exit
+code 0 and are retained for recovery. Full logs are retained in the Hephaistos
+artifact directory `pr72-main-gates/{package,paru}-r15-docker.log`.
+The launcher only replaced Docker's `--rm` with unique container names; no test
+assertion or installed-artifact mode was removed. Private archives were fetched
+with host credentials into the checksum-verified source cache; no credentials
+entered the containers. Anonymous installation and new live-model qualification
+are not claimed. No package was installed on the user's machine and no PR merged.
+
+### Previous r14 README delivery
+
 Package `0.1.0.r14.ge5aecca-1` includes the shorter English user README and all
 sources from `main` at `23f64e17fbf9c3d477f5a4405fdea0bcf147168a`.
 Its immutable source pin is `e5aeccaed203d5c3ce8f045b35d9a25cf9932f6b`;

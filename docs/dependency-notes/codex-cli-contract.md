@@ -36,6 +36,27 @@ The live contract smoke returned JSONL events on stdout and wrote this schema-va
 
 ## Project usage
 
+### Explicit audit model
+
+The issue #65 source candidate adds `--model <literal-id>` to the audit argv.
+The default is exactly `luna`; the optional AURoscope `config.json` can override
+it. Configuration is read only on the audit path, not for official operations.
+No shell interpolation, alias translation, or fallback model is introduced.
+
+Recovery reconciles this candidate with the merged provider implementation:
+`loadAuditConfig` is the single reader and supplies `luna` only for Codex.
+Claude Code retains its native default; API providers require an explicit model.
+The complete auxiliary-file prompt from #63 is preserved without modification.
+
+The version-matched Codex 0.153.4 source exposes the shared `model` argument in
+`ExecSharedCliOptions` and marks it global in `mark_exec_global_args`:
+<https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/exec/src/cli.rs>
+
+Fake-CLI tests verify the default and a literal override as one argv value.
+The local Codex launcher cannot start because `node` is absent; this is not
+real-model qualification or proof that an account accepts the `luna` identifier.
+The candidate still needs its immutable package pin and installed-artifact gates.
+
 AURoscope checks the strict stable banner and numeric minimum before each audit, bounds JSONL/stderr diagnostics and the final-message file, rejects unknown fields and trailing data, and validates every file/line reference against the recipe bundle. It runs Codex in a separate process group with empty stdin, a five-minute timeout, visible 15-second progress, signal forwarding, descendant cleanup, and a fresh private directory for every retry. Any command, version, transport, or validation failure enters the explicit retry/skip/cancel path; it never bypasses the audit silently.
 
 ## Verification

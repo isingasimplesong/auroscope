@@ -91,6 +91,12 @@ pacman --noconfirm -U /work/paru-provider/*.pkg.tar.zst
 mkdir -p /work/auroscope/packaging/aur/cache/sources
 printf '%s\n' 'SRCDEST=/work/auroscope/packaging/aur/cache/sources' >/etc/makepkg.conf.d/auroscope-sources.conf
 chown -R builder:builder /work/auroscope/packaging/aur
+if [[ -d /src/packaging/aur/cache/sources ]]; then
+  install -d -m 0755 -o builder -g builder /work/source-cache
+  cp -a /src/packaging/aur/cache/sources/. /work/source-cache/
+  chown -R builder:builder /work/source-cache
+  printf 'SRCDEST=/work/source-cache\n' >/etc/makepkg.conf.d/auroscope-cache.conf
+fi
 sudo -u builder -- bash -lc 'cd /work/auroscope/packaging/aur && makepkg --syncdeps --noconfirm'
 pacman --noconfirm -U /work/auroscope/packaging/aur/auroscope-*.pkg.tar.zst
 pacman -Q auroscope
@@ -127,14 +133,19 @@ if [ "${1:-}" = --version ]; then
   exit 0
 fi
 out=''
+model=''
 while [ "$#" -gt 0 ]; do
   if [ "$1" = --output-last-message ]; then
     shift
     out=$1
+  elif [ "$1" = --model ]; then
+    shift
+    model=$1
   fi
   shift || true
 done
 [ -n "$out" ]
+[ "$model" = luna ]
 [ "$PWD" != /home/builder/aur/hello ]
 [ -f bundle.json ]
 printf 'audit\n' >>/tmp/codex-calls
