@@ -86,6 +86,7 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 		}
 		prompt = provider.prompt()
 		config.auditModel = provider.Model
+		config.auditThinking = provider.Thinking
 	}
 	if prompt == "" {
 		prompt = auditPrompt()
@@ -117,6 +118,15 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 	args := []string{"exec", "--json", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--output-schema", schemaPath, "--output-last-message", reportPath}
 	if config.auditModel != "" {
 		args = append(args, "--model", config.auditModel)
+	}
+	if config.auditThinking != "" {
+		// JSON string quoting also produces a TOML basic string here. Keep the
+		// value in one argv element, never raw TOML or shell syntax.
+		value, err := json.Marshal(config.auditThinking)
+		if err != nil {
+			return auditReport{}, err
+		}
+		args = append(args, "--config", "model_reasoning_effort="+string(value))
 	}
 	cmd := exec.Command(c.path, append(args, prompt)...)
 	cmd.Dir = tmp

@@ -7,8 +7,10 @@ The provider extension from #68 is included in `main` through merged PR #71.
 
 The file is read only when an AUR audit is required, and reread on explicit retry.
 Official operations do not depend on it. AURoscope never overwrites this file.
-On the first AUR audit, a missing file is created with the complete built-in
-audit prompt in `prompt`. For Codex, an omitted `model` selects `gpt-5.6-luna`; an
+On the first AUR audit, a missing file is created with `provider: "codex"`,
+`model: "gpt-5.6-luna"`, `thinking: "medium"` and the complete built-in audit
+prompt in `prompt`. These are actual JSON fields, not implicit defaults.
+For Codex, an omitted `model` selects `gpt-5.6-luna`; an
 explicit nonempty `model` is passed unchanged as one `--model` argument. For
 example, `{"model":"your-exact-codex-model-id"}` selects another model. Empty
 or null models are rejected. Claude Code retains its native default when the
@@ -17,6 +19,20 @@ translate model aliases or fall back. Access to `gpt-5.6-luna` and real inferenc
 quality have not been qualified; use a model available to your account.
 An existing explicit `"model":"luna"` is not rewritten: change it to
 `"model":"gpt-5.6-luna"` or omit `model` to use the corrected default.
+
+The initial `thinking: "medium"` value is sent to the selected provider:
+
+- Codex: quoted `model_reasoning_effort` configuration override;
+- Claude Code: one `--effort` argument;
+- Anthropic API: `output_config.effort`, alongside the structured-output format;
+- OpenAI and OpenAI-compatible APIs: `reasoning_effort`.
+
+Omitting `thinking` in an existing file sends no effort override. Levels are
+provider/model-specific and are forwarded unchanged, not translated or silently
+dropped. Choose a nonempty supported string; null, empty and malformed values
+fail the audit. Anthropic effort controls overall response work without enabling
+a separate extended-thinking mode. An incompatible service or model can reject
+the setting; no error permits fallback, a downgraded retry or an audit bypass.
 
 Choose exactly one provider. Minimal CLI configurations are:
 

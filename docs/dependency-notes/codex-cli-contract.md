@@ -36,6 +36,28 @@ The live contract smoke returned JSONL events on stdout and wrote this schema-va
 
 ## Project usage
 
+### Explicit initial configuration and thinking
+
+Issue #77 requires all initial audit settings to be visible in `config.json`:
+Codex, `gpt-5.6-luna`, `medium` and the complete unchanged prompt. Existing files
+remain untouched; an omitted `thinking` leaves Codex's native setting intact.
+An explicit string becomes one `--config` argument whose value is
+`model_reasoning_effort=<quoted string>`. JSON string encoding quotes the value
+as a TOML basic string, rather than interpolating raw configuration or shell code.
+
+The version-matched 0.153.4 schema declares `model_reasoning_effort` as a nonempty
+string. Its shared CLI parser accepts global `--config key=value` overrides and
+parses values as TOML. AURoscope does not maintain its own list of model levels.
+Sources consulted:
+
+- <https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core/config.schema.json>
+- <https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/utils/cli/src/config_override.rs>
+
+Deterministic tests cover initial fields, argv transmission, existing-file
+preservation and invalid configuration. The lifecycle test also supports the
+installed artifact through `AUROSCOPE_TEST_BINARY`. These contracts do not
+qualify live model access, model-specific thinking levels or inference quality.
+
 ### Explicit audit model
 
 The issue #65 source candidate adds `--model <literal-id>` to the audit argv.
@@ -55,7 +77,7 @@ The version-matched Codex 0.153.4 source exposes the shared `model` argument in
 
 Fake-CLI tests verify the default and a literal override as one argv value.
 The local Codex launcher cannot start because `node` is absent; this is not
-real-model qualification or proof of account access to the requested model.
+real-model qualification or proof that an account accepts `gpt-5.6-luna`.
 The candidate still needs its immutable package pin and installed-artifact gates.
 
 AURoscope checks the strict stable banner and numeric minimum before each audit, bounds JSONL/stderr diagnostics and the final-message file, rejects unknown fields and trailing data, and validates every file/line reference against the recipe bundle. It runs Codex in a separate process group with empty stdin, a five-minute timeout, visible 15-second progress, signal forwarding, descendant cleanup, and a fresh private directory for every retry. Any command, version, transport, or validation failure enters the explicit retry/skip/cancel path; it never bypasses the audit silently.

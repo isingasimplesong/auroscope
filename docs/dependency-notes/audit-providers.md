@@ -96,6 +96,27 @@ only inside its test process and uses a loopback server with an inert credential
 
 ## HTTP contracts
 
+### Effort forwarding requested in #77
+
+The shared `thinking` field maps to Claude Code `--effort`, Anthropic
+`output_config.effort`, and OpenAI-compatible `reasoning_effort`. Codex retains
+its quoted `model_reasoning_effort` override. An omitted field adds nothing;
+explicit values are literal and provider/model compatibility remains external.
+Anthropic documents effort as applicable with or without extended thinking;
+this change does not enable a separate thinking mode or change report parsing.
+
+Sources consulted for these mappings:
+
+- <https://code.claude.com/docs/en/cli-reference>
+- <https://platform.claude.com/docs/en/build-with-claude/effort>
+- <https://developers.openai.com/api/docs/guides/reasoning>
+
+`TestProviderHTTPThinking` checks all API mappings, omission, preservation of
+the output schema and unsupported-level refusal without retry. Claude argv and
+failure without build are exercised by `TestProviderClaudeThinking`, including
+installed-artifact mode. The installed HTTP test checks the configured effort.
+These deterministic contracts do not qualify live models or native CLI versions.
+
 Authoritative sources consulted:
 
 - <https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create>
