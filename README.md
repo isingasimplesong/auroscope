@@ -1,200 +1,98 @@
 # AURoscope
 
-AURoscope is a small terminal wrapper around
-[Paru](https://github.com/Morganamilo/paru) and Pacman. Before Paru builds an AUR
-recipe, AURoscope asks the selected LLM provider to audit the exact recipe change,
-shows the result, and records a per-package decision. Codex CLI remains the default.
+**Review AUR recipes before building them with Paru.**
 
-## Intended interface
+AURoscope is a terminal wrapper around [Paru](https://github.com/Morganamilo/paru).
+It asks an LLM to review each AUR recipe and its changes, then lets you decide
+whether to proceed. Paru still handles search, dependencies, builds and installation.
+Official repository packages pass through without an audit.
 
-```console
-auroscope                    # native official update, then audited AUR updates
-auroscope <search terms>     # Paru-native search and numbered selection
-auroscope -S <packages>      # explicit installation
-auroscope <other Paru args>  # transparent passthrough when no AUR build occurs
-```
+An audit is advice, **not a security guarantee**. AURoscope reviews packaging, not
+the safety of upstream software or downloaded binaries. It does not sandbox builds.
+A final identity check rejects recipes that changed after approval, but does not
+protect against a compromised local account or all later modifications.
 
-## Product flow
+## Install
 
-1. Official repository updates and installs remain native Paru/Pacman operations. They receive no AURoscope audit.
-2. Paru identifies the AUR package bases that would be built.
-3. AURoscope compares each exact recipe with the last successfully approved commit, or sends the full recipe on first use.
-4. The selected provider returns a structured audit of the diff and recipe files.
-5. AURoscope shows a concise assessment and packaging-risk level; the full findings and diff appear only when the user chooses `inspect`.
-6. The user chooses by number, initial, or full word: `approve`, `inspect`, `edit` and re-audit, `skip`, or `cancel` per AUR package base.
-7. AURoscope relaunches Paru with the official targets and approved AUR targets. Paru resolves dependencies, calls `makepkg`, and installs through Pacman normally.
-8. A minimal `PreBuildCommand` rejects a recipe whose identity differs from the audited one.
+You need Arch Linux x86_64, `base-devel`, `git`, a compatible Paru, and an audit
+provider. Codex CLI is the default; install and authenticate it using its own
+instructions. Claude Code and API providers are also available.
 
-AURoscope does not replace Paru's search UI, resolver, build machinery, or Pacman. It does not audit official packages.
+**Stable Paru 2.1.0 is incompatible.** The tested Paru commit is
+`9ac3578807a87858651e81a02586ceb947686e7c`; install `paru-git` before AURoscope.
+If you do not have Paru, build its [AUR recipe](https://aur.archlinux.org/packages/paru-git)
+first. See the [package guide](packaging/aur/README.md) for details and diagnostics.
 
-### Recipe changed after approval
+Review the recipes, then run as your normal user, not root:
 
-If the final guard detects a changed recipe, Paru stops before executing it.
-AURoscope names the package and offers `retry`, `skip`, or `cancel`:
-
-- `retry` acquires that package again through Paru, reruns Codex, and requires
-  a new approval before another final Paru transaction;
-- `skip` removes its approval and targets; Paru may reject remaining packages
-  that still need the skipped dependency;
-- `cancel` or end-of-input stops the AUR phase without retrying.
-
-Other approved recipes remain subject to the exact identity guard on every
-attempt. A successful official update is not repeated. Ordinary Paru failures
-and signal exit statuses do not trigger this menu. Paru's native hook-failure
-diagnostic can still appear above AURoscope's explanation.
-
-## V1 shape
-
-- Go executable for Arch Linux `linux/amd64`.
-- Codex CLI by default; explicit alternatives implement accepted ADR-0066.
-- SQLite stores only the last successful recipe baseline and audit history.
-- One internal Go package initially; split only when demonstrated behavior requires it.
-- No deterministic rule engine, plugin system, build sandbox, cached artifact reuse, or same-UID security protocol.
-
-The accepted architecture is in [`docs/architecture/minimal-v1.md`](docs/architecture/minimal-v1.md) and [`ADR-0015`](docs/decisions/0015-minimal-llm-first-wrapper.md). A narrow disposable-Arch Paru worktree spike must be completed before the new implementation plan is written.
-
-## Current implementation
-
-The v1 implementation lives in `cmd/auroscope` and `internal/app`. Human-merged
-PR #48 implements ADR-0046: strict stable Codex CLI banners at least `0.150.1`,
-compared numerically, without a ceiling. Admission is not qualification; the
-[Codex contract note](docs/dependency-notes/codex-cli-contract.md) records the real
-0.153.4 audit and bounded sandbox evidence, not a guarantee for future versions.
-
-PR #49 preserves that admission fix and restores native Paru selection colors.
-Only machine-target stdout uses a private PTY when both caller outputs are
-terminals; stdin and the menu remain native. Paru still owns disabled `Color`
-and redirected-output behavior. Package metadata and installed-artifact gate
-results are maintained in [the package README](packaging/aur/README.md).
-An existing desktop installation is not upgraded by these disposable tests.
-
-## Install on Arch Linux
-
-The self-hosted AUR-style recipe lives in [`packaging/aur`](packaging/aur). Publication on `aur.archlinux.org` remains deferred.
-
-```console
-# Install Codex by any supported method, for example:
-npm install -g @openai/codex
-
-# Install the currently tested compatible provider. AURoscope needs Paru's
-# post-2.1 interactive-output fix and machine order records.
+```sh
 paru -S paru-git
-
-# Then bootstrap AURoscope without asking it to audit itself:
 git clone https://git.2027a.net/2027a/auroscope.git
 cd auroscope/packaging/aur
 makepkg -si
+pacman -Q auroscope
 ```
 
-Stable Paru 2.1.0 is not compatible: its interactive search writes the human menu and selected targets to the same stream, so AURoscope cannot recover the selection without parsing localized UI. The package depends on the virtual `paru` capability so an installed compatible provider such as `paru-git` satisfies `makepkg`, but it conflicts with the known-incompatible stable package version `paru<=2.1.0` instead of allowing installation to produce a silent search prompt. Pacman still cannot fetch an absent AUR provider, so install `paru-git` before bootstrapping AURoscope. The currently tested Paru surface is commit `9ac3578807a87858651e81a02586ceb947686e7c`. AURoscope validates the required selection and order behavior when those paths run and fails closed on incompatible output; a package name or `paru --version` string alone cannot prove that post-release contract. Codex is deliberately not a Pacman dependency: AURoscope uses the `codex` executable found on `PATH`, whether it came from npm, an Arch package, or another installation method. `codex --version` must report a supported version, and Codex must be authenticated for the user who runs AURoscope. During the first desktop trial, invoke `auroscope` explicitly rather than replacing `paru` with an alias.
+The package is hosted in this repository, not on `aur.archlinux.org`.
+`makepkg` builds the immutable source snapshot pinned in `PKGBUILD`, not the
+current checkout. Do not use AURoscope to bootstrap its own installation.
 
-## Audit prompt configuration
+## Use
 
-On the first AUR audit, AURoscope creates
-`${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.json` if absent.
-Its `prompt` JSON string contains the full default audit prompt. Edit that string
-to customize the audit; use `\n` for line breaks. Existing files are never
-rewritten by AURoscope or package upgrades. Keep a copy of your custom prompt
-before deleting the file to regenerate the default on the next audit.
-
-If an existing configuration has no `prompt` field, the built-in default is used
-without changing the file. Add `prompt` alongside model/provider settings in
-this same file rather than creating a second configuration. Empty or null
-prompts are errors, not a request for the default.
-
-An empty prompt or invalid JSON stops the audit with retry/skip/cancel, not an
-automatic approval. Native official-only operations do not load or create this
-file. Prompt changes do not disable the read-only Codex invocation, local report
-validation, human approval, or final recipe-identity guard.
-
-## Development verification
-
-```console
-CGO_ENABLED=1 go test ./...
-go vet ./...
-packaging/aur/scripts/test-package.sh
-AUROSCOPE_E2E_DISPOSABLE_ARCH=1 scripts/e2e-disposable-arch.sh
-AUROSCOPE_E2E_SUPPORTED_PARU=1 scripts/e2e-supported-paru.sh
+```sh
+auroscope                 # official updates, then audited AUR updates
+auroscope -Syu            # the same update flow
+auroscope visual studio   # Paru's interactive search and selection
+auroscope -S paru-git     # install an AUR package after review
+auroscope -S git          # official package: native installation, no audit
+auroscope -Q              # native installed-package query
 ```
 
-The package test and both integration scripts require Docker. The package test builds and installs `packaging/aur/PKGBUILD` in disposable Arch. The first integration script is a fast fake-Paru/fake-Codex smoke. The supported-version gate builds pinned Paru commit `9ac3578807a87858651e81a02586ceb947686e7c`, uses real AUR acquisition/resolution/build and Pacman installation only inside the disposable container, proves the real guard and drift rejection, and confirms that official-only work invokes no Codex audit.
+For each AUR package base, choose `approve`, `inspect`, `edit`, `skip` or `cancel`.
+The menu also accepts initials and numbers. Editing triggers a new audit.
+Provider errors offer retry, skip or cancel—never an automatic bypass or fallback.
+Paru retains its final installation confirmation. Skipping a dependency may prevent
+the remaining installation; cancelling AUR work does not undo completed official
+updates. Local recipe builds (`-B`, `--build`, local paths) are outside scope.
 
-For selection/color verification without executing any PKGBUILD, run `AUROSCOPE_E2E_SUPPORTED_PARU=1 AUROSCOPE_E2E_SELECTION_ONLY=1 scripts/e2e-supported-paru.sh`. This checks real native colors with `Color` enabled/disabled and redirected output, then exits before the build/install scenarios. See the [selection color contract](docs/dependency-notes/paru-selection-colors.md).
+## Configure
 
-For unpublished worktree changes, set `AUROSCOPE_E2E_SOURCE_ONLY=1` alongside
-`AUROSCOPE_E2E_SUPPORTED_PARU=1`. This tests the checkout binary, including drift
-and explicit retry, without fetching the immutable AURoscope package snapshot.
-Builds and installations still occur only inside disposable Arch. This source
-gate does not qualify the packaged artifact or advance its source pin.
+With no configuration file, AURoscope uses Codex CLI and its native model.
+Codex must report a stable `codex-cli MAJOR.MINOR.PATCH` version of at least
+`0.150.1`; admission does not guarantee compatibility with every later version.
 
-## Audit provider configuration
-
-Use `${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.json`. With no file,
-AURoscope keeps its original Codex CLI behavior, including Codex's default model.
-This candidate implements the provider extension authorized by #68. It is not a
-new packaged release until the source pin and Arch gates have been completed.
-
-The file is read only when an AUR audit is required, and reread on explicit retry.
-Official operations do not depend on it. AURoscope never overwrites this file.
-The editable prompt described above uses this same reader and file for every
-provider. The default-model request remains in #65; its retained source work must
-extend this reader rather than introducing another configuration file.
-
-Choose exactly one provider. Minimal CLI configurations are:
-
-```json
-{"provider": "codex"}
-```
+To choose Codex, Claude Code, Anthropic API, OpenAI API or an OpenAI-compatible
+service, create `${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.json`.
+For example:
 
 ```json
 {"provider": "claude-code"}
 ```
 
-CLI authentication stays with the CLI; no API key is stored by AURoscope. Claude
-Code uses the `claude` executable on `PATH`, with tools, MCP, user/project settings,
-skills and ordinary hooks disabled for the audit. Native login credentials remain
-available. Model selection is optional for CLI providers via `model`.
+CLI model selection is optional; APIs require an explicit model. API keys are
+referenced by environment variable name, never stored in the file. A selected
+remote service receives the recipe audit bundle. See [configuration](docs/configuration.md)
+for exact fields, examples and qualification limits. On the first AUR audit, a
+missing file is created with the full default `prompt`. Edit that JSON string to
+customize the audit; existing configuration and custom prompts survive upgrades.
+Official-only operations do not create or read it.
 
-For API providers, specify an actual model identifier available to your account:
+## Update and help
 
-```json
-{
-  "provider": "anthropic",
-  "model": "YOUR_MODEL_ID",
-  "api_key_env": "ANTHROPIC_API_KEY"
-}
+From your existing repository root:
+
+```sh
+git pull --ff-only
+cd packaging/aur
+makepkg -si
+pacman -Q auroscope
 ```
 
-For OpenAI, use `"provider": "openai"` and `"api_key_env": "OPENAI_API_KEY"`.
-These providers use their official HTTPS API roots. For another service:
+`auroscope --version` reports **Paru's** version; use `pacman -Q auroscope` for
+AURoscope's package version. Forcing an old recipe to rebuild does not update its pin.
 
-```json
-{
-  "provider": "openai-compatible",
-  "base_url": "https://openrouter.ai/api/v1",
-  "model": "YOUR_PROVIDER/MODEL_ID",
-  "api_key_env": "OPENROUTER_API_KEY"
-}
-```
-
-`base_url` is the API root, not the full `/chat/completions` endpoint. HTTPS is
-required; credentials in URLs, query strings, fragments and redirects are refused.
-The referenced environment variable must hold the key when AURoscope starts.
-Never put a key value in this file. Unknown fields and invalid configuration fail
-the audit rather than selecting a different provider. The file is limited to 64 KiB.
-
-API selection sends the same bounded recipe bundle to that service. OpenAI and
-compatible services must support Chat Completions with `response_format.json_schema`;
-Anthropic must support Messages with `output_config.format`. Refusal, truncation,
-HTTP error or invalid local report validation offers retry, skip or cancel only.
-There is no automatic provider fallback, schema-mode downgrade or audit bypass.
-
-Compatibility is not guaranteed by a provider name. Claude Code 2.1.269 was checked
-with its real executable and simulated transport in isolated Arch. API contracts
-have deterministic local HTTPS tests; no new live service/model is qualified yet.
-See the [provider contract note](docs/dependency-notes/audit-providers.md) for exact
-evidence, limitations and opt-in live qualification commands.
-
-## Previous design
-
-The earlier architecture was intentionally superseded because it made the LLM optional and accumulated resolver, approval, state, recovery, and test machinery outside the product's purpose. Historical material remains under [`docs/archive/pre-llm-first/`](docs/archive/pre-llm-first/).
+- [Configuration and provider contracts](docs/configuration.md)
+- [Package installation and verification](packaging/aur/README.md)
+- [Technical documentation and history](docs/README.md)
+- [Report a problem](https://git.2027a.net/2027a/auroscope/issues): include the command,
+  package/CLI versions, provider and error, but no credentials or private data.

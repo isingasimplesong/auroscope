@@ -1,7 +1,7 @@
 # Maintainer: Héphaïstos <hephaistos@ecl.400iso.net>
 
 pkgname=auroscope
-pkgver=0.1.0.r13.geb7109a
+pkgver=0.1.0.r14.ge5aecca
 pkgrel=1
 pkgdesc='LLM-first safety review wrapper around Paru and Pacman'
 arch=('x86_64')
@@ -19,9 +19,9 @@ makedepends=(
   'gcc'
   'go'
 )
-_commit='eb7109aa3d46fb9f689ba68528f8c39423f19f44'
+_commit='e5aeccaed203d5c3ce8f045b35d9a25cf9932f6b'
 source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/${_commit}.tar.gz")
-sha256sums=('2cb12936a01331aa61cd5fd8bc0dddeb2a81afe64c23276b76477e035183f8e2')
+sha256sums=('9f03404701919e28df93e2d4457352519158270668179c44a2ac9729b150c8c7')
 
 prepare() {
   local installed package_name paru_version
