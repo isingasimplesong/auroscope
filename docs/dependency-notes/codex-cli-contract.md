@@ -61,8 +61,9 @@ qualify live model access, model-specific thinking levels or inference quality.
 ### Explicit audit model
 
 The issue #65 source candidate adds `--model <literal-id>` to the audit argv.
-The default is exactly `gpt-5.6-luna`; the optional AURoscope `config.json` can
-override it. Configuration is read only on the audit path, not for official operations.
+Issue #76 corrects the default to exactly `gpt-5.6-luna`; the optional AURoscope
+`config.json` can override it. Configuration is read only on the audit path,
+not for official operations.
 No shell interpolation, alias translation, or fallback model is introduced.
 
 Recovery reconciles this candidate with the merged provider implementation:
