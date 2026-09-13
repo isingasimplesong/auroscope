@@ -64,6 +64,10 @@ if [[ "${AUROSCOPE_E2E_SELECTION_ONLY:-0}" == 1 ]]; then
   exit 0
 fi
 
+AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
+  GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
+  go test ./internal/app -run '^(TestEmptyAURUpdate|TestEmptyUpdateRealParu)$' -count=1 -v -timeout=120s
+
 # Install the pinned recipe, not the independently built source binary. Package
 # the real compiled Paru as a disposable provider so Pacman checks dependencies.
 # Source-only checks exercise unpublished worktree fixes without fetching the
@@ -101,6 +105,10 @@ sudo -u builder -- bash -lc 'cd /work/auroscope/packaging/aur && makepkg --syncd
 pacman --noconfirm -U /work/auroscope/packaging/aur/auroscope-*.pkg.tar.zst
 pacman -Q auroscope
 pacman -Qo /usr/bin/auroscope
+AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
+  AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
+  GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
+  go test ./internal/app -run '^(TestEmptyAURUpdate|TestEmptyUpdateRealParu)$' -count=1 -v -timeout=120s
 rm /usr/local/bin/auroscope
 ln -s /usr/bin/auroscope /usr/local/bin/auroscope
 AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \

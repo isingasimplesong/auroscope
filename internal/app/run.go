@@ -72,8 +72,15 @@ func run(args []string, config runConfig) int {
 		}
 		targets, err := paru.pendingAURUpdates()
 		if err != nil {
+			var exit childExit
+			if errors.As(err, &exit) {
+				return exit.status
+			}
 			fmt.Fprintf(config.stderr, "auroscope: %v\n", err)
 			return statusFailure
+		}
+		if len(targets) == 0 {
+			return paru.finishEmptyAURUpdate()
 		}
 		return runAuditedAUR(args, targets, config)
 	}

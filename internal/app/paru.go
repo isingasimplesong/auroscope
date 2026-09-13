@@ -192,6 +192,12 @@ func (paru paruClient) order(targets []string) (orderResult, error) {
 func (paru paruClient) pendingAURUpdates() ([]string, error) {
 	var output bytes.Buffer
 	command := paru.runMachine(&output, "", []string{"-Qua", "--quiet"})
+	// Pinned Paru query.rs returns 1 when no upgrades were printed, including
+	// installed packages absent from AUR. The native guarded update below must
+	// still confirm this result: runtime/network errors can also return 1.
+	if command.status == 1 && output.Len() == 0 {
+		return nil, nil
+	}
 	if command.status != 0 {
 		if command.err != nil && command.status < 0 {
 			return nil, command.err
@@ -214,6 +220,27 @@ func (paru paruClient) pendingAURUpdates() ([]string, error) {
 		return nil, fmt.Errorf("read Paru AUR update output: %w", err)
 	}
 	return targets, nil
+}
+
+// A quiet query cannot present Paru's missing/out-of-date warnings and its
+// native "nothing to do" result. Let Paru do that with native terminal streams,
+// but approve no recipe: a newly discovered update must not bypass the audit.
+func (paru paruClient) finishEmptyAURUpdate() int {
+	config := paru.config.withDefaults()
+	if err := ensurePrivateDir(config.cloneDir); err != nil {
+		fmt.Fprintf(config.stderr, "auroscope: prepare clone directory: %v\n", err)
+		return statusFailure
+	}
+	txDir, confPath, err := writeTransactionFiles(nil, config.cloneDir)
+	if err != nil {
+		fmt.Fprintf(config.stderr, "auroscope: prepare empty AUR transaction: %v\n", err)
+		return statusFailure
+	}
+	defer os.RemoveAll(txDir)
+	// Reset configured PKGBUILD-only mode. Never refresh or upgrade official
+	// repositories a second time, or enter local recipe repositories here.
+	result := paru.finalInstall([]string{"-Su", "--mode=aur", "--skipreview"}, []string{"PARU_CONF=" + confPath})
+	return reportCommandError(config.stderr, result, "AUR update")
 }
 
 func (result orderResult) plan() (resolvedPlan, error) {

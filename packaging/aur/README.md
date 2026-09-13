@@ -75,6 +75,36 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r23: empty AUR updates and native warnings
+
+Issue #84 fixes the false failure when Paru's quiet AUR query returns no
+updates with status 1. Native Paru confirms the empty update and displays its
+missing-package and out-of-date warnings. Actual failures retain their status.
+The final hook approves no recipe: a newly discovered update cannot bypass
+the audit and requires a fresh invocation.
+
+Package: `0.1.0.r23.gee99222-1`.
+Immutable source: `ee992223ee02dea214b5bb2c162c614ff250edd4`.
+Archive SHA-256:
+`08e1b3f85d98c18f88003a5c53478cfd6e09e522e1b7e9bd67b7a5cff6d00813`.
+The remote source checkpoint includes main at
+`8da35d6a6a4cf4c35e991ae3b3f745a841142711`. Preserve it without squash.
+
+Non-root Arch metadata generation and comparison, authenticated checksums,
+freshness, namcap, Go tests and vet passed. The package gate upgraded r22 to
+r23 with the old archives present, without `--force`, preserving configuration.
+Both disposable gates exited 0 and reported `auroscope 0.1.0.r23.gee99222-1`.
+
+The installed artifact passed the empty-update regression with actual pinned
+Paru, a private package database and local AUR RPC fixture. Both native warnings
+remained visible. Deterministic tests also checked streams, input, error status
+and refusal of unapproved recipes. The full gate retained native colors, real
+AUR builds, edit/re-audit, drift refusal, retry and audit-free official installs.
+
+Evidence: `build/issue-84/package-r23.log` and `build/issue-84/paru-r23.log`.
+Containers were removed; no credentials entered them. No workstation package
+was installed. Providers were deterministic, not a new live-model qualification.
+
 ### Verified r22: literal Codex thinking on reconciled main
 
 Issue #78 preserves Codex's native effort when `thinking` is omitted from an

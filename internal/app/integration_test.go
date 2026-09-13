@@ -370,7 +370,7 @@ exit 0
 	if status != 0 {
 		t.Fatalf("status = %d", status)
 	}
-	if got := readLines(t, calls); !reflect.DeepEqual(got, []string{"-Syu", "--repo", "-Qua", "--quiet"}) {
+	if got := readLines(t, calls); !reflect.DeepEqual(got, []string{"-Syu", "--repo", "-Qua", "--quiet", "-Su", "--mode=aur", "--skipreview"}) {
 		t.Fatalf("calls = %#v", got)
 	}
 }
