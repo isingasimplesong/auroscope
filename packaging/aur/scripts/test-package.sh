@@ -231,7 +231,7 @@ while [ "$#" -gt 0 ]; do
   shift || true
 done
 [ -n "$out" ]
-[ "$model" = "${EXPECTED_MODEL:-luna}" ]
+[ "$model" = "${EXPECTED_MODEL:-gpt-5.6-luna}" ]
 [ "$last" = 'My preserved packaging audit prompt' ]
 printf '%s' '{"summary":"packaging looks conventional","risk":"low","findings":[],"uncertainty":"","inspect":[]}' >"$out"
 SCRIPT
@@ -288,7 +288,7 @@ printf 'approve\n' | sudo -u builder -- env \
   AUROSCOPE_STATE=/tmp/package-test-state.sqlite3 \
   AUROSCOPE_CLONE_DIR=/tmp/package-test-clones \
   /usr/bin/auroscope -S hello
-echo 'Installed model configuration passed: default luna and explicit model'
+echo 'Installed model configuration passed: default gpt-5.6-luna and explicit model'
 
 grep -F '"prompt":"My preserved packaging audit prompt"' /home/builder/.config/auroscope/config.json
 echo 'Installed custom prompt received by Codex and preserved through upgrade and audit'

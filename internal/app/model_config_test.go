@@ -13,9 +13,10 @@ func TestAuditModelConfiguration(t *testing.T) {
 		name, content, want string
 		missing, invalid    bool
 	}{
-		{name: "absent", missing: true, want: "luna"},
-		{name: "omitted", content: `{}`, want: "luna"},
-		{name: "codex provider", content: `{"provider":"codex"}`, want: "luna"},
+		{name: "absent", missing: true, want: "gpt-5.6-luna"},
+		{name: "omitted", content: `{}`, want: "gpt-5.6-luna"},
+		{name: "codex provider", content: `{"provider":"codex"}`, want: "gpt-5.6-luna"},
+		{name: "explicit old identifier is not rewritten", content: `{"model":"luna"}`, want: "luna"},
 		{name: "shared provider and model", content: `{"provider":"codex","model":"chosen"}`, want: "chosen"},
 		{name: "claude native default", content: `{"provider":"claude-code"}`, want: ""},
 		{name: "api explicit model", content: `{"provider":"openai","model":"api-model"}`, want: "api-model"},
@@ -43,7 +44,7 @@ func TestAuditModelConfiguration(t *testing.T) {
 				t.Fatalf("model = %q, error = %v", got.Model, err)
 			}
 			if tc.missing && (got.Prompt == nil || *got.Prompt != auditPrompt()) {
-				t.Fatal("missing config must create the full default prompt alongside the luna default")
+				t.Fatal("missing config must create the full default prompt alongside the gpt-5.6-luna default")
 			}
 			if !tc.missing {
 				data, readErr := os.ReadFile(filepath.Join(dir, "auroscope", "config.json"))
@@ -97,9 +98,9 @@ done
 [ "$model" = "$EXPECTED_MODEL" ]
 printf '%s' '{"summary":"model verified","risk":"low","findings":[],"uncertainty":"","inspect":[]}' >"$out"
 `)
-	for _, model := range []string{"luna", "custom model;not-a-shell"} {
+	for _, model := range []string{"gpt-5.6-luna", "custom model;not-a-shell"} {
 		t.Setenv("EXPECTED_MODEL", model)
-		if model != "luna" {
+		if model != "gpt-5.6-luna" {
 			writeModelConfig(t, dir, `{"model":"custom model;not-a-shell"}`)
 		}
 		if _, err := auditWithProvider(auditBundle{}, (runConfig{codexPath: codex}).withDefaults()); err != nil {

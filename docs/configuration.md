@@ -2,19 +2,31 @@
 
 
 Use `${XDG_CONFIG_HOME:-$HOME/.config}/auroscope/config.json`. With no file,
-AURoscope uses Codex CLI and explicitly requests `luna`.
+AURoscope uses Codex CLI and explicitly requests `gpt-5.6-luna`.
 The provider extension from #68 is included in `main` through merged PR #71.
 
 The file is read only when an AUR audit is required, and reread on explicit retry.
 Official operations do not depend on it. AURoscope never overwrites this file.
-On the first AUR audit, a missing file is created with the complete built-in
-audit prompt in `prompt`. For Codex, an omitted `model` selects `luna`; an
+On the first AUR audit, a missing file is created with `provider: "codex"`,
+`model: "gpt-5.6-luna"`, `thinking: "medium"` and the complete built-in audit
+prompt in `prompt`. These are actual JSON fields, not implicit defaults.
+For Codex, an omitted `model` selects `gpt-5.6-luna`; an
 explicit nonempty `model` is passed unchanged as one `--model` argument. For
 example, `{"model":"your-exact-codex-model-id"}` selects another model. Empty
 or null models are rejected. Claude Code retains its native default when the
 model is omitted; API providers require an explicit model. AURoscope does not
-translate model aliases or fall back. Access to `luna` and real inference quality
-have not been qualified; use a model available to your account.
+translate model aliases or fall back. Access to `gpt-5.6-luna` and real inference
+quality have not been qualified; use a model available to your account.
+An existing explicit `"model":"luna"` is not rewritten: change it to
+`"model":"gpt-5.6-luna"` or omit `model` to use the corrected default.
+
+For Codex, `thinking` is passed as a quoted `model_reasoning_effort` override.
+The initial `medium` value matches the requested initial configuration. An
+existing file that omits `thinking` keeps Codex's native setting: no override is
+sent. AURoscope does not enumerate model-specific levels; choose a nonempty
+string supported by your Codex/model. Null, empty and malformed values fail the
+audit. Remove `thinking` when changing to another provider; other providers do
+not support this field. No provider error permits fallback or an audit bypass.
 
 Choose exactly one provider. Minimal CLI configurations are:
 

@@ -51,6 +51,8 @@ func TestPromptConfigurationLifecycle(t *testing.T) {
 	path := filepath.Join(dir, "auroscope", "config.json")
 	captured := filepath.Join(dir, "prompt")
 	t.Setenv("TEST_CAPTURED_PROMPT", captured)
+	t.Setenv("TEST_CAPTURED_MODEL", filepath.Join(dir, "model"))
+	t.Setenv("TEST_CAPTURED_THINKING", filepath.Join(dir, "thinking"))
 	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\n")
 	calls := filepath.Join(dir, "calls")
 	paru := fakeParu(t, dir, calls, repo, "AUR TARGET hello hello\n")
@@ -61,12 +63,18 @@ if [ "$1" = --version ]; then
   exit 0
 fi
 out=''
+model=''
+thinking=''
 while [ "$#" -gt 0 ]; do
   if [ "$1" = --output-last-message ]; then shift; out=$1; fi
+  if [ "$1" = --model ]; then shift; model=$1; fi
+  if [ "$1" = --config ]; then shift; thinking=$1; fi
   last=$1
   shift
 done
 printf '%s' "$last" > "$TEST_CAPTURED_PROMPT"
+printf '%s' "$model" > "$TEST_CAPTURED_MODEL"
+printf '%s' "$thinking" > "$TEST_CAPTURED_THINKING"
 printf '%s' '{"summary":"prompt received","risk":"low","findings":[],"uncertainty":"","inspect":[]}' > "$out"
 `)
 	invoke := func(args []string, input string) (int, string) {
@@ -101,9 +109,11 @@ printf '%s' '{"summary":"prompt received","risk":"low","findings":[],"uncertaint
 	}
 	for _, custom := range []bool{false, true} {
 		want := auditPrompt()
+		wantModel, wantThinking := "gpt-5.6-luna", "medium"
 		if custom {
 			want = "Custom audit\nPreserve my instructions exactly."
-			data, err := json.Marshal(map[string]string{"prompt": want, "model": "luna", "provider": "codex"})
+			wantModel, wantThinking = "custom-model", "high"
+			data, err := json.Marshal(map[string]string{"prompt": want, "model": wantModel, "thinking": wantThinking, "provider": "codex"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -119,15 +129,19 @@ printf '%s' '{"summary":"prompt received","risk":"low","findings":[],"uncertaint
 			if got := readString(t, captured); got != want {
 				t.Fatalf("Codex prompt = %q, want %q", got, want)
 			}
+			if got := readString(t, filepath.Join(dir, "model")); got != wantModel {
+				t.Fatalf("Codex model = %q, want %q", got, wantModel)
+			}
+			if got := readString(t, filepath.Join(dir, "thinking")); got != `model_reasoning_effort="`+wantThinking+`"` {
+				t.Fatalf("Codex thinking override = %q", got)
+			}
 			if readErr == nil && readString(t, path) != string(before) {
 				t.Fatal("audit rewrote existing shared configuration")
 			}
-			var saved struct {
-				Prompt string `json:"prompt"`
-			}
+			var saved map[string]string
 			readJSON(t, path, &saved)
-			if saved.Prompt != want {
-				t.Fatalf("saved prompt overwritten: %q", saved.Prompt)
+			if len(saved) != 4 || saved["provider"] != "codex" || saved["model"] != wantModel || saved["thinking"] != wantThinking || saved["prompt"] != want {
+				t.Fatalf("saved configuration is incomplete or changed: %v", saved)
 			}
 		}
 	}

@@ -58,7 +58,7 @@ updates. Local recipe builds (`-B`, `--build`, local paths) are outside scope.
 
 ## Configure
 
-With no configuration file, AURoscope uses Codex CLI and requests `luna`.
+With no configuration file, AURoscope uses Codex CLI and requests `gpt-5.6-luna`.
 Codex must report a stable `codex-cli MAJOR.MINOR.PATCH` version of at least
 `0.150.1`; admission does not guarantee compatibility with every later version.
 
@@ -74,8 +74,9 @@ CLI model selection is optional; APIs require an explicit model. API keys are
 referenced by environment variable name, never stored in the file. A selected
 remote service receives the recipe audit bundle. See [configuration](docs/configuration.md)
 for exact fields, examples and qualification limits. On the first AUR audit, a
-missing file is created with the full default `prompt`. Edit that JSON string to
-customize the audit; existing configuration and custom prompts survive upgrades.
+missing file is created with `provider`, `model`, `thinking` (`medium`) and the
+full default `prompt`. Edit these fields to customize the audit; existing files
+and custom prompts survive upgrades. `thinking` currently applies to Codex only.
 Official-only operations do not create or read it.
 
 ## Update and help
