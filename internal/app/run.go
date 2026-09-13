@@ -24,7 +24,7 @@ type runConfig struct {
 	paruPath      string
 	codexPath     string
 	auditModel    string
-	auditThinking string
+	auditThinking *string
 	auditPrompt   string
 	statePath     string
 	cloneDir      string

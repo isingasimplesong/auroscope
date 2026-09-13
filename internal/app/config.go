@@ -29,7 +29,8 @@ func createAuditConfig(path string) error {
 		return fmt.Errorf("create audit configuration directory: %w", err)
 	}
 	prompt := auditPrompt()
-	config, err := (auditConfig{Prompt: &prompt, Thinking: "medium"}).normalized()
+	thinking := "medium"
+	config, err := (auditConfig{Prompt: &prompt, Thinking: &thinking}).normalized()
 	if err != nil {
 		return err
 	}

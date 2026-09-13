@@ -47,7 +47,10 @@ func TestProviderHTTPThinking(t *testing.T) {
 					io.WriteString(w, providerEnvelope(provider, providerTestReport))
 				}))
 				defer s.Close()
-				c := auditConfig{Provider: provider, Model: "fixture", Thinking: effort, BaseURL: s.URL, APIKeyEnv: "TEST_KEY"}
+				c := auditConfig{Provider: provider, Model: "fixture", BaseURL: s.URL, APIKeyEnv: "TEST_KEY"}
+				if effort != "" {
+					c.Thinking = &effort
+				}
 				bundle := auditBundle{Files: []recipeFile{{Path: "PKGBUILD", Text: "pkgname=fixture\n"}}}
 				_, err := auditHTTP(bundle, c, runConfig{}.withDefaults(), s.Client().Transport)
 				if (err != nil) != strings.HasPrefix(effort, "future") || calls != 1 {
@@ -85,7 +88,11 @@ printf '%s' "$value" > "$CAPTURE_EFFORT"
 case "$value" in future*) exit 2 ;; esac
 printf '%s' '{"type":"result","subtype":"success","is_error":false,"result":"{\"summary\":\"reviewed\",\"risk\":\"low\",\"findings\":[],\"uncertainty\":\"\",\"inspect\":[]}"}'
 `)
-			data, _ := json.Marshal(auditConfig{Provider: "claude-code", Thinking: effort})
+			config := auditConfig{Provider: "claude-code"}
+			if effort != "" {
+				config.Thinking = &effort
+			}
+			data, _ := json.Marshal(config)
 			writeProviderConfig(t, string(data))
 			repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\n")
 			calls := filepath.Join(dir, "calls")

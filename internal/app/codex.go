@@ -119,13 +119,10 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 	if config.auditModel != "" {
 		args = append(args, "--model", config.auditModel)
 	}
-	if config.auditThinking != "" {
-		// JSON string quoting also produces a TOML basic string here. Keep the
-		// value in one argv element, never raw TOML or shell syntax.
-		value, err := json.Marshal(config.auditThinking)
-		if err != nil {
-			return auditReport{}, err
-		}
+	if config.auditThinking != nil {
+		// JSON string escaping is also valid TOML basic-string escaping. Keep
+		// the value literal, even when it contains quotes or config-like text.
+		value, _ := json.Marshal(*config.auditThinking)
 		args = append(args, "--config", "model_reasoning_effort="+string(value))
 	}
 	cmd := exec.Command(c.path, append(args, prompt)...)

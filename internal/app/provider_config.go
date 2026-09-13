@@ -18,7 +18,7 @@ import (
 type auditConfig struct {
 	Provider  string  `json:"provider"`
 	Model     string  `json:"model,omitempty"`
-	Thinking  string  `json:"thinking,omitempty"`
+	Thinking  *string `json:"thinking,omitempty"`
 	Prompt    *string `json:"prompt,omitempty"`
 	BaseURL   string  `json:"base_url,omitempty"`
 	APIKeyEnv string  `json:"api_key_env,omitempty"`
@@ -76,9 +76,7 @@ func loadAuditConfigPath(path string) (auditConfig, error) {
 	if _, present := fields["model"]; present && strings.TrimSpace(c.Model) == "" {
 		return c, errors.New("invalid AURoscope configuration: model must be non-empty")
 	}
-	if _, present := fields["thinking"]; present && strings.TrimSpace(c.Thinking) == "" {
-		return c, errors.New("invalid AURoscope configuration: thinking must be non-empty")
-	}
+
 	return c.normalized()
 }
 
@@ -92,11 +90,14 @@ func (c auditConfig) normalized() (auditConfig, error) {
 	if c.Provider == "codex" && c.Model == "" {
 		c.Model = "gpt-5.6-luna"
 	}
+
 	if len(c.Model) > 200 || strings.ContainsAny(c.Model, "\r\n\x00") {
 		return c, errors.New("invalid audit model")
 	}
-	if len(c.Thinking) > 200 || strings.ContainsAny(c.Thinking, "\r\n\x00") {
-		return c, errors.New("invalid audit thinking value")
+	if c.Provider != "codex" && c.Thinking != nil {
+		if strings.TrimSpace(*c.Thinking) == "" || len(*c.Thinking) > 200 || strings.ContainsAny(*c.Thinking, "\r\n\x00") {
+			return c, errors.New("invalid audit thinking value")
+		}
 	}
 
 	switch c.Provider {

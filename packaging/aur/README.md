@@ -75,6 +75,38 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r22: literal Codex thinking on reconciled main
+
+Issue #78 preserves Codex's native effort when `thinking` is omitted from an
+existing configuration. Explicit strings reach Codex literally, without a local
+list of levels or whitespace normalization. The initial complete configuration
+still writes `medium`; provider effort forwarding from merged PR #81 is retained.
+
+Package: `0.1.0.r22.gb630719-1`.
+Immutable source: `b630719c9c180fb61135b8e69a58a6e249c4f8fd`.
+Archive SHA-256:
+`40682ff9cec4b481f8f87cadc99d3948602b3ca76c8711f42e3035e176ded4e6`.
+This remote checkpoint includes main at
+`1c75904a01289c0c0bb57f6beacfa2c7b3696a2d` and preserves earlier source pins.
+Keep those histories reachable without squash.
+
+Non-root Arch metadata generation and exact comparison, archive verification,
+freshness, namcap, Go tests and vet passed. The package gate upgraded main's r21
+to r22 with the previous archives present, without `--force`, preserving custom
+configuration. Both disposable gates exited 0 and reported
+`auroscope 0.1.0.r22.gb630719-1`.
+
+The full supported-Paru gate exercised installed `/usr/bin/auroscope`: literal
+and omitted Codex effort, complete configuration and customization, Claude and
+HTTP effort, provider failure without bypass, auxiliary recipe context, native
+colors, real AUR builds, edit/re-audit, identity drift refusal, retry, skip and
+audit-free official installations. Deterministic providers do not qualify live
+model access or model-specific effort support.
+
+Evidence: `build/issue-78/package-r22.log` and `build/issue-78/paru-r22.log`.
+Test containers were removed. No credentials entered them, and no workstation
+installation, deployment or merge was performed.
+
 ### Verified r21: complete configuration and provider effort
 
 Issue #77 and Mathieu's comment 3253 on PR #81 are covered by the combined

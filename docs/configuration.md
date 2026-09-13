@@ -29,8 +29,12 @@ The initial `thinking: "medium"` value is sent to the selected provider:
 
 Omitting `thinking` in an existing file sends no effort override. Levels are
 provider/model-specific and are forwarded unchanged, not translated or silently
-dropped. Choose a nonempty supported string; null, empty and malformed values
-fail the audit. Anthropic effort controls overall response work without enabling
+dropped. For Codex, every string is passed literally, including an empty or unknown
+value; choosing a valid string is your responsibility. Null and non-string values
+are rejected locally. Other providers retain their nonempty, bounded string checks.
+The new-file template still writes `medium`, as requested for initial configuration.
+Remove that field to use Codex's native default instead.
+Anthropic effort controls overall response work without enabling
 a separate extended-thinking mode. An incompatible service or model can reject
 the setting; no error permits fallback, a downgraded retry or an audit bypass.
 

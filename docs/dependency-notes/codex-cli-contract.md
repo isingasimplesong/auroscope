@@ -48,6 +48,11 @@ as a TOML basic string, rather than interpolating raw configuration or shell cod
 The version-matched 0.153.4 schema declares `model_reasoning_effort` as a nonempty
 string. Its shared CLI parser accepts global `--config key=value` overrides and
 parses values as TOML. AURoscope does not maintain its own list of model levels.
+Issue #78 leaves string validity to the user and Codex: explicit empty, unknown,
+whitespace and escaped control-character strings are forwarded literally.
+Omission sends no override. Null and non-string JSON values remain invalid.
+The initial configuration template from #77 still explicitly writes `medium`;
+removing the field restores the native Codex default without rewriting the file.
 Sources consulted:
 
 - <https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core/config.schema.json>

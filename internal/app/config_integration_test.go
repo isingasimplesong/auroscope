@@ -145,6 +145,36 @@ printf '%s' '{"summary":"prompt received","risk":"low","findings":[],"uncertaint
 			}
 		}
 	}
+	// Preserve #78's distinction between omission and an explicit string on
+	// the installed artifact too, including values only Codex may reject.
+	for _, value := range []string{"omitted", "", "  medium  ", "future-level", "x\"\nmodel=\"other", "\x00", strings.Repeat("a", 201)} {
+		fields := map[string]string{"provider": "codex", "prompt": auditPrompt()}
+		want := ""
+		if value != "omitted" {
+			fields["thinking"] = value
+			quoted, err := json.Marshal(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want = "model_reasoning_effort=" + string(quoted)
+		}
+		data, err := json.Marshal(fields)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if status, output := invoke([]string{"-S", "hello"}, "approve\n"); status != 0 {
+			t.Fatalf("thinking %q: %d, %s", value, status, output)
+		}
+		if got := readString(t, filepath.Join(dir, "thinking")); got != want {
+			t.Fatalf("thinking override = %q, want %q", got, want)
+		}
+		if readString(t, path) != string(data) {
+			t.Fatal("thinking configuration was rewritten")
+		}
+	}
 }
 
 func TestInvalidPromptCanSkipWithoutAuditOrBuild(t *testing.T) {
