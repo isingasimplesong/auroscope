@@ -133,7 +133,7 @@ cat >/tmp/permission-paru <<'SCRIPT'
 set -eu
 printf '%s\n' "$*" >>/home/builder/permission-paru-calls
 case "$*" in
-  '-Syu --repo'|'-Qua --quiet') exit 0 ;;
+  '-Syu --repo'|'-Qua --quiet'|'-Su --mode=aur --skipreview') exit 0 ;;
   *) exit 64 ;;
 esac
 SCRIPT
@@ -172,7 +172,7 @@ cmp /tmp/expected-audit-config /home/builder/.config/auroscope/config.json
 
 rm -f /home/builder/permission-paru-calls
 permission_run
-printf '%s\n' '-Syu --repo' '-Qua --quiet' >/tmp/expected-permission-paru-calls
+printf '%s\n' '-Syu --repo' '-Qua --quiet' '-Su --mode=aur --skipreview' >/tmp/expected-permission-paru-calls
 cmp /tmp/expected-permission-paru-calls /home/builder/permission-paru-calls
 test "$(stat -c %a /home/builder/permission-clones)" = 700
 test "$(stat -c %a /home/builder/permission-clones/hermes-agent-desktop/pkg)" = 0

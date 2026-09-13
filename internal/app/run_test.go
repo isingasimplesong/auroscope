@@ -257,7 +257,7 @@ exit 99
 	if status != 0 {
 		t.Fatalf("status = %d", status)
 	}
-	if got := readLines(t, argsFile); !reflect.DeepEqual(got, []string{"-Syu", "--repo", "-Qua", "--quiet"}) {
+	if got := readLines(t, argsFile); !reflect.DeepEqual(got, []string{"-Syu", "--repo", "-Qua", "--quiet", "-Su", "--mode=aur", "--skipreview"}) {
 		t.Fatalf("args = %#v", got)
 	}
 	if stdout.String() != "official prompt\n" {

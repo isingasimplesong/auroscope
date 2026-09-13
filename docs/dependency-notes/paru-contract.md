@@ -37,6 +37,40 @@ AURoscope must preserve Paru's native selection and resolver while obtaining a m
 
 ## Current use under ADR-0015
 
+### Empty AUR updates and native warnings
+
+At the pinned `9ac3578807a87858651e81a02586ceb947686e7c`,
+`src/query.rs::print_upgrade_list` returns 1 when it prints no upgrades.
+An installed package missing from AUR contributes no target; an out-of-date
+flag does not by itself imply an available version upgrade. The previous
+adapter rejected this normal empty result as a child failure (issue #84).
+
+Status 1 with empty stdout is not sufficient proof of success: a network or
+runtime failure can have the same shape. The candidate lets native Paru
+confirm an empty result with `-Su --mode=aur --skipreview`, using the original
+terminal streams. Paru prints its own missing/out-of-date warnings and
+"nothing to do" text; AURoscope does not parse or reconstruct that UI.
+Native failure and interruption remain failures. No second official upgrade
+or configured local PKGBUILD repository is entered by this AUR-only command.
+
+The confirmation uses the existing transaction hook with an empty approval
+list. A newly discovered recipe is refused before its code executes, rather
+than using a stale empty query as permission to build. This conservative race
+case requires a fresh invocation to query and audit the newly available update.
+Updates already found by the query retain the existing audited target flow.
+
+Verified in disposable Arch: `TestEmptyUpdateRealParu` supplies a private
+libalpm database and local RPC response to the actual pinned Paru. The empty
+query returns 1; the corrected flow returns 0 and retains both native warnings.
+`TestEmptyAURUpdate` checks native streams and input, nonzero statuses, partial
+failed output, the empty approval guard, and absence of provider configuration.
+The full source-only supported-Paru gate also passed, including real build,
+edit/re-audit, drift refusal, retry and audit-free official installation.
+
+Evidence: `build/issue-84/source-paru.log`. These source checks are not package
+delivery. The same regression tests are wired into the installed-artifact gate;
+a new immutable package pin and both package gates remain required.
+
 These findings are historical evidence, not a complete active adapter contract. The first executable task must revalidate one supported Paru version and prove the exact native search/selection, AUR worktree, edit/re-audit, skip/exclusion, final build, and `PreBuildCommand` path required by [ADR-0015](../decisions/0015-minimal-llm-first-wrapper.md). Do not carry forward the transitional human-menu parser, broad mode classifier, or closure machinery merely because they were explored here.
 
 ## Sources consulted
