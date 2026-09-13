@@ -98,6 +98,103 @@ The full supported-Paru rerun has not yet been confirmed; this documentation
 change does not alter code or tests relative to the merged provider release.
 No installation on the user's machine or PR merge has been performed.
 
+### Verified r13 recovery
+
+Candidate `0.1.0.r13.geb7109a-1` preserves the editable prompt and shared provider
+configuration. It pins the remotely verified source checkpoint:
+`eb7109aa3d46fb9f689ba68528f8c39423f19f44`
+
+The real authenticated archive has SHA-256:
+`2cb12936a01331aa61cd5fd8bc0dddeb2a81afe64c23276b76477e035183f8e2`
+
+The previous wrapper failure came from an anonymous private-archive download
+(HTTP 404, `test-64.log` lines 926-936), after a successful package gate.
+The checkpoint makes both gates use the same prefetched archive cache, without
+a Docker PATH shim or credentials in containers. Checksums remain mandatory.
+
+Non-root Arch `.SRCINFO` generation and byte comparison, freshness, Go tests
+and vet passed. The package gate built and upgraded the actual r12 package to
+r13 with its old archives present, without `--force`. It verified that the custom
+prompt survived the upgrade and reached Codex unchanged. Both gates reported:
+
+```text
+auroscope 0.1.0.r13.geb7109a-1
+```
+
+The full supported-Paru gate passed on `/usr/bin/auroscope`, including prompt
+creation/customization/preservation, auxiliary scripts, provider failure without
+bypass, native colors, real AUR build/install, edit/re-audit, identity drift,
+explicit retry, skip and audit-free official operations. The complete container
+log and exact Docker exit event confirm success with exit code 0. Evidence:
+
+- `logs/recovery-64/package-r13.log`
+- `logs/recovery-64/paru-r13-docker.log`
+- `logs/recovery-64/paru-r13-docker-exit.json`
+
+The final fetch found `origin/main` at `23f64e1`, included in this source.
+Preserve this checkpoint and earlier pins in remote history. Wrapper publication
+and human review/merge remain pending. No desktop installation was changed;
+deterministic providers do not qualify a new live model. The separate #65 work
+and the unrelated `docs/user-readme` PR are not included or modified here.
+
+### Retained r12 verification
+
+Candidate package `0.1.0.r12.g78ad044-1` adds the editable audit prompt from #64
+to the shared provider configuration. A missing file receives the complete
+default prompt; existing files and customized prompts survive upgrades and audits.
+It preserves #63's complete auxiliary recipe context and #68's providers.
+The default-model change in #65 remains separate retained work, not delivered here.
+
+The immutable source was read back on remote `loop/subject-64`:
+`78ad044b5e627ea98638f0aa2074f42445c4e63b`
+
+The authenticated archive download has SHA-256:
+`bb1789647dddd3baa3b58ce806dd3610037b5c218eadc32653719a7053156197`
+
+Non-root Arch `.SRCINFO` generation, freshness, Go tests/vet and both disposable
+Arch gates passed. The package gate upgraded r11 with its real archives present,
+without `--force`, and confirmed that Codex received the preserved custom prompt.
+Both gates reported:
+
+```text
+auroscope 0.1.0.r12.g78ad044-1
+```
+
+The full supported-Paru gate exercised `/usr/bin/auroscope`: prompt creation,
+customization and preservation, auxiliary scripts, provider success/failure,
+native colors, real AUR build/install, edit/re-audit, drift refusal, explicit retry,
+skip and audit-free official operations passed. Providers were deterministic;
+this does not qualify a new live model or change a desktop installation.
+
+Anonymous archive downloads returned HTTP 404 for both r11 and r12 during this
+run. The gates therefore used the real archives downloaded with profile credentials
+in a shared makepkg `SRCDEST` cache; makepkg still verified their recipe checksums.
+No credentials entered the containers. An uncached anonymous bootstrap is not
+verified in this access state; authenticated source acquisition is required.
+
+The subsequent wrapper failure was not a prompt regression: its normal package
+test lacked the earlier run's Docker cache shim. The repaired package gate was
+rerun without that shim, using fresh authenticated r11/r12 archives in the
+documented cache. It passed generation and byte comparison of non-root Arch
+`.SRCINFO`, checksums, stable-Paru refusal, r11-to-r12 upgrade without `--force`,
+and transmission and preservation of the custom prompt. Its process exited 0.
+
+The full installed-artifact supported-Paru gate also exited 0 on this same pin,
+including `TestPromptConfigurationLifecycle` and the auxiliary/provider tests.
+That unchanged integration script still used the retained archive-cache Docker
+shim; its anonymous download path is not newly qualified. Local evidence:
+`logs/recovery-64/package-normal.log` and
+`logs/recovery-64/paru-revalidated.log`. Both again reported
+`auroscope 0.1.0.r12.g78ad044-1`.
+
+Only the external package-test harness changed in this recovery, not an input
+consumed by the recipe's build, check or package functions. The existing remote
+source pin and candidate package identity therefore remain valid.
+
+The final fetch still found `main` at `23f64e1`, fully included in this source.
+Preserve this pin and earlier pins in remote history. Wrapper publication and
+human review/merge remain separate from these successful package validations.
+
 ### Previous r11 provider verification
 
 Candidate package `0.1.0.r11.gad96e16-1` delivers the explicit audit-provider

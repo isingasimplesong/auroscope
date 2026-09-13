@@ -72,8 +72,10 @@ For example:
 CLI model selection is optional; APIs require an explicit model. API keys are
 referenced by environment variable name, never stored in the file. A selected
 remote service receives the recipe audit bundle. See [configuration](docs/configuration.md)
-for exact fields, examples and qualification limits. Automatic file creation and
-editable prompts are not yet in `main`.
+for exact fields, examples and qualification limits. On the first AUR audit, a
+missing file is created with the full default `prompt`. Edit that JSON string to
+customize the audit; existing configuration and custom prompts survive upgrades.
+Official-only operations do not create or read it.
 
 ## Update and help
 

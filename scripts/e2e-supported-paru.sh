@@ -85,6 +85,11 @@ EOF
 chown builder:builder /work/paru-provider/PKGBUILD
 sudo -u builder -- bash -lc 'cd /work/paru-provider && makepkg --noconfirm'
 pacman --noconfirm -U /work/paru-provider/*.pkg.tar.zst
+# Use the same prefetched archive data as the package gate. The checkout export
+# already copied this ignored cache; no host credentials or PATH shim are needed.
+# makepkg still verifies the recipe checksum and downloads any missing source.
+mkdir -p /work/auroscope/packaging/aur/cache/sources
+printf '%s\n' 'SRCDEST=/work/auroscope/packaging/aur/cache/sources' >/etc/makepkg.conf.d/auroscope-sources.conf
 chown -R builder:builder /work/auroscope/packaging/aur
 sudo -u builder -- bash -lc 'cd /work/auroscope/packaging/aur && makepkg --syncdeps --noconfirm'
 pacman --noconfirm -U /work/auroscope/packaging/aur/auroscope-*.pkg.tar.zst
@@ -99,6 +104,12 @@ AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
 AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
   GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
   go test ./internal/app -run '^(TestAuditIncludesAuxiliaryScripts|TestProviderSelectionAndNoBypass|TestProviderInstalledHTTP)$' -count=1 -v -timeout=120s
+fi
+
+if [[ "${AUROSCOPE_E2E_SOURCE_ONLY:-0}" != 1 ]]; then
+AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
+  GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
+  go test ./internal/app -run '^TestPromptConfigurationLifecycle$' -count=1 -v -timeout=120s
 fi
 
 cat >/usr/local/bin/paru <<'EOF'

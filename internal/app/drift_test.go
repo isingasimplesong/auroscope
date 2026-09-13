@@ -80,6 +80,7 @@ exit 1
 			cmd := exec.Command(binary)
 			cmd.Stdin = strings.NewReader(tc.input)
 			cmd.Env = append(os.Environ(),
+				"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
 				"AUROSCOPE_PARU="+paru, "AUROSCOPE_CODEX="+codex,
 				"AUROSCOPE_CLONE_DIR="+filepath.Join(dir, "clones"),
 				"AUROSCOPE_STATE="+statePath, "CALLS="+calls,

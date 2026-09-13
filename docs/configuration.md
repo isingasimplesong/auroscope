@@ -7,8 +7,9 @@ The provider extension from #68 is included in `main` through merged PR #71.
 
 The file is read only when an AUR audit is required, and reread on explicit retry.
 Official operations do not depend on it. AURoscope never overwrites this file.
-Automatic creation and editable prompt defaults remain separate work in #64;
-the default-model request remains in #65. Both must use this same file.
+On the first AUR audit, a missing file is created with the complete built-in
+audit prompt in `prompt`. The default-model request (`luna`) remains separate in
+#65 / PR #73; this branch uses the CLI's native model unless `model` is set.
 
 Choose exactly one provider. Minimal CLI configurations are:
 
@@ -64,6 +65,22 @@ with its real executable and simulated transport in isolated Arch. API contracts
 have deterministic local HTTPS tests; no new live service/model is qualified yet.
 See the [provider contract note](dependency-notes/audit-providers.md) for exact
 evidence, limitations and opt-in live qualification commands.
+
+## Editable audit prompt
+
+Edit the `prompt` JSON string in the same configuration file as provider and
+model settings. Use `\n` for line breaks. The string is passed to the selected
+provider; it does not replace the bounded recipe bundle or local report checks.
+
+Existing files are never rewritten. If an existing file omits `prompt`, the
+built-in default is used without modifying the file. An empty or null prompt,
+invalid JSON, or an invalid configuration fails the audit with retry/skip/cancel,
+never approval. The file is reread on explicit retry. Save a copy of a custom
+prompt before deleting the file to regenerate the default on the next AUR audit.
+
+Prompt customization does not disable read-only CLI protections, strict local
+report validation, human approval, or the final recipe-identity guard. Package
+upgrades do not own or replace user configuration.
 
 ## Other settings
 

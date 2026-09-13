@@ -16,10 +16,11 @@ import (
 // The shared user file is read only at the audit boundary, never on official
 // operations. Model/prompt follow-up work must extend this file, not add another.
 type auditConfig struct {
-	Provider  string `json:"provider"`
-	Model     string `json:"model,omitempty"`
-	BaseURL   string `json:"base_url,omitempty"`
-	APIKeyEnv string `json:"api_key_env,omitempty"`
+	Provider  string  `json:"provider"`
+	Model     string  `json:"model,omitempty"`
+	Prompt    *string `json:"prompt,omitempty"`
+	BaseURL   string  `json:"base_url,omitempty"`
+	APIKeyEnv string  `json:"api_key_env,omitempty"`
 }
 
 var environmentName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -30,9 +31,16 @@ func loadAuditConfig() (auditConfig, error) {
 		return auditConfig{}, errors.New("cannot locate AURoscope configuration directory")
 	}
 	path := filepath.Join(root, "auroscope", "config.json")
+	return loadAuditConfigPath(path)
+}
+
+func loadAuditConfigPath(path string) (auditConfig, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return auditConfig{Provider: "codex"}, nil
+		if err := createAuditConfig(path); err != nil {
+			return auditConfig{}, err
+		}
+		f, err = os.Open(path)
 	}
 	if err != nil {
 		return auditConfig{}, errors.New("cannot read auroscope/config.json")
@@ -52,14 +60,14 @@ func loadAuditConfig() (auditConfig, error) {
 	}
 	for _, value := range fields {
 		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-			return c, errors.New("AURoscope configuration fields cannot be null")
+			return c, errors.New("audit configuration fields cannot be null")
 		}
 	}
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
 	// Do not echo JSON parser errors: the user may have pasted a secret value.
 	if err := d.Decode(&c); err != nil {
-		return c, errors.New("invalid AURoscope configuration: expected provider, model, base_url and api_key_env only")
+		return c, errors.New("invalid audit configuration: expected provider, model, prompt, base_url and api_key_env only")
 	}
 	if err := d.Decode(new(any)); err != io.EOF {
 		return c, errors.New("invalid AURoscope configuration: trailing data")
@@ -68,6 +76,9 @@ func loadAuditConfig() (auditConfig, error) {
 }
 
 func (c auditConfig) normalized() (auditConfig, error) {
+	if c.Prompt != nil && strings.TrimSpace(*c.Prompt) == "" {
+		return c, errors.New("audit configuration requires a nonempty prompt")
+	}
 	if c.Provider == "" {
 		c.Provider = "codex"
 	}
@@ -139,6 +150,7 @@ func auditWithProvider(bundle auditBundle, config runConfig) (auditReport, error
 		return auditReport{}, err
 	}
 	fmt.Fprintf(config.stdout, "AURoscope: auditing %s with %s (timeout %s)...\n", escapeTerminal(bundle.Identity.Pkgbase), c.label(), config.codexTimeout)
+	config.auditPrompt = c.prompt()
 	switch c.Provider {
 	case "codex":
 		config.auditModel = c.Model

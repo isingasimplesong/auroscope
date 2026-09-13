@@ -69,6 +69,11 @@ SCRIPT
 chmod 0755 /usr/local/bin/codex
 
 cp -a /package-source /work/package
+# An operator may prefetch authenticated source archives into this ignored
+# directory. Share only archive data, never credentials or host makepkg config.
+# Both the previous and candidate recipes still verify their own checksums.
+mkdir -p /work/package/cache/sources
+printf '%s\n' 'SRCDEST=/work/package/cache/sources' >/etc/makepkg.conf.d/auroscope-sources.conf
 chown -R builder:builder /work/package
 sudo -u builder -- bash -lc 'cd /work/package && makepkg --printsrcinfo > /tmp/generated.SRCINFO'
 cmp /work/package/.SRCINFO /tmp/generated.SRCINFO
@@ -80,7 +85,11 @@ if sudo -u builder -- bash -lc 'cd /work/package && makepkg --syncdeps --noconfi
   echo 'AURoscope unexpectedly built with incompatible stable Paru installed' >&2
   exit 1
 fi
-grep -F 'install paru-git first, then rerun makepkg -si' /tmp/stable-build.err
+if ! grep -F 'install paru-git first, then rerun makepkg -si' /tmp/stable-build.err; then
+  echo 'Stable-Paru check did not reach prepare(); inspect source acquisition below.' >&2
+  cat /tmp/stable-build.out /tmp/stable-build.err >&2
+  exit 1
+fi
 if compgen -G '/work/package/auroscope-*.pkg.tar.zst' >/dev/null; then
   echo 'AURoscope package artifact exists after the incompatible-provider check' >&2
   exit 1
@@ -102,6 +111,12 @@ sudo -u builder -- bash -lc 'cd /work/previous && makepkg --syncdeps --noconfirm
 mapfile -t previous_archives < <(sudo -u builder -- bash -lc 'cd /work/previous && makepkg --packagelist')
 pacman --noconfirm -U "${previous_archives[@]}"
 previous_version=$(pacman -Q auroscope)
+
+# User configuration is not package-owned and must survive a real upgrade.
+install -d -m 0700 -o builder -g builder /home/builder/.config/auroscope
+printf '%s\n' '{"prompt":"My preserved packaging audit prompt"}' >/tmp/expected-audit-config
+install -m 0600 -o builder -g builder /tmp/expected-audit-config \
+  /home/builder/.config/auroscope/config.json
 
 # Reproduce #60 on the old installed artifact before testing the upgrade.
 install -d -m 0755 -o builder -g builder /home/builder/permission-clones/hermes-agent-desktop/pkg
@@ -147,6 +162,7 @@ done
 new_version=$(pacman -Q auroscope)
 test "$(vercmp "${new_version#auroscope }" "${previous_version#auroscope }")" -gt 0
 printf 'Cached-package upgrade passed: %s -> %s (no --force)\n' "$previous_version" "$new_version"
+cmp /tmp/expected-audit-config /home/builder/.config/auroscope/config.json
 
 rm -f /home/builder/permission-paru-calls
 permission_run
@@ -201,9 +217,11 @@ while [ "$#" -gt 0 ]; do
     shift
     out=$1
   fi
+  last=$1
   shift || true
 done
 [ -n "$out" ]
+[ "$last" = 'My preserved packaging audit prompt' ]
 printf '%s' '{"summary":"packaging looks conventional","risk":"low","findings":[],"uncertainty":"","inspect":[]}' >"$out"
 SCRIPT
 chmod 0755 /tmp/package-test-codex
@@ -247,5 +265,7 @@ case "$review_output" in
     ;;
 esac
 
+cmp /tmp/expected-audit-config /home/builder/.config/auroscope/config.json
+echo 'Installed custom prompt received by Codex and preserved through upgrade and audit'
 echo 'AURoscope package build/install smoke passed'
 BASH
