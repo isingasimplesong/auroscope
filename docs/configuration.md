@@ -7,8 +7,10 @@ The provider extension from #68 is included in `main` through merged PR #71.
 
 The file is read only when an AUR audit is required, and reread on explicit retry.
 Official operations do not depend on it. AURoscope never overwrites this file.
-On the first AUR audit, a missing file is created with the complete built-in
-audit prompt in `prompt`. For Codex, an omitted `model` selects `gpt-5.6-luna`; an
+On the first AUR audit, a missing file is created with `provider: "codex"`,
+`model: "gpt-5.6-luna"`, `thinking: "medium"` and the complete built-in audit
+prompt in `prompt`. These are actual JSON fields, not implicit defaults.
+For Codex, an omitted `model` selects `gpt-5.6-luna`; an
 explicit nonempty `model` is passed unchanged as one `--model` argument. For
 example, `{"model":"your-exact-codex-model-id"}` selects another model. Empty
 or null models are rejected. Claude Code retains its native default when the
@@ -18,19 +20,23 @@ quality have not been qualified; use a model available to your account.
 An existing explicit `"model":"luna"` is not rewritten: change it to
 `"model":"gpt-5.6-luna"` or omit `model` to use the corrected default.
 
-For Codex, optional `thinking` sets its native `model_reasoning_effort`:
+The initial `thinking: "medium"` value is sent to the selected provider:
 
-```json
-{"provider":"codex","model":"gpt-5.6-luna","thinking":"medium"}
-```
+- Codex: quoted `model_reasoning_effort` configuration override;
+- Claude Code: one `--effort` argument;
+- Anthropic API: `output_config.effort`, alongside the structured-output format;
+- OpenAI and OpenAI-compatible APIs: `reasoning_effort`.
 
-Omit `thinking` to leave Codex's own default/configuration unchanged. AURoscope
-passes the string literally, without trimming or checking a list of levels;
-you are responsible for choosing a value accepted by your Codex and model.
-Empty or unknown strings are also sent to Codex, whose errors retain the normal
-retry/skip/cancel path. Null and non-string values are rejected locally.
-This field is Codex-only; other providers reject it rather than silently ignoring it.
-Existing configuration is never rewritten, and explicit retry rereads this field.
+Omitting `thinking` in an existing file sends no effort override. Levels are
+provider/model-specific and are forwarded unchanged, not translated or silently
+dropped. For Codex, every string is passed literally, including an empty or unknown
+value; choosing a valid string is your responsibility. Null and non-string values
+are rejected locally. Other providers retain their nonempty, bounded string checks.
+The new-file template still writes `medium`, as requested for initial configuration.
+Remove that field to use Codex's native default instead.
+Anthropic effort controls overall response work without enabling
+a separate extended-thinking mode. An incompatible service or model can reject
+the setting; no error permits fallback, a downgraded retry or an audit bypass.
 
 Choose exactly one provider. Minimal CLI configurations are:
 

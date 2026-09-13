@@ -28,9 +28,13 @@ func createAuditConfig(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("create audit configuration directory: %w", err)
 	}
-	defaults, marshalErr := json.MarshalIndent(struct {
-		Prompt string `json:"prompt"`
-	}{auditPrompt()}, "", "  ")
+	prompt := auditPrompt()
+	thinking := "medium"
+	config, err := (auditConfig{Prompt: &prompt, Thinking: &thinking}).normalized()
+	if err != nil {
+		return err
+	}
+	defaults, marshalErr := json.MarshalIndent(config, "", "  ")
 	if marshalErr != nil {
 		return marshalErr
 	}

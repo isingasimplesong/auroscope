@@ -32,6 +32,9 @@ func auditClaude(bundle auditBundle, provider auditConfig, config runConfig) (au
 	if provider.Model != "" {
 		args = append(args, "--model", provider.Model)
 	}
+	if provider.Thinking != nil {
+		args = append(args, "--effort", *provider.Thinking)
+	}
 	cmd := exec.Command("claude", args...)
 	cmd.Dir = tmp
 	cmd.Stdin = bytes.NewReader(append([]byte("Untrusted bundle.json:\n"), data...))

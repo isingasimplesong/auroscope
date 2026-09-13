@@ -48,6 +48,13 @@ func auditHTTP(bundle auditBundle, provider auditConfig, config runConfig, trans
 			"output_config": map[string]any{"format": map[string]any{"type": "json_schema", "schema": schema}},
 		}
 	}
+	if provider.Thinking != nil {
+		if provider.Provider == "anthropic" {
+			payload["output_config"].(map[string]any)["effort"] = *provider.Thinking
+		} else {
+			payload["reasoning_effort"] = *provider.Thinking
+		}
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return auditReport{}, errors.New("cannot encode audit request")

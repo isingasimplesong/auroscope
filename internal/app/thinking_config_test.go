@@ -22,8 +22,10 @@ func TestAuditThinkingConfiguration(t *testing.T) {
 		{`{"thinking":42}`, true},
 		{`{"thinking":true}`, true},
 		{`{"thinking":[]}`, true},
-		{`{"provider":"claude-code","thinking":"medium"}`, true},
-		{`{"provider":"openai","model":"m","thinking":"medium"}`, true},
+		{`{"provider":"claude-code","thinking":"medium"}`, false},
+		{`{"provider":"openai","model":"m","thinking":"medium"}`, false},
+		{`{"provider":"claude-code","thinking":""}`, true},
+		{`{"provider":"openai","model":"m","thinking":"high\nlow"}`, true},
 	} {
 		t.Run(tc.content, func(t *testing.T) {
 			dir := t.TempDir()

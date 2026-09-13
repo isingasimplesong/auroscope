@@ -38,6 +38,10 @@ func TestProviderInstalledHTTP(t *testing.T) {
 				if r.Header.Get("Authorization") != "Bearer credential-fixture" {
 					t.Error("missing auth")
 				}
+				var request map[string]any
+				if json.Unmarshal(data, &request) != nil || request["reasoning_effort"] != "medium" {
+					t.Error("configured thinking did not reach API")
+				}
 				if !success {
 					w.WriteHeader(401)
 					io.WriteString(w, "credential-fixture")
@@ -50,7 +54,8 @@ func TestProviderInstalledHTTP(t *testing.T) {
 			if err := os.WriteFile(caPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: s.Certificate().Raw}), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			data, _ := json.Marshal(auditConfig{Provider: "openai-compatible", Model: "fixture-model", BaseURL: s.URL + "/v1", APIKeyEnv: "TEST_API_KEY"})
+			thinking := "medium"
+			data, _ := json.Marshal(auditConfig{Provider: "openai-compatible", Model: "fixture-model", Thinking: &thinking, BaseURL: s.URL + "/v1", APIKeyEnv: "TEST_API_KEY"})
 			writeProviderConfig(t, string(data))
 			repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\n")
 			calls := filepath.Join(dir, "calls")
