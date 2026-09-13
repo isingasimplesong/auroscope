@@ -234,8 +234,7 @@ auditLoop:
 		if err != nil {
 			return reviewedPackage{}, err
 		}
-		fmt.Fprintf(o.config.stdout, "AURoscope: auditing %s with Codex (timeout %s)...\n", escapeTerminal(pkgbase), o.config.codexTimeout)
-		report, err := (codexClient{path: o.config.codexPath}).audit(bundle, o.config)
+		report, err := auditWithProvider(bundle, o.config)
 		if err != nil {
 			fmt.Fprintf(o.config.stderr, "auroscope: audit failed for %s: %v\n", pkgbase, err)
 			switch askDecision(reader, o.config, []string{"retry", "skip", "cancel"}) {

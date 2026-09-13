@@ -14,8 +14,9 @@ ADR-0046 (Codex admission) and ADR-0066 (accepted provider choice, not yet shipp
 
 The active list also includes
 [ADR-0066 — configurable audit provider](0066-configurable-audit-provider.md).
-Mathieu accepted the provider extension; implementation and Arch delivery require
-a separate `MODE: EXECUTION` issue. Codex remains the only implemented provider.
+Mathieu accepted the provider extension; separate `MODE: EXECUTION` issue #68
+now carries its implementation and Arch delivery. Codex remains the default;
+candidate code is not proof of packaged delivery or live-provider qualification.
 
 ## Superseded
 

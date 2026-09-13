@@ -51,7 +51,11 @@ auroscope -S <packages>      # explicit package installation
 auroscope --version          # transparent Paru passthrough
 ```
 
-State is stored in `${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/state.sqlite3`. Codex authentication remains in Codex's own user configuration.
+State defaults to `$HOME/.local/state/auroscope/state.sqlite3`; override it with
+`AUROSCOPE_STATE`. The current implementation does not read `XDG_STATE_HOME`.
+See [configuration](../../docs/configuration.md) for CLI/API providers and their
+native authentication or environment-key requirements. Codex is the default,
+not a requirement when another provider is configured.
 
 During the first desktop trial, keep invoking `auroscope` explicitly rather than replacing `paru` with an alias.
 
@@ -71,31 +75,37 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
-Candidate package `0.1.0.r11.g396e770-1` pins the user-documentation source commit
-`396e770762af39321d3c76749149103ac4a07eea`, published on `docs/user-readme`.
-It replaces the installed root README with a French user guide and preserves the
-previous technical README under `docs/README.md` in the repository. Runtime code,
-dependencies and tests are unchanged from the merged r10 inputs.
+Candidate package `0.1.0.r11.gad96e16-1` delivers the explicit audit-provider
+selection authorized by #68: Codex remains the default, with Claude Code,
+Anthropic API, OpenAI API and configurable OpenAI-compatible API alternatives.
+Configuration and bounded qualification evidence are documented in the root
+README and `docs/dependency-notes/audit-providers.md`.
 
-The archive SHA-256 is:
-`dac0c10e53d36d7185964b1f8e44a2f9784b18bcf94347bb8ece23841d51c232`
+The immutable source pin, verified on remote `loop/subject-68`, is:
+`ad96e164679bbdd0a2b474d9712f238cc3a06679`
 
-Non-root Arch `.SRCINFO` generation, source freshness, checksum validation,
-`namcap`, Go tests, installed file ownership, passthrough, guard failure and
-review layout passed. The disposable package gate upgraded r10 to r11 with the
-previous real package archives still present, without `--force`:
+The downloaded archive SHA-256 is:
+`ba45ebc42831195e9e474fc9cc715978c205eb888d0b622ff2487e7c43f5fde1`
+
+Non-root Arch `.SRCINFO` generation, freshness, Go tests/vet and both disposable
+Arch gates passed. The upgrade test retained the real r10 archives and installed
+r11 without `--force`. Both gates reported:
 
 ```text
-auroscope 0.1.0.r11.g396e770-1
-AURoscope package build/install smoke passed
+auroscope 0.1.0.r11.gad96e16-1
 ```
 
-The container exited with status 0. This documentation-only change does not
-requalify real Codex or rerun the full supported-Paru gate; runtime behavior is
-unchanged. No desktop installation was changed. Human review and merge remain
-required; preserve the immutable source commit in history rather than squashing
-it away. The installed README links target the repository documentation, which
-is not bundled in the Arch package.
+The supported-Paru gate exercised `/usr/bin/auroscope`, including configured HTTP
+approval and failed-audit skip, explicit Claude selection, retry/cancel/skip with
+no Codex fallback, and complete auxiliary-script audit input. Native colors,
+real AUR build/install, edit/re-audit, identity drift refusal, explicit recovery
+and audit-free official operations also passed. These deterministic provider
+tests do not qualify a live API endpoint/model or native Claude authentication.
+
+The final fetch confirmed that the source includes current `origin/main` at
+`da9dca7`; no concurrent source fix is omitted. Preserve the source commit in
+remote merge history. Publication and human review/merge remain pending; no
+desktop installation was changed.
 
 ### Previous r10 verification
 
