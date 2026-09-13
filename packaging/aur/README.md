@@ -6,8 +6,8 @@ Self-hosted AUR-style package recipe for AURoscope. Publication on `aur.archlinu
 
 - Arch Linux `x86_64`;
 - a package providing `paru` with Paru's post-2.1 interactive-output fix and machine order records (currently `paru-git`);
-- a supported Codex CLI executable available as `codex` on `PATH`;
-- Codex authenticated for the user who runs AURoscope.
+- an audit provider: authenticated Codex CLI by default, or a configured alternative
+  as described in [configuration](../../docs/configuration.md).
 
 AURoscope's currently tested Paru surface is commit `9ac3578807a87858651e81a02586ceb947686e7c`. Stable Paru 2.1.0 is not compatible because it mixes the interactive human menu and selected targets on stdout. The package depends on the virtual `paru` capability so an already installed compatible provider such as `paru-git` satisfies `makepkg`, and conflicts with the known-incompatible stable package version `paru<=2.1.0` so it cannot install into the silent-search failure state. Pacman cannot fetch an absent AUR provider or replace stable `paru` with `paru-git` while installing the already-built AURoscope archive. The recipe therefore stops in `prepare()` with the remediation below when that stable package is installed, before compiling AURoscope. AURoscope also validates the required selection and order behavior when those paths run and fails closed on incompatible output; the package name and `paru --version` string alone do not prove compatibility.
 
@@ -51,7 +51,11 @@ auroscope -S <packages>      # explicit package installation
 auroscope --version          # transparent Paru passthrough
 ```
 
-State is stored in `${XDG_STATE_HOME:-$HOME/.local/state}/auroscope/state.sqlite3`. Codex authentication remains in Codex's own user configuration.
+State defaults to `$HOME/.local/state/auroscope/state.sqlite3`; override it with
+`AUROSCOPE_STATE`. The current implementation does not read `XDG_STATE_HOME`.
+See [configuration](../../docs/configuration.md) for CLI/API providers and their
+native authentication or environment-key requirements. Codex is the default,
+not a requirement when another provider is configured.
 
 During the first desktop trial, keep invoking `auroscope` explicitly rather than replacing `paru` with an alias.
 
@@ -71,75 +75,127 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
-Candidate `0.1.0.r13.g281d061-1` completes the package preparation for #65.
-It pins remote source checkpoint `281d061fa9c9e3d67de408c6adbb415bb04af3cc`.
-The downloaded archive SHA-256 is:
-`49d5c9f07d78d4f0a172dda118a6620885944343c41ac693200615fa3e10097f`
+Package `0.1.0.r14.ge5aecca-1` includes the shorter English user README and all
+sources from `main` at `23f64e17fbf9c3d477f5a4405fdea0bcf147168a`.
+Its immutable source pin is `e5aeccaed203d5c3ce8f045b35d9a25cf9932f6b`;
+archive SHA-256: `9f03404701919e28df93e2d4457352519158270668179c44a2ac9729b150c8c7`.
+Preserve that commit in remote history rather than squashing it away.
 
-The previous failure was an anonymous HTTP 404 downloading the private archive,
-not a failed model test. Both gates now use the optional authenticated archive
-cache, with makepkg checksum validation and no credentials in containers.
-
-Non-root Arch `.SRCINFO` generation, freshness, Go tests/vet and both complete
-disposable Arch gates passed. The package gate upgraded r12 to r13 with the old
-archives still present, without `--force`, and verified default `luna` and a
-literal configured model against the installed binary. The supported-Paru gate
-verified the installed artifact, provider failures without bypass, native colors,
-auxiliary recipe context, real build/install, edit/re-audit, drift refusal/retry
-and audit-free official operations. Both gates reported:
+Non-root Arch `.SRCINFO` generation, source freshness, checksums, `namcap`, Go
+checks, build and installation passed. The package gate upgraded the actual r11
+package to r14 with old archives present, without `--force`. Installed ownership,
+executable mode, native passthrough, guard failure, permission regression and
+review layout passed. `pacman -Q auroscope` returned:
 
 ```text
-auroscope 0.1.0.r13.g281d061-1
+auroscope 0.1.0.r14.ge5aecca-1
 ```
 
-Evidence: `logs/recovery-65/r13-package.log` and `logs/recovery-65/r13-paru.log`.
-The final fetch confirmed current main remains included at
-`23f64e17fbf9c3d477f5a4405fdea0bcf147168a`.
-Provider configuration remains intact; #64 prompt delivery remains separate.
-These deterministic tests do not qualify live access to `luna`. Wrapper
-validation/publication and human review/merge remain pending. No deployment or
-user-machine installation was performed. Preserve the source checkpoint.
+The private repository archives were authenticated and checksum-verified on the
+host, then supplied through a disposable makepkg source cache. No credentials
+were passed to the container and no package gate assertions were removed.
+The full supported-Paru rerun has not yet been confirmed; this documentation
+change does not alter code or tests relative to the merged provider release.
+No installation on the user's machine or PR merge has been performed.
 
-### Previous r12 verification
+### Verified r13 recovery
 
-Candidate `0.1.0.r12.g46bef00-1` packages issue #65: Codex receives `luna` by
-default, or the literal `model` from the shared `auroscope/config.json` file.
-Provider selection from #68 is preserved. Prompt configuration remains in #64's
-separate execution lane; this package does not claim to deliver that feature.
+Candidate `0.1.0.r13.geb7109a-1` preserves the editable prompt and shared provider
+configuration. It pins the remotely verified source checkpoint:
+`eb7109aa3d46fb9f689ba68528f8c39423f19f44`
 
-The source checkpoint is present on remote `loop/subject-65` and includes
-`origin/main` at `23f64e17fbf9c3d477f5a4405fdea0bcf147168a`:
-`46bef004e9db34870c736737d3d5402e59f5f5eb`
+The real authenticated archive has SHA-256:
+`2cb12936a01331aa61cd5fd8bc0dddeb2a81afe64c23276b76477e035183f8e2`
 
-The downloaded archive SHA-256 is:
-`a18d8267386c269cbfb5133f6acfafda5cfd1969942155063a76f3bc2fbde57e`
+The previous wrapper failure came from an anonymous private-archive download
+(HTTP 404, `test-64.log` lines 926-936), after a successful package gate.
+The checkpoint makes both gates use the same prefetched archive cache, without
+a Docker PATH shim or credentials in containers. Checksums remain mandatory.
 
-Non-root Arch `.SRCINFO` generation, freshness, Go tests/vet, package build and
-upgrade passed. The upgrade retained r11's real archives and installed r12
-without `--force`. Installed tests verified both default `luna` and an explicit
-model. The full supported-Paru gate passed against `/usr/bin/auroscope`, retaining
-provider failure/no-bypass, auxiliary recipe context, native colors, real AUR
-build/install, edit/re-audit, drift refusal/retry and audit-free official work.
+Non-root Arch `.SRCINFO` generation and byte comparison, freshness, Go tests
+and vet passed. The package gate built and upgraded the actual r12 package to
+r13 with its old archives present, without `--force`. It verified that the custom
+prompt survived the upgrade and reached Codex unchanged. Both gates reported:
+
+```text
+auroscope 0.1.0.r13.geb7109a-1
+```
+
+The full supported-Paru gate passed on `/usr/bin/auroscope`, including prompt
+creation/customization/preservation, auxiliary scripts, provider failure without
+bypass, native colors, real AUR build/install, edit/re-audit, identity drift,
+explicit retry, skip and audit-free official operations. The complete container
+log and exact Docker exit event confirm success with exit code 0. Evidence:
+
+- `logs/recovery-64/package-r13.log`
+- `logs/recovery-64/paru-r13-docker.log`
+- `logs/recovery-64/paru-r13-docker-exit.json`
+
+The final fetch found `origin/main` at `23f64e1`, included in this source.
+Preserve this checkpoint and earlier pins in remote history. Wrapper publication
+and human review/merge remain pending. No desktop installation was changed;
+deterministic providers do not qualify a new live model. The separate #65 work
+and the unrelated `docs/user-readme` PR are not included or modified here.
+
+### Retained r12 verification
+
+Candidate package `0.1.0.r12.g78ad044-1` adds the editable audit prompt from #64
+to the shared provider configuration. A missing file receives the complete
+default prompt; existing files and customized prompts survive upgrades and audits.
+It preserves #63's complete auxiliary recipe context and #68's providers.
+The default-model change in #65 remains separate retained work, not delivered here.
+
+The immutable source was read back on remote `loop/subject-64`:
+`78ad044b5e627ea98638f0aa2074f42445c4e63b`
+
+The authenticated archive download has SHA-256:
+`bb1789647dddd3baa3b58ce806dd3610037b5c218eadc32653719a7053156197`
+
+Non-root Arch `.SRCINFO` generation, freshness, Go tests/vet and both disposable
+Arch gates passed. The package gate upgraded r11 with its real archives present,
+without `--force`, and confirmed that Codex received the preserved custom prompt.
 Both gates reported:
 
 ```text
-auroscope 0.1.0.r12.g46bef00-1
+auroscope 0.1.0.r12.g78ad044-1
 ```
 
-The archive endpoint returned HTTP 404 anonymously and succeeded with profile
-authentication. The package gate now accepts real, checksum-checked archives in
-ignored `packaging/aur/cache/sources`; credentials are not sent to the container.
-It also displays makepkg diagnostics when source retrieval fails before the
-expected incompatible-Paru check. The supported-Paru run used the same archives
-through a local Docker mount and makepkg `SRCDEST`, without changing its scenarios.
-These caches affect download transport only, not the pinned contents or checksums.
+The full supported-Paru gate exercised `/usr/bin/auroscope`: prompt creation,
+customization and preservation, auxiliary scripts, provider success/failure,
+native colors, real AUR build/install, edit/re-audit, drift refusal, explicit retry,
+skip and audit-free official operations passed. Providers were deterministic;
+this does not qualify a new live model or change a desktop installation.
 
-Worker evidence is retained in ignored `logs/recovery-65/package-cached.log` and
-`logs/recovery-65/paru.log`. These deterministic tests do not qualify a live
-Codex account's access to `luna`. Publication and human review/merge remain
-pending. No user-machine installation was changed; preserve the source pin.
+Anonymous archive downloads returned HTTP 404 for both r11 and r12 during this
+run. The gates therefore used the real archives downloaded with profile credentials
+in a shared makepkg `SRCDEST` cache; makepkg still verified their recipe checksums.
+No credentials entered the containers. An uncached anonymous bootstrap is not
+verified in this access state; authenticated source acquisition is required.
 
-### Previous r11 verification
+The subsequent wrapper failure was not a prompt regression: its normal package
+test lacked the earlier run's Docker cache shim. The repaired package gate was
+rerun without that shim, using fresh authenticated r11/r12 archives in the
+documented cache. It passed generation and byte comparison of non-root Arch
+`.SRCINFO`, checksums, stable-Paru refusal, r11-to-r12 upgrade without `--force`,
+and transmission and preservation of the custom prompt. Its process exited 0.
+
+The full installed-artifact supported-Paru gate also exited 0 on this same pin,
+including `TestPromptConfigurationLifecycle` and the auxiliary/provider tests.
+That unchanged integration script still used the retained archive-cache Docker
+shim; its anonymous download path is not newly qualified. Local evidence:
+`logs/recovery-64/package-normal.log` and
+`logs/recovery-64/paru-revalidated.log`. Both again reported
+`auroscope 0.1.0.r12.g78ad044-1`.
+
+Only the external package-test harness changed in this recovery, not an input
+consumed by the recipe's build, check or package functions. The existing remote
+source pin and candidate package identity therefore remain valid.
+
+The final fetch still found `main` at `23f64e1`, fully included in this source.
+Preserve this pin and earlier pins in remote history. Wrapper publication and
+human review/merge remain separate from these successful package validations.
+
+### Previous r11 provider verification
 
 Candidate package `0.1.0.r11.gad96e16-1` delivers the explicit audit-provider
 selection authorized by #68: Codex remains the default, with Claude Code,

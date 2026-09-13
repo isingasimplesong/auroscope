@@ -78,6 +78,18 @@ type codexClient struct {
 
 func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, error) {
 	config = config.withDefaults()
+	prompt := config.auditPrompt
+	if prompt == "" && config.userConfig {
+		provider, err := loadAuditConfig()
+		if err != nil {
+			return auditReport{}, err
+		}
+		prompt = provider.prompt()
+		config.auditModel = provider.Model
+	}
+	if prompt == "" {
+		prompt = auditPrompt()
+	}
 	if err := c.verifyVersion(config); err != nil {
 		return auditReport{}, err
 	}
@@ -102,7 +114,6 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 	if err := os.WriteFile(schemaPath, []byte(auditOutputSchema), 0o600); err != nil {
 		return auditReport{}, err
 	}
-	prompt := auditPrompt()
 	args := []string{"exec", "--json", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--output-schema", schemaPath, "--output-last-message", reportPath}
 	if config.auditModel != "" {
 		args = append(args, "--model", config.auditModel)

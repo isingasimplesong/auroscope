@@ -140,13 +140,18 @@ func TestProviderHTTPContracts(t *testing.T) {
 						}
 					}
 				}
-				if !strings.Contains(string(data), "untrusted") || !strings.Contains(string(data), "PKGBUILD") {
+				if !strings.Contains(string(data), "Untrusted bundle.json") || !strings.Contains(string(data), "PKGBUILD") {
 					t.Error("lost bundle")
+				}
+				if !strings.Contains(string(data), "Custom shared audit prompt") {
+					t.Error("configured prompt did not reach API")
 				}
 				io.WriteString(w, providerEnvelope(provider, providerTestReport))
 			}))
 			defer s.Close()
 			c := auditConfig{Provider: provider, Model: "chosen-model", BaseURL: s.URL + "/v1", APIKeyEnv: "TEST_KEY"}
+			prompt := "Custom shared audit prompt"
+			c.Prompt = &prompt
 			bundle := auditBundle{Identity: recipeIdentity{Pkgbase: "fixture"}, Files: []recipeFile{{Path: "PKGBUILD", Text: "pkgname=fixture\n"}}}
 			report, err := auditHTTP(bundle, c, runConfig{}.withDefaults(), s.Client().Transport)
 			if err != nil || report.Summary != "recipe reviewed" || calls.Load() != 1 {
@@ -259,11 +264,15 @@ printf '%s' "$CLAUDE_OUTPUT"
 `)
 	output, _ := json.Marshal(map[string]any{"type": "result", "subtype": "success", "is_error": false, "result": providerTestReport})
 	t.Setenv("CLAUDE_OUTPUT", string(output))
-	_, err := auditClaude(auditBundle{}, auditConfig{Model: "selected-model"}, runConfig{}.withDefaults())
+	prompt := "Custom shared audit prompt"
+	_, err := auditClaude(auditBundle{}, auditConfig{Model: "selected-model", Prompt: &prompt}, runConfig{}.withDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}
 	args := readString(t, argsPath)
+	if !strings.Contains(args, "--system-prompt\n"+prompt) {
+		t.Fatal("configured prompt did not reach Claude")
+	}
 	for _, pair := range []string{"--tools\n\n", "--strict-mcp-config\n", "--mcp-config\n{\"mcpServers\":{}}", "--setting-sources\n\n", "--settings\n{\"disableAllHooks\":true}", "--model\nselected-model", "--no-session-persistence", "--disable-slash-commands", "--permission-mode\ndontAsk"} {
 		if !strings.Contains(args, pair) {
 			t.Errorf("missing %q", pair)

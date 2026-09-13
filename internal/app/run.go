@@ -20,9 +20,11 @@ const (
 )
 
 type runConfig struct {
+	userConfig   bool
 	paruPath     string
 	codexPath    string
 	auditModel   string
+	auditPrompt  string
 	statePath    string
 	cloneDir     string
 	editorPath   string
@@ -42,10 +44,11 @@ func Run(args []string) int {
 	defer signal.Stop(signals)
 
 	return run(args, runConfig{
-		stdin:   os.Stdin,
-		stdout:  os.Stdout,
-		stderr:  os.Stderr,
-		signals: signals,
+		userConfig: true,
+		stdin:      os.Stdin,
+		stdout:     os.Stdout,
+		stderr:     os.Stderr,
+		signals:    signals,
 	})
 }
 
