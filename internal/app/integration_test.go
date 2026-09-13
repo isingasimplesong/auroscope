@@ -632,7 +632,7 @@ func TestGuardRejectsIdentityDriftAndUnexpectedPackage(t *testing.T) {
 	}
 }
 
-func TestRecipeManifestIncludesTrackedModeAndRejectsSymlinkAndInvalidUTF8(t *testing.T) {
+func TestRecipeManifestIncludesTrackedModeAndRejectsInvalidUTF8(t *testing.T) {
 	dir := t.TempDir()
 	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\n")
 	if err := os.Chmod(filepath.Join(repo, "PKGBUILD"), 0o755); err != nil {
@@ -675,8 +675,8 @@ func TestRecipeManifestIncludesTrackedModeAndRejectsSymlinkAndInvalidUTF8(t *tes
 	}
 	gitRun(t, symlinkRepo, "add", "PKGBUILD")
 	gitRun(t, symlinkRepo, "commit", "-m", "symlink")
-	if _, _, err := readRecipeIdentity("linked", symlinkRepo); err == nil || !strings.Contains(err.Error(), "unsupported tracked mode") {
-		t.Fatalf("symlink error = %v", err)
+	if _, files, err := readRecipeIdentity("linked", symlinkRepo); err != nil || files[1].Type != trackedSymlinkType || files[1].Text != ".SRCINFO" {
+		t.Fatalf("symlink files=%+v error=%v", files, err)
 	}
 
 	utfRepo := createRecipeRepo(t, dir, "utf", "pkgname=utf\n")

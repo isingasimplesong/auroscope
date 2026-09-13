@@ -27,6 +27,10 @@ func TestAuditIncludesAuxiliaryScripts(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// Waypaper-style tracked link: include target text, never dereference.
+	if err := os.Symlink("helper", filepath.Join(repo, "helper-link")); err != nil {
+		t.Fatal(err)
+	}
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "auxiliary recipe files")
 	previous := gitTrim(t, repo, "rev-parse", "HEAD")

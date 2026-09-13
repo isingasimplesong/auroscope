@@ -50,7 +50,8 @@ auroscope -Q              # native installed-package query
 
 For each AUR package base, choose `approve`, `inspect`, `edit`, `skip` or `cancel`.
 The menu also accepts initials and numbers. Editing triggers a new audit.
-Provider errors offer retry, skip or cancel—never an automatic bypass or fallback.
+Provider and audit-preparation errors offer retry, skip or cancel—never an automatic
+bypass or fallback. Tracked symlinks are reviewed as target text, not followed.
 Paru retains its final installation confirmation. Skipping a dependency may prevent
 the remaining installation; cancelling AUR work does not undo completed official
 updates. Local recipe builds (`-B`, `--build`, local paths) are outside scope.
