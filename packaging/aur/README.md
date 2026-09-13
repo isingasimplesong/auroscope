@@ -75,6 +75,41 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r15: prompt configuration on current main
+
+Package `0.1.0.r15.g6429418-1` combines the editable audit prompt with `main`
+commit `70718ea6568170f93681bfcd9c0d1479019f4b59`, including PR #70's short
+English README and configuration guide, provider selection and existing fixes.
+The shared guide now documents automatic prompt creation and preservation;
+the separate #65 / PR #73 default-model change is not included.
+
+Immutable source pin: `6429418b8003a0360e9adb4aa18f6eafe86d393c`.
+Archive SHA-256: `1423f8c4050e236e5fe5c6aba4d6a6f36a5cefa726a89562a4c97522ba78f1a7`.
+The source checkpoint is a merge commit preserved on remote `loop/subject-64`.
+Preserve it and earlier pins when merging; do not squash them away.
+
+Verified: non-root Arch `.SRCINFO` generation and byte comparison, freshness,
+checksums, `namcap`, full Go tests and vet, package build/check/install, and the
+real r14-to-r15 upgrade with old archives present, without `--force`.
+The preserved custom prompt reached Codex unchanged after upgrade.
+
+The full supported-Paru gate passed against installed `/usr/bin/auroscope`,
+including prompt lifecycle, auxiliary recipe context, configured providers and
+failure without bypass, native colors, real AUR acquisition/build/install,
+edit/re-audit, identity-drift refusal, explicit retry, skip and audit-free official
+operations. Both gates reported `auroscope 0.1.0.r15.g6429418-1`.
+
+Both named containers (`pr72-package-r15`, `pr72-paru-r15`) completed with exit
+code 0 and are retained for recovery. Full logs are retained in the Hephaistos
+artifact directory `pr72-main-gates/{package,paru}-r15-docker.log`.
+The launcher only replaced Docker's `--rm` with unique container names; no test
+assertion or installed-artifact mode was removed. Private archives were fetched
+with host credentials into the checksum-verified source cache; no credentials
+entered the containers. Anonymous installation and new live-model qualification
+are not claimed. No package was installed on the user's machine and no PR merged.
+
+### Previous r14 README delivery
+
 Package `0.1.0.r14.ge5aecca-1` includes the shorter English user README and all
 sources from `main` at `23f64e17fbf9c3d477f5a4405fdea0bcf147168a`.
 Its immutable source pin is `e5aeccaed203d5c3ce8f045b35d9a25cf9932f6b`;
