@@ -75,6 +75,42 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r21: complete configuration and provider effort
+
+Issue #77 and Mathieu's comment 3253 on PR #81 are covered by the combined
+source: the first AUR audit writes `provider`, `model`, `thinking` and the full
+prompt. Customized configuration is preserved. Thinking reaches Codex, Claude
+Code, Anthropic, OpenAI and OpenAI-compatible providers through their respective
+effort parameters. Unsupported values fail without fallback or an audit bypass.
+
+Package: `0.1.0.r21.g92232fe-1`.
+Immutable source: `92232fedb1b902f7f42416573dcb491d997706bb`.
+Archive SHA-256:
+`1768adb86a837d250e1f97b0e48fad0a290d04a14d240f1884de5d6feb5991ed`.
+The source checkpoint is remotely reachable and contains current main at
+`edffd014ed14c284d93bcfb7d028d0bf572bd07d`, including merged PR #80's model fix.
+Preserve this checkpoint and both parent histories without squash. Revision r20
+already exists on the separate issue #78 branch; this package advances to r21.
+
+Non-root Arch `.SRCINFO` generation and byte comparison, authenticated archive
+checksums, freshness, namcap, Go tests and vet passed. The unchanged package gate
+upgraded the actual r19 package to r21 with its old archives still present and
+without `--force`. A direct upgrade from main's r18 was not separately exercised.
+Both disposable gates exited 0 and reported `auroscope 0.1.0.r21.g92232fe-1`.
+
+The full supported-Paru gate exercised installed `/usr/bin/auroscope`: complete
+configuration creation, customization and preservation, Codex and Claude effort,
+configured HTTP effort and failure without bypass, complete auxiliary files,
+preparation recovery, native colors, real AUR builds, edit/re-audit, identity
+drift refusal, explicit retry, skip and audit-free official installations.
+The API unit contracts cover effort forwarding for all three API choices.
+These deterministic provider checks do not qualify live models, account access
+or model-specific effort support.
+
+Evidence: `build/issue-77/package-r21.log` and `build/issue-77/paru-r21.log`.
+Test containers were removed; no credentials entered them. No workstation
+installation, deployment or merge was performed.
+
 ### Verified r19: complete initial audit configuration
 
 Issue #77's candidate writes `provider`, `model`, `thinking` and the full prompt
