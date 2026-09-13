@@ -98,9 +98,7 @@ func (c auditConfig) normalized() (auditConfig, error) {
 	if len(c.Thinking) > 200 || strings.ContainsAny(c.Thinking, "\r\n\x00") {
 		return c, errors.New("invalid audit thinking value")
 	}
-	if c.Thinking != "" && c.Provider != "codex" {
-		return c, errors.New("thinking is supported only by the Codex provider")
-	}
+
 	switch c.Provider {
 	case "codex", "claude-code":
 		if c.BaseURL != "" || c.APIKeyEnv != "" {

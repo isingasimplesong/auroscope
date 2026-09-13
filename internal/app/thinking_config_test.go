@@ -23,8 +23,10 @@ func TestThinkingConfiguration(t *testing.T) {
 		{name: "newline", text: `{"thinking":"high\nlow"}`, invalid: true},
 		{name: "nul", text: `{"thinking":"high\u0000"}`, invalid: true},
 		{name: "too long", text: `{"thinking":"` + strings.Repeat("a", 201) + `"}`, invalid: true},
-		{name: "claude", text: `{"provider":"claude-code","thinking":"medium"}`, invalid: true},
-		{name: "api", text: `{"provider":"openai","model":"test","thinking":"medium"}`, invalid: true},
+		{name: "claude", text: `{"provider":"claude-code","thinking":"medium"}`, want: "medium"},
+		{name: "api", text: `{"provider":"openai","model":"test","thinking":"medium"}`, want: "medium"},
+		{name: "anthropic", text: `{"provider":"anthropic","model":"test","thinking":"medium"}`, want: "medium"},
+		{name: "compatible", text: `{"provider":"openai-compatible","model":"test","thinking":"medium","base_url":"https://example.invalid/v1","api_key_env":"TEST_KEY"}`, want: "medium"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()

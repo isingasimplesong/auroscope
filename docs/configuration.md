@@ -20,13 +20,19 @@ quality have not been qualified; use a model available to your account.
 An existing explicit `"model":"luna"` is not rewritten: change it to
 `"model":"gpt-5.6-luna"` or omit `model` to use the corrected default.
 
-For Codex, `thinking` is passed as a quoted `model_reasoning_effort` override.
-The initial `medium` value matches the requested initial configuration. An
-existing file that omits `thinking` keeps Codex's native setting: no override is
-sent. AURoscope does not enumerate model-specific levels; choose a nonempty
-string supported by your Codex/model. Null, empty and malformed values fail the
-audit. Remove `thinking` when changing to another provider; other providers do
-not support this field. No provider error permits fallback or an audit bypass.
+The initial `thinking: "medium"` value is sent to the selected provider:
+
+- Codex: quoted `model_reasoning_effort` configuration override;
+- Claude Code: one `--effort` argument;
+- Anthropic API: `output_config.effort`, alongside the structured-output format;
+- OpenAI and OpenAI-compatible APIs: `reasoning_effort`.
+
+Omitting `thinking` in an existing file sends no effort override. Levels are
+provider/model-specific and are forwarded unchanged, not translated or silently
+dropped. Choose a nonempty supported string; null, empty and malformed values
+fail the audit. Anthropic effort controls overall response work without enabling
+a separate extended-thinking mode. An incompatible service or model can reject
+the setting; no error permits fallback, a downgraded retry or an audit bypass.
 
 Choose exactly one provider. Minimal CLI configurations are:
 
