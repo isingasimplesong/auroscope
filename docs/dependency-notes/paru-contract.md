@@ -67,9 +67,13 @@ failed output, the empty approval guard, and absence of provider configuration.
 The full source-only supported-Paru gate also passed, including real build,
 edit/re-audit, drift refusal, retry and audit-free official installation.
 
-Evidence: `build/issue-84/source-paru.log`. These source checks are not package
-delivery. The same regression tests are wired into the installed-artifact gate;
-a new immutable package pin and both package gates remain required.
+Source evidence: `build/issue-84/source-paru.log`. The subsequent r23 package
+pins `ee992223ee02dea214b5bb2c162c614ff250edd4`. Both package gates exited 0;
+the r22-to-r23 upgrade retained the old archives without forcing a rebuild.
+The same regression tests passed against installed `/usr/bin/auroscope`,
+including actual pinned Paru and both native warnings. Package and installed
+integration evidence: `build/issue-84/package-r23.log` and
+`build/issue-84/paru-r23.log`. No workstation installation was performed.
 
 These findings are historical evidence, not a complete active adapter contract. The first executable task must revalidate one supported Paru version and prove the exact native search/selection, AUR worktree, edit/re-audit, skip/exclusion, final build, and `PreBuildCommand` path required by [ADR-0015](../decisions/0015-minimal-llm-first-wrapper.md). Do not carry forward the transitional human-menu parser, broad mode classifier, or closure machinery merely because they were explored here.
 
