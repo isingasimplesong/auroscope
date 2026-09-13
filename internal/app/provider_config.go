@@ -86,7 +86,7 @@ func (c auditConfig) normalized() (auditConfig, error) {
 		c.Provider = "codex"
 	}
 	if c.Provider == "codex" && c.Model == "" {
-		c.Model = "luna"
+		c.Model = "gpt-5.6-luna"
 	}
 	if len(c.Model) > 200 || strings.ContainsAny(c.Model, "\r\n\x00") {
 		return c, errors.New("invalid audit model")
