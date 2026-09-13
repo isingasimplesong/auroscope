@@ -61,11 +61,14 @@ if [ "$1" = --version ]; then
   exit 0
 fi
 out=''
+thinking=''
 while [ "$#" -gt 0 ]; do
   if [ "$1" = --output-last-message ]; then shift; out=$1; fi
+  if [ "$1" = --config ]; then shift; thinking=$1; fi
   last=$1
   shift
 done
+[ "$thinking" = "$TEST_EXPECTED_THINKING" ]
 printf '%s' "$last" > "$TEST_CAPTURED_PROMPT"
 printf '%s' '{"summary":"prompt received","risk":"low","findings":[],"uncertainty":"","inspect":[]}' > "$out"
 `)
@@ -101,9 +104,11 @@ printf '%s' '{"summary":"prompt received","risk":"low","findings":[],"uncertaint
 	}
 	for _, custom := range []bool{false, true} {
 		want := auditPrompt()
+		t.Setenv("TEST_EXPECTED_THINKING", "")
 		if custom {
 			want = "Custom audit\nPreserve my instructions exactly."
-			data, err := json.Marshal(map[string]string{"prompt": want, "model": "luna", "provider": "codex"})
+			t.Setenv("TEST_EXPECTED_THINKING", `model_reasoning_effort="medium"`)
+			data, err := json.Marshal(map[string]string{"prompt": want, "model": "luna", "provider": "codex", "thinking": "medium"})
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -36,6 +36,28 @@ The live contract smoke returned JSONL events on stdout and wrote this schema-va
 
 ## Project usage
 
+### Optional reasoning effort
+
+Issue #78 adds the optional Codex-only `thinking` string. Omission sends no
+override, retaining Codex's native default/configuration. An explicit value is
+JSON-string-escaped (valid TOML basic-string escaping) and passed as one argument
+after `--config`, with the fixed key `model_reasoning_effort`. No shell, trimming
+or local level enumeration is involved; Codex remains responsible for validity.
+
+Version-matched 0.153.4 source confirms the key in `core/config.schema.json`
+and the TOML parsing of `--config key=value` in `utils/cli/src/config_override.rs`:
+
+- <https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core/config.schema.json>
+- <https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/utils/cli/src/config_override.rs>
+
+`TestAuditThinkingConfiguration` and `TestCodexReceivesConfiguredThinking`
+verify omitted, literal, empty, future and malformed values, rereading and native
+official status. `TestPromptConfigurationLifecycle` also checks absent/explicit
+thinking at the executable boundary and supports the installed-artifact gate.
+The full Go suite and vet pass. The local launcher still lacks `node`; these
+checks do not qualify live inference. The source needs its new immutable pin
+and Arch package/installed-artifact gates before delivery.
+
 ### Explicit audit model
 
 The issue #65 source candidate adds `--model <literal-id>` to the audit argv.

@@ -86,6 +86,7 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 		}
 		prompt = provider.prompt()
 		config.auditModel = provider.Model
+		config.auditThinking = provider.Thinking
 	}
 	if prompt == "" {
 		prompt = auditPrompt()
@@ -117,6 +118,12 @@ func (c codexClient) audit(bundle auditBundle, config runConfig) (auditReport, e
 	args := []string{"exec", "--json", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--output-schema", schemaPath, "--output-last-message", reportPath}
 	if config.auditModel != "" {
 		args = append(args, "--model", config.auditModel)
+	}
+	if config.auditThinking != nil {
+		// JSON string escaping is also valid TOML basic-string escaping. Keep
+		// the value literal, even when it contains quotes or config-like text.
+		value, _ := json.Marshal(*config.auditThinking)
+		args = append(args, "--config", "model_reasoning_effort="+string(value))
 	}
 	cmd := exec.Command(c.path, append(args, prompt)...)
 	cmd.Dir = tmp

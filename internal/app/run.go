@@ -20,20 +20,21 @@ const (
 )
 
 type runConfig struct {
-	userConfig   bool
-	paruPath     string
-	codexPath    string
-	auditModel   string
-	auditPrompt  string
-	statePath    string
-	cloneDir     string
-	editorPath   string
-	stdin        io.Reader
-	reviewInput  io.Reader
-	stdout       io.Writer
-	stderr       io.Writer
-	signals      <-chan os.Signal
-	codexTimeout time.Duration
+	userConfig    bool
+	paruPath      string
+	codexPath     string
+	auditModel    string
+	auditThinking *string
+	auditPrompt   string
+	statePath     string
+	cloneDir      string
+	editorPath    string
+	stdin         io.Reader
+	reviewInput   io.Reader
+	stdout        io.Writer
+	stderr        io.Writer
+	signals       <-chan os.Signal
+	codexTimeout  time.Duration
 }
 
 // Run executes AURoscope with the process terminal and forwards termination

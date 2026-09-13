@@ -18,6 +18,20 @@ quality have not been qualified; use a model available to your account.
 An existing explicit `"model":"luna"` is not rewritten: change it to
 `"model":"gpt-5.6-luna"` or omit `model` to use the corrected default.
 
+For Codex, optional `thinking` sets its native `model_reasoning_effort`:
+
+```json
+{"provider":"codex","model":"gpt-5.6-luna","thinking":"medium"}
+```
+
+Omit `thinking` to leave Codex's own default/configuration unchanged. AURoscope
+passes the string literally, without trimming or checking a list of levels;
+you are responsible for choosing a value accepted by your Codex and model.
+Empty or unknown strings are also sent to Codex, whose errors retain the normal
+retry/skip/cancel path. Null and non-string values are rejected locally.
+This field is Codex-only; other providers reject it rather than silently ignoring it.
+Existing configuration is never rewritten, and explicit retry rereads this field.
+
 Choose exactly one provider. Minimal CLI configurations are:
 
 ```json

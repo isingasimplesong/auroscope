@@ -18,6 +18,7 @@ import (
 type auditConfig struct {
 	Provider  string  `json:"provider"`
 	Model     string  `json:"model,omitempty"`
+	Thinking  *string `json:"thinking,omitempty"`
 	Prompt    *string `json:"prompt,omitempty"`
 	BaseURL   string  `json:"base_url,omitempty"`
 	APIKeyEnv string  `json:"api_key_env,omitempty"`
@@ -67,7 +68,7 @@ func loadAuditConfigPath(path string) (auditConfig, error) {
 	d.DisallowUnknownFields()
 	// Do not echo JSON parser errors: the user may have pasted a secret value.
 	if err := d.Decode(&c); err != nil {
-		return c, errors.New("invalid audit configuration: expected provider, model, prompt, base_url and api_key_env only")
+		return c, errors.New("invalid audit configuration: expected provider, model, thinking, prompt, base_url and api_key_env only")
 	}
 	if err := d.Decode(new(any)); err != io.EOF {
 		return c, errors.New("invalid AURoscope configuration: trailing data")
@@ -87,6 +88,9 @@ func (c auditConfig) normalized() (auditConfig, error) {
 	}
 	if c.Provider == "codex" && c.Model == "" {
 		c.Model = "gpt-5.6-luna"
+	}
+	if c.Thinking != nil && c.Provider != "codex" {
+		return c, errors.New("thinking is supported only by the codex provider")
 	}
 	if len(c.Model) > 200 || strings.ContainsAny(c.Model, "\r\n\x00") {
 		return c, errors.New("invalid audit model")
@@ -160,6 +164,7 @@ func auditWithProvider(bundle auditBundle, config runConfig) (auditReport, error
 	switch c.Provider {
 	case "codex":
 		config.auditModel = c.Model
+		config.auditThinking = c.Thinking
 		return (codexClient{path: config.codexPath}).audit(bundle, config)
 	case "claude-code":
 		return auditClaude(bundle, c, config)
