@@ -21,6 +21,7 @@ func TestAuditModelConfiguration(t *testing.T) {
 		{name: "api explicit model", content: `{"provider":"openai","model":"api-model"}`, want: "api-model"},
 		{name: "api requires model", content: `{"provider":"openai"}`, invalid: true},
 		{name: "custom", content: `{"model":"another-model"}`, want: "another-model"},
+		{name: "shared prompt and model", content: `{"model":"chosen","prompt":"custom audit"}`, want: "chosen"},
 		{name: "literal", content: `{"model":"custom model;not-a-shell"}`, want: "custom model;not-a-shell"},
 		{name: "empty", content: `{"model":""}`, invalid: true},
 		{name: "whitespace", content: `{"model":"  "}`, invalid: true},
@@ -39,7 +40,16 @@ func TestAuditModelConfiguration(t *testing.T) {
 			}
 			got, err := loadAuditConfig()
 			if (err != nil) != tc.invalid || !tc.invalid && got.Model != tc.want {
-				t.Fatalf("model = %q, error = %v", got, err)
+				t.Fatalf("model = %q, error = %v", got.Model, err)
+			}
+			if tc.missing && (got.Prompt == nil || *got.Prompt != auditPrompt()) {
+				t.Fatal("missing config must create the full default prompt alongside the luna default")
+			}
+			if !tc.missing {
+				data, readErr := os.ReadFile(filepath.Join(dir, "auroscope", "config.json"))
+				if readErr != nil || string(data) != tc.content {
+					t.Fatal("model selection must not rewrite existing configuration")
+				}
 			}
 		})
 	}
@@ -62,7 +72,7 @@ func TestAuditModelHomeFallback(t *testing.T) {
 	t.Setenv("HOME", home)
 	writeModelConfig(t, filepath.Join(home, ".config"), `{"model":"home-model"}`)
 	if got, err := loadAuditConfig(); err != nil || got.Model != "home-model" {
-		t.Fatalf("model = %q, error = %v", got, err)
+		t.Fatalf("model = %q, error = %v", got.Model, err)
 	}
 }
 
