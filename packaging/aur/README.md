@@ -75,6 +75,34 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r20: optional Codex thinking configuration
+
+Package `0.1.0.r20.g04b68b0-1` adds the optional `thinking` string for Codex.
+Omission preserves Codex's native default; explicit strings are passed literally,
+without a local list of accepted levels. Existing configuration is preserved.
+Source pin: `04b68b0d9b5a3f965c7b3a935d8130412a6fde3c`.
+SHA-256: `5e003c17b4fbbcda65a4300cd4559b1f15533d7612286264ba64111ddd741d8b`.
+Preserve this checkpoint and earlier source pins in remote history without squash.
+
+The source includes current main and the merged r18 model correction. Revision
+r19 is already used by the separate open configuration-initialization PR #81;
+this package does not incorporate that unmerged feature or its provider extension.
+
+Non-root Arch `.SRCINFO` generation and exact comparison, checksum, namcap,
+freshness, full Go tests and vet passed. The package gate upgraded the real r18
+package with its old archives still present, without `--force`. Both disposable
+gates reported `auroscope 0.1.0.r20.g04b68b0-1` and completed with exit code 0.
+The supported-Paru gate exercised the installed `/usr/bin/auroscope`, including
+omitted/explicit thinking, preserved prompt, provider failures without bypass,
+native selection, real AUR builds, edit/re-audit, drift refusal and explicit retry,
+and official installations without audit.
+
+Local evidence: `build/issue-78/package.log` and `build/issue-78/paru.log`.
+Both disposable containers were removed; no workstation installation occurred.
+Codex was deterministic: these checks do not qualify live inference or account
+access to a particular model or reasoning level. Thinking for other providers
+remains separate work in PR #81, not a capability claimed by this package.
+
 ### Verified r16: combined prompt and Codex model configuration
 
 Package `0.1.0.r16.g20bdd79-1` combines main's configurable prompt with Codex

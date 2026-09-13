@@ -54,9 +54,12 @@ and the TOML parsing of `--config key=value` in `utils/cli/src/config_override.r
 verify omitted, literal, empty, future and malformed values, rereading and native
 official status. `TestPromptConfigurationLifecycle` also checks absent/explicit
 thinking at the executable boundary and supports the installed-artifact gate.
-The full Go suite and vet pass. The local launcher still lacks `node`; these
-checks do not qualify live inference. The source needs its new immutable pin
-and Arch package/installed-artifact gates before delivery.
+The full Go suite and vet pass. Package `0.1.0.r20.g04b68b0-1` now includes
+this change. The non-root Arch metadata check, archive checksum, freshness,
+real r18-to-r20 upgrade with cached old archives and full supported-Paru gate
+passed. `TestPromptConfigurationLifecycle` passed on `/usr/bin/auroscope`,
+checking both omitted and explicit thinking values and preserved customization.
+These deterministic CLI checks do not qualify live inference or account access.
 
 ### Explicit audit model
 
