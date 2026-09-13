@@ -75,6 +75,41 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r19: complete initial audit configuration
+
+Issue #77's candidate writes `provider`, `model`, `thinking` and the full prompt
+on the first AUR audit. The installed artifact transmits the initial model and
+`medium` thinking setting to Codex, then preserves and uses customized values.
+Existing configuration remains untouched; official operations do not create it.
+Thinking currently applies only to Codex. These deterministic tests do not
+qualify live model access or model-specific reasoning levels.
+
+Package: `0.1.0.r19.g3d0c08a-1`.
+Immutable source: `3d0c08abd313af09e84b3b078dd10aa59d7c9bf3`.
+Archive SHA-256:
+`46ce18978515fe431d50869259e42bf70dca562968e46a68f1f935b461fdfb20`.
+Preserve this remote source checkpoint and earlier pins without squash.
+
+Non-root Arch `.SRCINFO` generation and exact comparison, archive checksums,
+freshness, namcap, Go tests and vet passed. The package gate upgraded r17 to r19
+with the old archives present and without `--force`. Both disposable gates
+reported `auroscope 0.1.0.r19.g3d0c08a-1` and exited successfully.
+The supported-Paru gate exercised installed `/usr/bin/auroscope`, including
+`TestPromptConfigurationLifecycle`, provider failures without bypass, auxiliary
+files, preparation recovery, colors, real AUR builds, edit/re-audit, identity
+drift refusal, explicit retry, skip and audit-free official installations.
+
+During validation, main advanced to `edffd014ed14c284d93bcfb7d028d0bf572bd07d`
+with the separate r18 model correction. Its functional changes are already
+included in this source; r19 advances beyond that package. The branch histories
+remain separate and must both survive integration. The source archive still
+contains the r17 recipe, which is the package gate's tested upgrade baseline.
+Logs are retained in `build/issue-77/package-r19.log` and
+`build/issue-77/paru-r19.log`. Test containers were automatically removed.
+Private archives were authenticated on the host and checksum-verified; no
+credentials entered containers. No host installation or merge was performed.
+Wrapper publication and human review remain separate from these validations.
+
 ### Verified r16: combined prompt and Codex model configuration
 
 Package `0.1.0.r16.g20bdd79-1` combines main's configurable prompt with Codex
