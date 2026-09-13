@@ -145,7 +145,7 @@ while [ "$#" -gt 0 ]; do
   shift || true
 done
 [ -n "$out" ]
-[ "$model" = luna ]
+[ "$model" = gpt-5.6-luna ]
 [ "$PWD" != /home/builder/aur/hello ]
 [ -f bundle.json ]
 printf 'audit\n' >>/tmp/codex-calls
