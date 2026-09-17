@@ -75,6 +75,42 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r28: audit after historical clone loss
+
+Issue #89 recovers a full current-recipe audit when the previous successful
+commit is absent from a recreated clone. A visible warning explains the missing
+comparison; the old identity and audit history remain recorded. A valid new
+audit, explicit approval and the final identity check remain mandatory. Other
+Git errors still fail preparation, and cancellation or failure keeps the baseline.
+
+Package: `0.1.0.r28.gfce9185-1`.
+Immutable source: `fce9185734c52e726cc5ee74afed0f947658637f`.
+Archive SHA-256:
+`c1133667b5973cc5e159653fc6ebdb6197daeb2222db276edf0755b2fba24a1c`.
+This remote checkpoint includes main at
+`040e879f9377b9898b0bd03495c3e47d4e8428a3`, including the native option fix.
+Preserve its history without squash. Earlier r27 gates passed on an older
+snapshot; r28 replaces that candidate rather than reusing its package identity.
+
+Non-root Arch metadata generation and comparison, authenticated checksums,
+freshness, namcap, Go tests and vet passed. The package gate upgraded r26 to
+r28 with old archives present, without `--force`, preserving configuration.
+Both named gates exited 0 and reported `auroscope 0.1.0.r28.gfce9185-1`.
+
+The installed executable passed approval, inspection, cancel, EOF, skip, invalid
+audit, failed final Paru and identity-drift cases with a missing historical commit.
+Real supported Paru also rebuilt after loss of its edited clone, requiring a new
+audit and approval. Existing native options, official paths and guard tests passed.
+Source tests cover removed upstream history, preserved diffs and other Git errors.
+Providers were deterministic; this does not qualify a new live model.
+
+Evidence: `build/issue-89/package-r28-docker.log` and
+`build/issue-89/paru-r28-docker.log`. Containers `issue89-package-r28`,
+`issue89-paru-r28` and `issue89-metadata-r28` are retained. The original Paru
+container completed after the caller timeout; its exit code and logs were read
+back without rerunning the gate. Credentials stayed on the host; no workstation
+installation occurred.
+
 ### Verified r26: native option operands
 
 Issue #87 separates option operands from package targets and reuses that parsing
