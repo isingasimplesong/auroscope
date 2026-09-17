@@ -75,6 +75,41 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r24: native upgrade previews
+
+Issue #86 keeps upgrade previews on the native Paru path, with their exact
+arguments, streams and exit status. Preview commands no longer become an
+official installation, and do not prepare recipes or invoke an audit provider.
+Ordinary upgrades retain the official phase followed by the AUR audit.
+
+Package: `0.1.0.r24.gc380a5b-1`.
+Immutable source: `c380a5b2a0689c503eb7a746755a00e6ec8df3ea`.
+Archive SHA-256:
+`78c4f683657b1aab8490559f2becdb0ab4096f14bebf30501ba5b0471685d0d5`.
+The remote checkpoint includes current main at
+`30b53a270c3e28024a74762fc94c5ddb6f541f38`; preserve its history without squash.
+
+Non-root Arch metadata generation and comparison, authenticated checksums,
+freshness, namcap, Go tests and vet passed. The package gate upgraded r23 to
+r24 with the previous archives present, without `--force`, preserving custom
+configuration. Both gates exited 0 and reported `auroscope 0.1.0.r24.gc380a5b-1`.
+
+The installed executable passed all three reported preview forms and both
+`--print-format` forms, preserving success and failure statuses, terminal streams
+and argument boundaries without audit side effects. The full supported-Paru gate
+also passed real AUR builds, edit/re-audit, drift refusal, retry, native colors
+and audit-free official installation. Preview dispatch uses deterministic Paru
+responses; the integration gate uses actual pinned Paru for its other paths.
+
+Other option loss in building upgrades was examined, not fixed by this change;
+see the issue #86 section in the Paru dependency note. Provider qualification
+is unchanged. No package was installed on the workstation.
+
+Evidence: `build/issue-86/package-r24.log` and `build/issue-86/paru-r24.log`.
+Named containers `issue86-package-r24`, `issue86-paru-r24` and
+`issue86-metadata-r24` are retained. Credentials stayed on the host; the
+containers received checksum-verified source archives only.
+
 ### Verified r23: empty AUR updates and native warnings
 
 Issue #84 fixes the false failure when Paru's quiet AUR query returns no

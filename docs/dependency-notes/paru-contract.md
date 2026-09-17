@@ -37,6 +37,38 @@ AURoscope must preserve Paru's native selection and resolver while obtaining a m
 
 ## Current use under ADR-0015
 
+### Upgrade previews (issue #86)
+
+The upgrade dispatch previously preceded `commandMayBuildAUR`, replacing
+`-Syu --print`, `-Sup` and `--sync --sysupgrade --print` with `-Syu --repo`.
+The regression reproduced that replacement before the fix, including native
+status 17. No real installation was attempted in this reproduction.
+
+Non-building classification now precedes upgrade orchestration. The original
+argument vector goes directly to Paru, including both `--print-format VALUE`
+and `--print-format=VALUE`. The same ordering preserves the existing info,
+search and repo-only paths rather than adding a separate preview parser.
+Paru still validates argument combinations and owns their native semantics.
+
+`TestUpgradePreviewPassesThrough` checks exact arguments, a single invocation,
+stdin/stdout/stderr, success and failure status, and absence of Codex, clone,
+state and provider-configuration side effects. The installed-artifact gate runs
+the same test against the packaged executable. The ordinary upgrade test also
+covers explicit short/long sysupgrade: official phase first, then acquisition,
+Codex audit, approval and final AUR handoff. Package verification remains a
+separate delivery requirement; checkout tests alone do not satisfy it.
+
+The adjacent option-loss review found a broader existing limitation, not fixed
+by this preview change: building upgrades still reconstruct the official phase
+as `-Syu --repo`, and `auditedInstallArgs` reconstructs AUR installs as `-S` plus
+selected targets. Options such as `--needed`, `--noconfirm`, `--ignore`,
+`--config` and `--dbpath`, repeated refresh/upgrade flags and explicit extra
+targets are not faithfully carried through those reconstructed phases.
+`--aur` likewise does not suppress the existing official-first phase. These
+paths require their own grounded option-forwarding work; the preview regression
+does not establish that they work. This fix adds no general CLI parser and
+does not change the accepted official-first architecture.
+
 ### Empty AUR updates and native warnings
 
 At the pinned `9ac3578807a87858651e81a02586ceb947686e7c`,
