@@ -66,7 +66,7 @@ fi
 
 AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
   GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
-  go test ./internal/app -run '^(TestEmptyAURUpdate|TestEmptyUpdateRealParu|TestUpgradePreviewPassesThrough)$' -count=1 -v -timeout=120s
+  go test ./internal/app -run '^(TestEmptyAURUpdate|TestEmptyUpdateRealParu|TestUpgradePreviewPassesThrough|TestAuditStateBoundary)$' -count=1 -v -timeout=120s
 
 # Install the pinned recipe, not the independently built source binary. Package
 # the real compiled Paru as a disposable provider so Pacman checks dependencies.
@@ -108,7 +108,7 @@ pacman -Qo /usr/bin/auroscope
 AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
   AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
   GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
-  go test ./internal/app -run '^(TestEmptyAURUpdate|TestEmptyUpdateRealParu|TestUpgradePreviewPassesThrough)$' -count=1 -v -timeout=120s
+  go test ./internal/app -run '^(TestEmptyAURUpdate|TestEmptyUpdateRealParu|TestUpgradePreviewPassesThrough|TestAuditStateBoundary)$' -count=1 -v -timeout=120s
 rm /usr/local/bin/auroscope
 ln -s /usr/bin/auroscope /usr/local/bin/auroscope
 AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
@@ -267,8 +267,13 @@ pacman -Q hello
 # Selecting an official package installs the resolved target, not the search
 # terms again. Answer Pacman's confirmation explicitly: EOF cancels this path.
 # Wait for the actual prompt so Paru selection cannot buffer the later answer.
+# Corrupt audit state and an unusable clone path must not affect real Paru.
+printf 'not a database\n' >/home/builder/state/official-corrupt.sqlite3
+printf 'not a directory\n' >/home/builder/official-clones
+chown builder:builder /home/builder/state/official-corrupt.sqlite3 /home/builder/official-clones
 before_codex=$(wc -l </tmp/codex-calls)
-run_as_builder python - <<'PY'
+run_as_builder env AUROSCOPE_STATE=/home/builder/state/official-corrupt.sqlite3 \
+  AUROSCOPE_CLONE_DIR=/home/builder/official-clones python - <<'PY'
 import os
 import select
 import subprocess
@@ -313,8 +318,14 @@ after_codex=$(wc -l </tmp/codex-calls)
 
 # An explicit official-only install also remains native without Codex.
 before_codex=$(wc -l </tmp/codex-calls)
-run_as_builder /usr/local/bin/auroscope -S --repo --noconfirm tree
+run_as_builder env AUROSCOPE_STATE=/home/builder/state/official-corrupt.sqlite3 \
+  AUROSCOPE_CLONE_DIR=/home/builder/official-clones \
+  /usr/local/bin/auroscope -S --noconfirm tree
 pacman -Q tree
+grep -Fx 'not a database' /home/builder/state/official-corrupt.sqlite3
+grep -Fx 'not a directory' /home/builder/official-clones
+[ ! -e /home/builder/state/official-corrupt.sqlite3-wal ]
+[ ! -e /home/builder/state/official-corrupt.sqlite3-shm ]
 after_codex=$(wc -l </tmp/codex-calls)
 [ "$before_codex" -eq "$after_codex" ]
 
