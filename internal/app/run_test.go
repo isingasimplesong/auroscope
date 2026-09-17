@@ -362,7 +362,7 @@ exit 99
 			if status != wantStatus {
 				t.Fatalf("status = %d, want %d; stderr = %s", status, wantStatus, stderr.String())
 			}
-			wantCalls := []string{"-Ssq --interactive tree search-term", "-P --order tree", "-S -- tree"}
+			wantCalls := []string{"-Ssq --interactive tree search-term", "-P --order -- tree", "-S -- tree"}
 			if got := strings.Split(strings.TrimSpace(readString(t, calls)), "\n"); !reflect.DeepEqual(got, wantCalls) {
 				t.Fatalf("calls = %#v, want %#v", got, wantCalls)
 			}
@@ -592,12 +592,15 @@ exit 0
 }
 
 func TestAuditedInstallArgsPreserveNativeOptionsAndReplaceTargets(t *testing.T) {
-	args := auditedInstallArgs(
+	args, err := auditedInstallArgs(
 		[]string{"-S", "--needed", "--noconfirm", "tree", "hello"},
-		[]string{"tree", "hello"},
 		[]string{"tree"},
+		"--skipreview",
 	)
-	args = insertBeforeTargets(args, "--skipreview")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	want := []string{"-S", "--needed", "--noconfirm", "--skipreview", "--", "tree"}
 	if !reflect.DeepEqual(args, want) {
 		t.Fatalf("args = %#v, want %#v", args, want)
