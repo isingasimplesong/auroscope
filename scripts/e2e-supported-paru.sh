@@ -117,7 +117,7 @@ AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
   go test ./internal/app -run '^TestSelectionRealParuColors$' -count=1 -v -timeout=120s
 AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
   GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
-  go test ./internal/app -run '^(TestAuditIncludesAuxiliaryScripts|TestPreparationFailureDecisionsDoNotApprove|TestProviderSelectionAndNoBypass|TestProviderInstalledHTTP|TestProviderClaudeThinking)$' -count=1 -v -timeout=120s
+  go test ./internal/app -run '^(TestMissingBaselineReview|TestAuditIncludesAuxiliaryScripts|TestPreparationFailureDecisionsDoNotApprove|TestProviderSelectionAndNoBypass|TestProviderInstalledHTTP|TestProviderClaudeThinking)$' -count=1 -v -timeout=120s
 fi
 
 if [[ "${AUROSCOPE_E2E_SOURCE_ONLY:-0}" != 1 ]]; then
@@ -217,6 +217,17 @@ after_edit_codex=$(wc -l </tmp/codex-calls)
 [ "$after_edit_codex" -eq $((before_edit_codex + 2)) ]
 sudo -u builder -- git -C /home/builder/aur/hello log -1 --format=%s | grep -q 'AURoscope reviewed edit'
 grep -q 'reviewed local edit' /home/builder/aur/hello/PKGBUILD
+
+# Losing the edited clone must trigger a full audit, not a fatal missing diff.
+# Keep SQLite and require another approval before the real guarded Paru build.
+sudo -u builder -- rm -rf /home/builder/aur/hello
+before_cleanup_codex=$(wc -l </tmp/codex-calls)
+printf 'approve\n' | run_as_builder /usr/local/bin/auroscope -S --noconfirm --rebuild hello \
+  2>&1 | tee /tmp/clone-cleanup-output
+grep -Fq 'Historical comparison unavailable' /tmp/clone-cleanup-output
+after_cleanup_codex=$(wc -l </tmp/codex-calls)
+[ "$after_cleanup_codex" -eq $((before_cleanup_codex + 1)) ]
+pacman -Q hello
 
 # A committed mutation after bundle construction must fail at the real hook.
 before_drift=$(grep -Fxc -- '-S --noconfirm --rebuild --skipreview -- hello' /tmp/paru-calls || true)

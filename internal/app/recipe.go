@@ -46,6 +46,7 @@ type auditBundle struct {
 	Label          string         `json:"label"`
 	Identity       recipeIdentity `json:"identity"`
 	PreviousCommit string         `json:"previous_commit,omitempty"`
+	Warning        string         `json:"warning,omitempty"`
 	Mode           string         `json:"mode"`
 	Diff           string         `json:"diff,omitempty"`
 	Files          []recipeFile   `json:"files"`
@@ -67,7 +68,13 @@ func buildAuditBundle(pkgbase, dir string, previous *packageBaseline) (auditBund
 	}
 	if previous != nil && previous.Commit != "" {
 		bundle.PreviousCommit = previous.Commit
-		if previous.Commit == identity.Commit && previous.ManifestDigest == identity.ManifestDigest {
+		available, err := baselineCommitAvailable(dir, previous.Commit)
+		if err != nil {
+			return auditBundle{}, err
+		}
+		if !available {
+			bundle.Warning = "Historical comparison unavailable: the previous successful commit is absent from this clone. Auditing the complete current recipe; this does not mean it is unchanged. A valid audit and new approval are required."
+		} else if previous.Commit == identity.Commit && previous.ManifestDigest == identity.ManifestDigest {
 			bundle.Mode = "unchanged"
 		} else {
 			bundle.Mode = "diff"
@@ -91,6 +98,35 @@ func buildAuditBundle(pkgbase, dir string, previous *packageBaseline) (auditBund
 		return auditBundle{}, err
 	}
 	return bundle, nil
+}
+
+// Batch-check distinguishes a missing object with successful machine output,
+// not a localized fatal diagnostic or a generic nonzero Git exit. Keep errors
+// (including corruption reported on stderr) visible rather than losing context.
+func baselineCommitAvailable(dir, commit string) (bool, error) {
+	if !isHex(commit, 40) {
+		return false, fmt.Errorf("invalid historical recipe commit %q", commit)
+	}
+	cmd := exec.Command("git", "cat-file", "--batch-check=%(objectname) %(objecttype)")
+	cmd.Dir = dir
+	cmd.Stdin = strings.NewReader(commit + "\n")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("check historical recipe commit: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	if stderr.Len() != 0 {
+		return false, fmt.Errorf("check historical recipe commit: %s", strings.TrimSpace(stderr.String()))
+	}
+	switch string(out) {
+	case commit + " commit\n":
+		return true, nil
+	case commit + " missing\n":
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected historical recipe object: %q", out)
+	}
 }
 
 func readRecipeIdentity(pkgbase, dir string) (recipeIdentity, []recipeFile, error) {

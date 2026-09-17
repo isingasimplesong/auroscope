@@ -245,6 +245,9 @@ auditLoop:
 				return reviewedPackage{Identity: recipeIdentity{Pkgbase: pkgbase}, Decision: decisionCancel}, nil
 			}
 		}
+		if bundle.Warning != "" {
+			fmt.Fprintf(o.config.stdout, "AURoscope: %s\n", escapeTerminal(bundle.Warning))
+		}
 		report, err := auditWithProvider(bundle, o.config)
 		if err != nil {
 			fmt.Fprintf(o.config.stderr, "auroscope: audit failed for %s: %v\n", pkgbase, err)
@@ -296,6 +299,9 @@ func printReviewSummary(config runConfig, pkgbase string, report auditReport) {
 
 func printReview(config runConfig, pkgbase string, bundle auditBundle, report auditReport) {
 	fmt.Fprintf(config.stdout, "\nAUR audit: %s\ncommit: %s\nmanifest: %s\nrisk: %s\n%s\n", escapeTerminal(pkgbase), bundle.Identity.Commit, bundle.Identity.ManifestDigest, escapeTerminal(report.Risk), escapeTerminal(report.Summary))
+	if bundle.Warning != "" {
+		fmt.Fprintf(config.stdout, "\n%s\nPrevious successful commit: %s\n", escapeTerminal(bundle.Warning), escapeTerminal(bundle.PreviousCommit))
+	}
 	for _, finding := range report.Findings {
 		location := escapeTerminal(finding.File)
 		if finding.Line > 0 {
