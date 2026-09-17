@@ -75,6 +75,39 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r25: official installs independent of audit state
+
+Issue #88 moves audit resource preparation after Paru classifies the targets.
+Explicit official installs, official search selections and empty selections
+do not open SQLite or prepare clone directories. Unusable AUR audit resources
+still stop the AUR path; existing corrupt files are never repaired or replaced.
+
+Package: `0.1.0.r25.g0944841-1`.
+Immutable source: `0944841179160d0aa130758b2fd671775bf2c97a`.
+Archive SHA-256:
+`8adc85e8b5935480a765e457fbcb9e6fe16cdde1d905ac221b2a7a2853ea054c`.
+The remote checkpoint includes main at
+`fa68e25167929a152a61161fa9acc209dc8ba30e`; preserve its history without squash.
+
+Non-root Arch metadata generation and comparison, authenticated checksums,
+freshness, namcap, Go tests and vet passed. The package gate upgraded r24 to
+r25 with the previous archives present, without `--force`, preserving custom
+configuration. Both gates exited 0 and reported `auroscope 0.1.0.r25.g0944841-1`.
+
+The installed executable passed the audit-resource matrix: missing resources,
+corrupt SQLite, invalid state parents and invalid clone paths; native arguments,
+input, output and success/failure statuses remained unchanged. AUR failures
+remained closed, without provider calls or destructive state recovery.
+The full supported-Paru gate also passed real official selection and explicit
+installation with corrupt state and an unusable clone path, without Codex.
+Terminal colors, AUR builds, edit/re-audit, drift refusal and retry passed too.
+Deterministic providers do not establish new live-model qualification.
+
+Evidence: `build/issue-88/package-r25.log` and `build/issue-88/paru-r25.log`.
+Named containers `issue88-package-r25`, `issue88-paru-r25` and
+`issue88-metadata-r25` are retained. Credentials stayed on the host; containers
+received checksum-verified archives only. No workstation installation occurred.
+
 ### Verified r24: native upgrade previews
 
 Issue #86 keeps upgrade previews on the native Paru path, with their exact
