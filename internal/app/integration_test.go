@@ -304,6 +304,15 @@ func TestMixedInstallSkipKeepsOfficialNativeAndOmitsAUR(t *testing.T) {
 }
 
 func TestBareUpdateAuditsPendingAURAfterOfficialPhase(t *testing.T) {
+	for _, args := range [][]string{nil, {"-Syu"}, {"--sync", "--sysupgrade"}} {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			testUpgradeAuditsPendingAUR(t, args)
+		})
+	}
+}
+
+func testUpgradeAuditsPendingAUR(t *testing.T, args []string) {
+	t.Helper()
 	dir := t.TempDir()
 	repo := createRecipeRepo(t, dir, "hello", "pkgname=hello\n")
 	calls := filepath.Join(dir, "calls")
@@ -330,7 +339,7 @@ exit 0
 	t.Setenv("CALLS", calls)
 	t.Setenv("RECIPE_REPO", repo)
 	codexPath := fakeCodex(t, dir, filepath.Join(dir, "bundle.json"), `{"summary":"update reviewed","risk":"low","findings":[],"uncertainty":"","inspect":[]}`)
-	status := run(nil, runConfig{
+	status := run(args, runConfig{
 		paruPath:    paruPath,
 		codexPath:   codexPath,
 		statePath:   filepath.Join(dir, "state.sqlite3"),
@@ -349,6 +358,13 @@ exit 0
 			t.Fatalf("missing %q in calls %s", want, callsText)
 		}
 	}
+	if !strings.HasPrefix(callsText, "-Syu --repo\n-Qua --quiet\n") {
+		t.Fatalf("official update must precede AUR preparation: %s", callsText)
+	}
+	if !strings.Contains(readString(t, filepath.Join(dir, "bundle.json")), "hello") {
+		t.Fatal("pending AUR update was not sent to Codex")
+	}
+	assertBaseline(t, filepath.Join(dir, "state.sqlite3"), "hello")
 }
 
 func TestExplicitSystemUpgradeUsesOfficialFirstPath(t *testing.T) {

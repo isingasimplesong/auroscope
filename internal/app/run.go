@@ -64,6 +64,11 @@ func run(args []string, config runConfig) int {
 	}
 
 	paru := paruClient{config: config}
+	// Classify before rewriting upgrades: previews and other non-building
+	// operations must keep their native arguments, streams and status.
+	if len(args) > 0 && !commandMayBuildAUR(args) {
+		return reportCommandError(config.stderr, paru.run(nil, args), "Paru")
+	}
 
 	if len(args) == 0 || isSystemUpgrade(args) {
 		result := paru.run(nil, []string{"-Syu", "--repo"})
@@ -241,6 +246,9 @@ func commandMayBuildAUR(args []string) bool {
 		case "--database", "--files", "--getpkgbuild", "--query", "--remove", "--show", "--deptest", "--upgrade", "--version":
 			hasOperation = true
 		case "--clean", "--groups", "--info", "--list", "--print", "--print-format", "--search":
+			nonBuildingSyncAction = true
+		}
+		if strings.HasPrefix(arg, "--print-format=") {
 			nonBuildingSyncAction = true
 		}
 		if len(arg) >= 2 && arg[0] == '-' && arg[1] != '-' {
