@@ -54,7 +54,7 @@ func TestSelectionRealParuColors(t *testing.T) {
 # For the installed-artifact probe, stop after selection with a distinctive
 # status. Verify the exact machine target reached planning, without a recipe.
 if [ "${AUROSCOPE_TEST_BINARY:-}" != "" ] && [ "${1:-}" = '-P' ]; then
-  [ "$#" = 3 ] && [ "$2" = '--order' ] && [ "$3" = "$AUROSCOPE_TEST_TARGET" ] || exit 74
+  [ "$#" = 4 ] && [ "$2" = '--order' ] && [ "$3" = '--' ] && [ "$4" = "$AUROSCOPE_TEST_TARGET" ] || exit 74
   exit 73
 fi
 exec "$AUROSCOPE_TEST_REAL_PARU" --config "$AUROSCOPE_TEST_PACMAN_CONF" "$@"

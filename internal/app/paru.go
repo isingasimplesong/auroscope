@@ -155,7 +155,7 @@ func validSelectedTarget(target string) bool {
 // failures rather than input for a fallback human-output parser.
 func (paru paruClient) order(targets []string) (orderResult, error) {
 	var output bytes.Buffer
-	args := append([]string{"-P", "--order"}, targets...)
+	args := append([]string{"-P", "--order", "--"}, targets...)
 	command := paru.runMachine(&output, "", args)
 	if command.status != 0 && command.status != 1 {
 		return orderResult{}, incompatibleParu("order returned status %d", command.status)

@@ -40,7 +40,7 @@ func TestApprovedAURPackageEndToEndWithFirstAudit(t *testing.T) {
 		t.Fatalf("status = %d; stdout = %s; stderr = %s; calls = %s", status, stdout.String(), stderr.String(), readString(t, calls))
 	}
 	callsText := readString(t, calls)
-	if !strings.Contains(callsText, "-P --order hello") || !strings.Contains(callsText, "-G hello") || !strings.Contains(callsText, "-S --skipreview -- hello") {
+	if !strings.Contains(callsText, "-P --order -- hello") || !strings.Contains(callsText, "-G hello") || !strings.Contains(callsText, "-S --skipreview -- hello") {
 		t.Fatalf("calls = %s", callsText)
 	}
 	if !strings.Contains(stdout.String(), "AURoscope: acquiring AUR recipe hello with Paru...") ||
@@ -353,7 +353,7 @@ exit 0
 		t.Fatalf("status = %d; calls = %s", status, readString(t, calls))
 	}
 	callsText := readString(t, calls)
-	for _, want := range []string{"-Syu --repo", "-Qua --quiet", "-P --order hello", "-G hello", "-S --skipreview -- hello"} {
+	for _, want := range []string{"-Syu --repo", "-Qua --quiet", "-P --order -- hello", "-G hello", "-S --skipreview -- hello"} {
 		if !strings.Contains(callsText, want) {
 			t.Fatalf("missing %q in calls %s", want, callsText)
 		}

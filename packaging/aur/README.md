@@ -75,6 +75,38 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r26: native option operands
+
+Issue #87 separates option operands from package targets and reuses that parsing
+for dispatch and the final install. Both spellings of `--config` and `--ignore`,
+relative values, repeated options and `--` retain their boundaries. Unknown forms
+fail explicitly; actual local recipe targets remain outside v1.
+
+Package: `0.1.0.r26.g949c75d-1`.
+Immutable source: `949c75db8e21cc6b1e632830894cac1cb4765c8d`.
+Archive SHA-256:
+`e267f2866e35e433281d5ac5ae8706604f57466e4dcd2e44301d7ef02cb28d66`.
+The remote checkpoint includes main at
+`38b260dedba8e0f411b0a4a4140a6ae81cd5d60a`; preserve its history without squash.
+
+Non-root Arch metadata generation and comparison, authenticated checksums,
+freshness, namcap, Go tests and vet passed. The package gate upgraded r25 to
+r26 with old archives present, without `--force`, preserving configuration.
+Both named gates exited 0 and reported `auroscope 0.1.0.r26.g949c75d-1`.
+
+The installed executable passed operand preservation, approve/skip handoffs,
+separator handling, native status preservation and invalid/local target refusal.
+Real supported Paru accepted separate and attached operands, relative config,
+repeated ignores and the separator in audited installations. Full AUR builds,
+edit/re-audit, drift refusal, retry and audit-free official installs also passed.
+Providers were deterministic; this does not qualify a new live model.
+
+Evidence: `build/issue-87/package-r26.log` and `build/issue-87/paru-r26.log`.
+Containers `issue87-package-r26`, `issue87-paru-r26` and `issue87-metadata-r26`
+are retained. The Docker caller timed out, but the original containers completed;
+their exit codes and full logs were recovered, without rerunning the gates.
+Credentials stayed on the host. No workstation installation occurred.
+
 ### Verified r25: official installs independent of audit state
 
 Issue #88 moves audit resource preparation after Paru classifies the targets.
