@@ -38,15 +38,6 @@ func (e childExit) Error() string {
 }
 
 func (o orchestrator) run(originalArgs, targets []string) error {
-	if err := ensurePrivateDir(o.config.cloneDir); err != nil {
-		return fmt.Errorf("prepare clone directory: %w", err)
-	}
-	store, err := openState(o.config.statePath)
-	if err != nil {
-		return fmt.Errorf("open state: %w", err)
-	}
-	defer store.Close()
-
 	if len(targets) == 0 {
 		fmt.Fprintln(o.config.stderr, "auroscope: no AUR targets selected")
 		return nil
@@ -65,6 +56,16 @@ func (o orchestrator) run(originalArgs, targets []string) error {
 	if len(plan.AURPkgbases) == 0 {
 		return finishNative(o.paru, originalArgs, plan.RepoTargets)
 	}
+
+	// Audit resources belong only to transactions containing AUR recipes.
+	if err := ensurePrivateDir(o.config.cloneDir); err != nil {
+		return fmt.Errorf("prepare clone directory: %w", err)
+	}
+	store, err := openState(o.config.statePath)
+	if err != nil {
+		return fmt.Errorf("open state: %w", err)
+	}
+	defer store.Close()
 
 	reader := bufio.NewReader(o.config.reviewInput)
 	var reviewed []reviewedPackage
