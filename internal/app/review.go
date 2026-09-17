@@ -81,7 +81,7 @@ func (o orchestrator) run(originalArgs, targets []string) error {
 	}
 
 	for {
-		err := o.installReviewed(store, originalArgs, targets, plan, reviewed)
+		err := o.installReviewed(store, originalArgs, plan, reviewed)
 		var drift recipeDrift
 		if !errors.As(err, &drift) {
 			return err
@@ -115,7 +115,7 @@ func (o orchestrator) run(originalArgs, targets []string) error {
 	}
 }
 
-func (o orchestrator) installReviewed(store *stateStore, originalArgs, targets []string, plan resolvedPlan, reviewed []reviewedPackage) error {
+func (o orchestrator) installReviewed(store *stateStore, originalArgs []string, plan resolvedPlan, reviewed []reviewedPackage) error {
 	var approved []recipeIdentity
 	var finalTargets []string
 	finalTargets = append(finalTargets, plan.RepoTargets...)
@@ -130,7 +130,11 @@ func (o orchestrator) installReviewed(store *stateStore, originalArgs, targets [
 		return nil
 	}
 	if len(approved) == 0 {
-		result := o.paru.finalInstall(auditedInstallArgs(originalArgs, targets, plan.RepoTargets), nil)
+		args, err := auditedInstallArgs(originalArgs, plan.RepoTargets)
+		if err != nil {
+			return err
+		}
+		result := o.paru.finalInstall(args, nil)
 		if result.status != 0 {
 			return childExit{status: result.status}
 		}
@@ -141,8 +145,11 @@ func (o orchestrator) installReviewed(store *stateStore, originalArgs, targets [
 		return err
 	}
 	defer os.RemoveAll(txDir)
-	args := auditedInstallArgs(originalArgs, targets, finalTargets)
-	args = insertBeforeTargets(args, "--skipreview")
+	args, err := auditedInstallArgs(originalArgs, finalTargets, "--skipreview")
+	if err != nil {
+		return err
+	}
+
 	result := o.paru.finalInstall(args, []string{"PARU_CONF=" + confPath})
 	if result.status != 0 {
 		// Only a guard-produced result for an approved package is recoverable.
@@ -180,40 +187,19 @@ func finishNative(paru paruClient, originalArgs, repoTargets []string) error {
 	return nil
 }
 
-func auditedInstallArgs(originalArgs, selectedTargets, finalTargets []string) []string {
+func auditedInstallArgs(originalArgs, finalTargets []string, extraOptions ...string) ([]string, error) {
 	if len(originalArgs) == 0 || isSystemUpgrade(originalArgs) || !strings.HasPrefix(originalArgs[0], "-") {
-		args := []string{"-S", "--"}
-		return append(args, finalTargets...)
+		args := append([]string{"-S"}, extraOptions...)
+		args = append(args, "--")
+		return append(args, finalTargets...), nil
 	}
-	selected := map[string]bool{}
-	for _, target := range selectedTargets {
-		selected[target] = true
-		selected[unqualifiedTarget(target)] = true
+	parsed, err := parseParuArguments(originalArgs)
+	if err != nil {
+		return nil, err
 	}
-	args := make([]string, 0, len(originalArgs)+len(finalTargets)+1)
-	for _, arg := range originalArgs {
-		if arg == "--" {
-			continue
-		}
-		if !strings.HasPrefix(arg, "-") && (selected[arg] || selected[unqualifiedTarget(arg)]) {
-			continue
-		}
-		args = append(args, arg)
-	}
+	args := append(parsed.options, extraOptions...)
 	args = append(args, "--")
-	return append(args, finalTargets...)
-}
-
-func insertBeforeTargets(args []string, option string) []string {
-	for i, arg := range args {
-		if arg == "--" {
-			out := make([]string, 0, len(args)+1)
-			out = append(out, args[:i]...)
-			out = append(out, option)
-			return append(out, args[i:]...)
-		}
-	}
-	return append(args, option)
+	return append(args, finalTargets...), nil
 }
 
 func (o orchestrator) reviewPackage(store *stateStore, pkgbase string, reader *bufio.Reader) (reviewedPackage, error) {

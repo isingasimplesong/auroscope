@@ -118,6 +118,9 @@ AUROSCOPE_TEST_REAL_PARU=/usr/local/bin/paru-real \
 AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
   GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
   go test ./internal/app -run '^(TestMissingBaselineReview|TestAuditIncludesAuxiliaryScripts|TestPreparationFailureDecisionsDoNotApprove|TestProviderSelectionAndNoBypass|TestProviderInstalledHTTP|TestProviderClaudeThinking)$' -count=1 -v -timeout=120s
+AUROSCOPE_TEST_BINARY=/usr/bin/auroscope \
+  GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache CGO_ENABLED=1 \
+  go test ./internal/app -run '^TestOptionOperands(Handoff|RejectInvalidBeforeParu|NativePassThrough|SeparatorReachesOrder)$' -count=1 -v -timeout=120s
 fi
 
 if [[ "${AUROSCOPE_E2E_SOURCE_ONLY:-0}" != 1 ]]; then
@@ -198,9 +201,24 @@ pacman -Q hello
 first_codex_count=$(wc -l </tmp/codex-calls)
 [ "$first_codex_count" -eq 1 ]
 grep -q -- '-Ssq --interactive hello' /tmp/paru-calls
-grep -q -- '-P --order hello' /tmp/paru-calls
+grep -q -- '-P --order -- hello' /tmp/paru-calls
 grep -q -- '-G hello' /tmp/paru-calls
 grep -q -- '-S --skipreview -- hello' /tmp/paru-calls
+
+# Real Paru accepts both operand spellings, relative configuration, repetitions
+# and the explicit target separator. Only hello is resolved and audited.
+before_options_codex=$(wc -l </tmp/codex-calls)
+cp /etc/pacman.conf /work/auroscope/option-pacman.conf
+printf 'approve\n' | run_as_builder /usr/local/bin/auroscope \
+  -S --noconfirm --ignore linux --config /etc/pacman.conf -- hello
+grep -Fx -- '-S --noconfirm --ignore linux --config /etc/pacman.conf --skipreview -- hello' /tmp/paru-calls
+printf 'approve\n' | run_as_builder /usr/local/bin/auroscope \
+  -S --noconfirm --ignore=linux --config=./option-pacman.conf --ignore=glibc -- hello
+grep -Fx -- '-S --noconfirm --ignore=linux --config=./option-pacman.conf --ignore=glibc --skipreview -- hello' /tmp/paru-calls
+after_options_codex=$(wc -l </tmp/codex-calls)
+[ "$after_options_codex" -eq $((before_options_codex + 2)) ]
+pacman -Q hello
+echo 'Native option operands preserved through audited Paru installs'
 
 # Real edit snapshots the cache worktree as a local commit, triggers a second
 # audit, and reaches the same Paru worktree/guard before rebuilding.

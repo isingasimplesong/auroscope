@@ -151,38 +151,25 @@ func (config runConfig) withDefaults() runConfig {
 }
 
 func initialTargets(args []string, paru paruClient) ([]string, error) {
-	for _, arg := range args {
+	parsed, err := parseParuArguments(args)
+	if err != nil {
+		return nil, err
+	}
+	for _, arg := range parsed.flags {
 		if arg == "--build" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.ContainsRune(strings.TrimPrefix(arg, "-"), 'B') {
 			return nil, fmt.Errorf("local PKGBUILD builds are outside AURoscope v1")
 		}
 	}
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		if err := rejectLocalRecipeTargets(args); err != nil {
+		if err := rejectLocalRecipeTargets(parsed.targets); err != nil {
 			return nil, err
 		}
 		return paru.selectPackages(args)
 	}
-	var targets []string
-	takeNext := false
-	for _, arg := range args {
-		if takeNext {
-			targets = append(targets, arg)
-			takeNext = false
-			continue
-		}
-		if arg == "--" {
-			takeNext = true
-			continue
-		}
-		if strings.HasPrefix(arg, "-") {
-			continue
-		}
-		targets = append(targets, arg)
-	}
-	if err := rejectLocalRecipeTargets(targets); err != nil {
+	if err := rejectLocalRecipeTargets(parsed.targets); err != nil {
 		return nil, err
 	}
-	return targets, nil
+	return parsed.targets, nil
 }
 
 func rejectLocalRecipeTargets(targets []string) error {
@@ -195,7 +182,11 @@ func rejectLocalRecipeTargets(targets []string) error {
 }
 
 func isSystemUpgrade(args []string) bool {
-	for _, arg := range args {
+	parsed, err := parseParuArguments(args)
+	if err != nil {
+		return false
+	}
+	for _, arg := range parsed.flags {
 		if arg == "--sysupgrade" {
 			return true
 		}
@@ -204,9 +195,6 @@ func isSystemUpgrade(args []string) bool {
 			if strings.ContainsRune(short, 'S') && strings.ContainsRune(short, 'u') {
 				return true
 			}
-		}
-		if arg == "--sync" && hasArgument(args, "--sysupgrade") {
-			return true
 		}
 	}
 	return false
@@ -226,6 +214,13 @@ func runAuditedAUR(originalArgs, targets []string, config runConfig) int {
 }
 
 func commandMayBuildAUR(args []string) bool {
+	parsed, err := parseParuArguments(args)
+	if err != nil {
+		// Reach initialTargets' explicit diagnostic, never guess an unknown
+		// option's arity and accidentally select a non-audited path.
+		return true
+	}
+	args = parsed.classificationArgs()
 	if hasArgument(args, "--repo") {
 		return false
 	}

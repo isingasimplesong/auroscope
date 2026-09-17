@@ -37,6 +37,56 @@ AURoscope must preserve Paru's native selection and resolver while obtaining a m
 
 ## Current use under ADR-0015
 
+### Option operands and target boundaries (issue #87)
+
+The operand rules were checked against `src/command_line.rs::parse_arg`,
+`takes_value` and `src/args.rs` at pinned Paru `9ac3578`. Required long values
+consume the next argument or the text after `=`; optional values require `=`.
+Short `-b` and `-r` consume the remaining cluster or the next argument.
+The first unconsumed `--` ends option parsing for all subsequent arguments.
+
+`parseParuArguments` now supplies one representation for target extraction,
+dispatch and final target replacement. Operand text cannot enable a preview,
+an official-only operation or a system upgrade. Unknown options and missing
+required operands are refused rather than guessed. The final handoff retains
+option spelling, repetitions and values, even if a value equals a skipped
+target. The planning call also uses `--` to protect literal target text.
+Actual local recipe targets remain rejected before Paru starts.
+
+The original spaced `--ignore linux` and `--config /tmp/pacman.conf` failures
+were reproduced by `TestOptionOperandsAreNotTargets` before the fix. The new
+tests cover spaced and attached values, relative paths, repetitions, target
+collisions, the separator, refusal paths and native passthrough. Both approval
+and skip retain exact arguments; only real targets enter the planning call.
+
+Go tests, vet and checkout-binary regressions passed. The complete source-only
+Arch gate passed with actual pinned Paru, including two audited installations
+using both operand spellings and a relative configuration path. Existing
+selection, edit/re-audit, drift refusal, retry and official paths also passed.
+Evidence is retained in `build/issue-87/`, including `reproduction.log`,
+`tests.log`, `binary-options.log` and `source-paru.log`; named container
+`issue87-source-paru` exited 0 and is retained. No workstation installation
+occurred. This is not yet package qualification: the immutable source checkpoint
+and both installed-package gates remain required.
+
+Recovery after main advanced to merged PR #91 preserved all candidate edits
+and fast-forwarded the issue branch without creating a commit. Main's r25
+source and official-install audit-state boundary remain included. The combined
+test suite initially failed only because that new boundary test expected the
+old planning arguments. Its expectations now include the protective `--`;
+all resource, stream and exit-status assertions remain intact. Full Go tests,
+vet and checkout-binary operand and audit-state regressions passed again.
+Evidence: `build/issue-87/recovered-tests-fixed.log` and
+`build/issue-87/recovered-binary.log`. The earlier source-only Arch result does
+not qualify this combined snapshot; installed-package gates must exercise it
+after the wrapper publishes the immutable source checkpoint.
+
+This fixes operand/target separation for explicit installs, not general option
+forwarding through every internal Paru call. In particular the existing system
+upgrade reconstruction described below is unchanged; custom resolution settings
+are still not forwarded to the preliminary `-P --order` call. Paru remains the
+resolver, and this parser does not interpret configuration or ignore semantics.
+
 ### Upgrade previews (issue #86)
 
 The upgrade dispatch previously preceded `commandMayBuildAUR`, replacing

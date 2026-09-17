@@ -59,10 +59,10 @@ exit "$NATIVE_STATUS"
 					t.Setenv("AUROSCOPE_CLONE_DIR", clones)
 					t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "config"))
 					args := []string{"-S", "--needed", "tree"}
-					expectedCalls := "-P --order tree\n-S --needed tree\n"
+					expectedCalls := "-P --order -- tree\n-S --needed tree\n"
 					if mode == "selection" || mode == "empty" {
 						args = []string{"directory", "listing"}
-						expectedCalls = "-Ssq --interactive directory listing\n-P --order tree\n-S -- tree\n"
+						expectedCalls = "-Ssq --interactive directory listing\n-P --order -- tree\n-S -- tree\n"
 					}
 					if mode == "empty" {
 						expectedCalls = "-Ssq --interactive directory listing\n"
@@ -94,7 +94,7 @@ exit "$NATIVE_STATUS"
 					}
 					switch mode {
 					case "aur":
-						expectedCalls = "-P --order tree\n"
+						expectedCalls = "-P --order -- tree\n"
 						if status != 1 || !(strings.Contains(stderr.String(), "open state:") || strings.Contains(stderr.String(), "prepare clone directory:")) {
 							t.Errorf("AUR did not fail closed: %d %q", status, &stderr)
 						}

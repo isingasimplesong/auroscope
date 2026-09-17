@@ -17,10 +17,10 @@ func TestOfficialSelectionFinalInstall(t *testing.T) {
 		args []string
 		want []string
 	}{
-		{"search", []string{"tree"}, []string{"-Ssq --interactive tree", "-P --order tree", "-S -- tree"}},
-		{"search terms differ from target", []string{"directory", "listing"}, []string{"-Ssq --interactive directory listing", "-P --order tree", "-S -- tree"}},
-		{"explicit options", []string{"-S", "--needed", "--noconfirm", "extra/tree"}, []string{"-P --order extra/tree", "-S --needed --noconfirm extra/tree"}},
-		{"explicit delimiter", []string{"--sync", "--needed", "--", "tree"}, []string{"-P --order tree", "--sync --needed -- tree"}},
+		{"search", []string{"tree"}, []string{"-Ssq --interactive tree", "-P --order -- tree", "-S -- tree"}},
+		{"search terms differ from target", []string{"directory", "listing"}, []string{"-Ssq --interactive directory listing", "-P --order -- tree", "-S -- tree"}},
+		{"explicit options", []string{"-S", "--needed", "--noconfirm", "extra/tree"}, []string{"-P --order -- extra/tree", "-S --needed --noconfirm extra/tree"}},
+		{"explicit delimiter", []string{"--sync", "--needed", "--", "tree"}, []string{"-P --order -- tree", "--sync --needed -- tree"}},
 	} {
 		for _, nativeStatus := range []int{0, 17, 130} {
 			t.Run(fmt.Sprintf("%s/status%d", tc.name, nativeStatus), func(t *testing.T) {
