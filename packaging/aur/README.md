@@ -75,6 +75,28 @@ the full pinned-Paru integration gate and the opt-in real Codex audit test.
 
 ## Upstream snapshot
 
+### Verified r29: MIT licensing
+
+Package `0.1.0.r29.gb922b4c-1` pins source
+`b922b4c970c62b607cd07fee5d80b5e00d79dea4`, preserved on the licensing branch.
+Archive SHA-256:
+`d69e5b5a3f273717e02d1bbef1dc1c6a0da50ca3c08008b8e96949a4a092e0ad`.
+Preserve this source checkpoint in merge history, without squash.
+
+Non-root Arch `.SRCINFO` generation and exact comparison, source checksums,
+namcap, Go tests/vet, freshness, and the package gate passed. The real r28-to-r29
+upgrade kept both previous archives present, used no `--force`, and preserved
+custom configuration. Pacman reported `auroscope 0.1.0.r29.gb922b4c-1`.
+The installed MIT notice is package-owned, identical to the pinned source,
+and mode 0644; Pacman reports MIT. Passthrough, guard failure, review, model
+selection and custom-prompt checks passed with deterministic test providers.
+
+No production code, Go dependency or runtime test changed from main's r28.
+The supported-Paru integration gate was therefore not rerun for this licensing
+change; the package gate is not a new real-Paru or live-model qualification.
+Local evidence is retained under Hephaistos artifacts `auroscope-mit-evidence`.
+No workstation installation, merge, tag, release or AUR publication is included.
+
 ### Verified r28: audit after historical clone loss
 
 Issue #89 recovers a full current-recipe audit when the previous successful
@@ -644,7 +666,7 @@ AUROSCOPE_E2E_SUPPORTED_PARU=1 scripts/e2e-supported-paru.sh
 Run these commands from the repository root. Both package-verification entry
 points invoke the freshness check before starting Docker; source-only E2E mode
 remains explicitly separate. The check compares code, tests, test scripts,
-Go dependencies, and the installed root README with the immutable source pin.
+Go dependencies, and the installed root README and LICENSE with the immutable source pin.
 It rejects changed tracked inputs and new non-ignored source files. Keep its
 input list in sync with the recipe. It is a local release gate, not a configured
 server-side branch protection or an automatic release publisher.
@@ -670,4 +692,15 @@ intentionally passes through to Paru; use `pacman -Q auroscope` for this package
 The installed README comes from the immutable source and may retain historical
 candidate wording; current recipe metadata identifies the delivered snapshot.
 
-Upstream has not yet declared a software license. `LicenseRef-Unspecified` records that fact; it must be replaced when upstream adopts a license.
+AURoscope is licensed under MIT. The package declares `license=('MIT')` and
+installs the upstream notice at `/usr/share/licenses/auroscope/LICENSE` with
+mode 0644. Third-party dependencies retain their own licenses.
+
+## Distribution boundary
+
+Forgejo remains canonical; the GitHub mirror follows `main` only. Future release
+automation is intended to publish from Forgejo to GitHub, with 0.2 as the first
+official release only once readiness is established and publication authorized.
+This licensing change does not create a tag or release, change mirror settings,
+or publish to the AUR. AUR publication remains deferred until after several
+weeks of testing and a separate authorization.
