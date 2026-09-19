@@ -196,6 +196,12 @@ fi
 printf '%s\n' 'checking installed package files'
 pacman -Ql auroscope | grep -Fx 'auroscope /usr/bin/auroscope'
 pacman -Ql auroscope | grep -Fx 'auroscope /usr/share/doc/auroscope/README.md'
+pacman -Ql auroscope | grep -Fx 'auroscope /usr/share/licenses/auroscope/LICENSE'
+pacman -Qo /usr/share/licenses/auroscope/LICENSE
+cmp /work/package/src/auroscope/LICENSE /usr/share/licenses/auroscope/LICENSE
+test "$(stat -c %a /usr/share/licenses/auroscope/LICENSE)" = 644
+pacman -Qi auroscope | grep '^Licenses' | grep -qw MIT
+echo 'Installed MIT license verified: package-owned, identical to source, mode 644'
 stat -c '%A %a %n' /usr/bin/auroscope
 test -x /usr/bin/auroscope
 printf '%s\n' 'checking native Paru passthrough'

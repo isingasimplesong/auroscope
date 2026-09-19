@@ -12,6 +12,11 @@ the safety of upstream software or downloaded binaries. It does not sandbox buil
 A final identity check rejects recipes that changed after approval, but does not
 protect against a compromised local account or all later modifications.
 
+## License
+
+AURoscope is licensed under the [MIT License](LICENSE), copyright Mathieu.
+Third-party dependencies retain their own licenses; this grant does not relicense them.
+
 ## Install
 
 You need Arch Linux x86_64, `base-devel`, `git`, a compatible Paru, and an audit
